@@ -20,10 +20,15 @@ final class PreferencesStore: ObservableObject {
     var onChange: ((Preferences) -> Void)?
 
     private init() {
-        if let data = UserDefaults.standard.data(forKey: Self.key),
-           let decoded = try? JSONDecoder().decode(Preferences.self, from: data) {
+        let data = UserDefaults.standard.data(forKey: Self.key)
+        if let data, let decoded = try? JSONDecoder().decode(Preferences.self, from: data) {
             prefs = decoded
         } else {
+            if let data {
+                // Unreadable (e.g. written by a newer version): keep a copy before defaults overwrite it.
+                UserDefaults.standard.set(data, forKey: Self.key + ".unreadable")
+                Log.error("Preferences could not be read; saved a copy and using defaults")
+            }
             prefs = Preferences()
         }
     }

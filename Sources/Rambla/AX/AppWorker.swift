@@ -33,6 +33,7 @@ final class AppWorker: @unchecked Sendable {
     private var lastFrames: [WindowID: CGRect] = [:]
     private var lastWrite: [WindowID: CFAbsoluteTime] = [:]
     private var frozen: Set<WindowID> = []
+    private var titlePending: Set<WindowID> = []
     private var stopped = false
 
     private let lock = NSLock()
@@ -345,7 +346,13 @@ final class AppWorker: @unchecked Sendable {
                 emit(.minimized(pid, id, notification == kAXWindowMiniaturizedNotification))
             }
         case kAXTitleChangedNotification:
-            if let id = ids[AXElementKey(element)] { emit(.titleChanged(pid, id, AX.title(element))) }
+            // Coalesced: some apps (terminals with spinners) change their title several times a second.
+            guard let id = ids[AXElementKey(element)], !titlePending.contains(id) else { return }
+            titlePending.insert(id)
+            perform(after: 0.5) { [self] in
+                titlePending.remove(id)
+                if let element = windows[id] { emit(.titleChanged(pid, id, AX.title(element))) }
+            }
         default:
             break
         }

@@ -29,7 +29,8 @@ final class HotkeyCenter {
         var nextID: UInt32 = 1
         for action in Action.allCases {
             if let only, !only.contains(action) { continue }
-            for combo in bindings[action] ?? [] {
+            // A global shortcut needs ⌃, ⌥ or ⌘ (a corrupt preference must never grab a bare key).
+            for combo in bindings[action] ?? [] where !combo.modifiers.isDisjoint(with: [.control, .option, .command]) {
                 var ref: EventHotKeyRef?
                 let hotKeyID = EventHotKeyID(signature: OSType(0x524D_424C), id: nextID) // 'RMBL'
                 let status = RegisterEventHotKey(UInt32(combo.keyCode), combo.modifiers.carbon, hotKeyID,

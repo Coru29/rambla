@@ -11,8 +11,12 @@ final class MenuBarController: NSObject {
     init(statusTitle: String) {
         super.init()
         if let button = statusItem.button {
-            let image = NSImage(systemSymbolName: "rectangle.split.3x1", accessibilityDescription: "Rambla")
+            // Template image: macOS tints it for light and dark menu bars.
+            let image = Bundle.main.image(forResource: "MenuBarIcon")
+                ?? NSImage(systemSymbolName: "rectangle.split.3x1", accessibilityDescription: "Rambla")
+            image?.size = NSSize(width: 18, height: 18)
             image?.isTemplate = true
+            image?.accessibilityDescription = "Rambla"
             button.image = image
         }
         statusLine.isEnabled = false

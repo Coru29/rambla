@@ -105,6 +105,48 @@ func draw(_ ctx: CGContext) {
     }
 }
 
+/// Menu bar template icon on an 18×18 pt canvas: three windows standing on the promenade (the focused one
+/// filled) over a small wave of the river. Black on transparent; macOS tints template images for light and
+/// dark menu bars.
+func drawMenuBarIcon(_ ctx: CGContext) {
+    let black = color(0x000000)
+    ctx.setStrokeColor(black)
+    ctx.setFillColor(black)
+    ctx.setLineWidth(1.2)
+    for rect in [CGRect(x: 1.1, y: 7.1, width: 4.6, height: 6.6), CGRect(x: 12.3, y: 7.1, width: 4.6, height: 6.6)] {
+        ctx.addPath(CGPath(roundedRect: rect, cornerWidth: 1, cornerHeight: 1, transform: nil))
+        ctx.strokePath()
+    }
+    ctx.addPath(CGPath(roundedRect: CGRect(x: 6.6, y: 6.5, width: 4.8, height: 9), cornerWidth: 1.1, cornerHeight: 1.1, transform: nil))
+    ctx.fillPath()
+    // The promenade the windows stand on, and the river's wave below it.
+    ctx.setLineWidth(1.2)
+    ctx.setLineCap(.round)
+    ctx.move(to: CGPoint(x: 0.8, y: 5))
+    ctx.addLine(to: CGPoint(x: 17.2, y: 5))
+    ctx.strokePath()
+    ctx.move(to: CGPoint(x: 1.2, y: 2.2))
+    var x: CGFloat = 1.2
+    while x <= 16.8 {
+        ctx.addLine(to: CGPoint(x: x, y: 2.2 + 0.8 * sin((x - 1.2) / 15.6 * 4 * .pi)))
+        x += 0.2
+    }
+    ctx.strokePath()
+}
+
+func templatePNG(points: CGFloat, scale: CGFloat) -> Data {
+    let pixels = Int(points * scale)
+    let ctx = CGContext(data: nil, width: pixels, height: pixels, bitsPerComponent: 8, bytesPerRow: 0, space: sRGB,
+                        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+    ctx.scaleBy(x: scale, y: scale)
+    drawMenuBarIcon(ctx)
+    let data = NSMutableData()
+    let dest = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil)!
+    CGImageDestinationAddImage(dest, ctx.makeImage()!, [kCGImagePropertyDPIWidth: 72 * scale, kCGImagePropertyDPIHeight: 72 * scale] as CFDictionary)
+    CGImageDestinationFinalize(dest)
+    return data as Data
+}
+
 func png(size: Int) -> Data {
     let ctx = CGContext(data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: 0, space: sRGB,
                         bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
@@ -134,4 +176,6 @@ try task.run()
 task.waitUntilExit()
 guard task.terminationStatus == 0 else { fatalError("iconutil failed") }
 try png(size: 512).write(to: URL(fileURLWithPath: "Packaging/AppIcon-preview.png"))
+try templatePNG(points: 18, scale: 1).write(to: URL(fileURLWithPath: "Packaging/MenuBarIcon.png"))
+try templatePNG(points: 18, scale: 2).write(to: URL(fileURLWithPath: "Packaging/MenuBarIcon@2x.png"))
 print("Packaging/AppIcon.icns")

@@ -140,6 +140,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             item("Flotar / volver la ventana actual", #selector(toggleFloat)),
             .separator(),
             item("Configuración…", #selector(openSettings), key: ","),
+            item("Manual de uso", #selector(openManual)),
             item("Mostrar registro", #selector(showLog)),
         ]
         menuBar.setItems(items)
@@ -158,6 +159,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func gather() { engine.gatherAll(synchronously: false) }
     @objc private func toggleFloat() { engine.toggleFloatFocused() }
     @objc private func showLog() { NSWorkspace.shared.open(Log.fileURL) }
+    @objc private func openManual() { NSWorkspace.shared.open(Self.manualURL) }
+
+    static let manualURL = URL(string: "https://github.com/Coru29/rambla/blob/main/docs/MANUAL.md")!
     @objc private func openSettings() { SettingsOpener.open() }
 
     @objc private func openAccessibilitySettings() {

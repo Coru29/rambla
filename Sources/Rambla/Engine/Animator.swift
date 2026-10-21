@@ -82,7 +82,8 @@ final class Animator {
         let now = CFAbsoluteTimeGetCurrent()
         let dt = min(max(now - lastTick, 1.0 / 240.0), 1.0 / 20.0)
         lastTick = now
-        let spring = Spring(response: 0.24 / max(speed, 0.2))
+        // Clamp: very short responses make the explicit integrator unstable.
+        let spring = Spring(response: 0.24 / min(max(speed, 0.25), 3))
         var moving: [WindowID: CGRect] = [:]
         var finished: [WindowID: CGRect] = [:]
         for (id, var state) in states {

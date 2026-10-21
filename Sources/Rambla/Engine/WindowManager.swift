@@ -249,7 +249,11 @@ final class WindowManager {
             scheduleReconcile()
         case .titleChanged(_, let id, let title):
             windows[id]?.title = title
-            overlayHook?()
+            // Only tab bars show titles; skip the overlay refresh otherwise (terminals retitle constantly).
+            if let key = key(containing: id), let location = strips[key]?.location(of: id),
+               strips[key]?.columns[location.column].mode == .tabbed {
+                overlayHook?()
+            }
         case .focusedWindow(let pid, let id):
             if pid == frontmostPID { focusChanged(id) }
         case .applied(_, let id, let frame):
@@ -621,12 +625,12 @@ final class WindowManager {
         }
         guard !inGrace, !dragTracker.isFrozen(id) else { return }
         let reference = requested[id] ?? previous ?? frame
-        let originMoved = abs(frame.minX - reference.minX) > 2 || abs(frame.minY - reference.minY) > 2
-        if originMoved && prefs.floatOnExternalMove {
+        if FrameChange.isAnchoredResize(from: reference, to: frame) {
+            // The app resized itself (terminals snap to their character grid keeping a corner fixed).
+            adoptSize(id, frame: frame, in: key)
+        } else if prefs.floatOnExternalMove {
             Log.info("Window \(id) moved by another app: floating it")
             makeFloating(id, from: key, center: false)
-        } else if !originMoved {
-            adoptSize(id, frame: frame, in: key)
         } else {
             apply(key, animate: true)
         }
