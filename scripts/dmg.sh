@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 scripts/build.sh
-VERSION=$(tr -d '[:space:]' < VERSION)
+VERSION=${RAMBLA_VERSION:-$(tr -d '[:space:]' < VERSION)}
 STAGE=$(mktemp -d)
 cp -R build/Rambla.app "$STAGE/"
 ln -s /Applications "$STAGE/Applications"

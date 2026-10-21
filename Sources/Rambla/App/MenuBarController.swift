@@ -20,6 +20,7 @@ final class MenuBarController: NSObject {
             button.image = image
         }
         statusLine.isEnabled = false
+        menu.autoenablesItems = false
         statusItem.menu = menu
         setStatus(statusTitle, active: true)
         rebuild()

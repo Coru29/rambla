@@ -17,6 +17,8 @@ extension WindowManager {
             gatherAll(synchronously: false)
         case "relayout":
             relayoutAll()
+        case "debug-update":
+            Task { await Updater.shared.installForTesting() }
         case "debug-external-move":
             let values = (argument ?? "").split(separator: " ").compactMap { Double($0) }
             guard values.count == 5, let id = WindowID(exactly: values[0]) else { return false }

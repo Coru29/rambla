@@ -1,24 +1,39 @@
 import AppKit
 import RamblaCore
+import Security
 
-/// Tells the user when a newer release exists on GitHub. It checks once a day through the system's energy-aware
-/// scheduler (plus "Buscar actualizaciones…" on demand) and offers to open the download; it never downloads or
-/// installs anything by itself.
+/// Keeps Rambla up to date from its GitHub releases, as the user asked: it checks once a day (through the system's
+/// energy-aware scheduler) or on demand, and when the user accepts it downloads the DMG, verifies that the new app
+/// is signed with the same certificate as the running one (the designated requirement), swaps the bundle in place
+/// and relaunches. Anything not signed by the project's certificate is refused and the user gets the release page.
 @MainActor
 final class Updater {
     static let shared = Updater()
     static let latestReleaseAPI = URL(string: "https://api.github.com/repos/Coru29/rambla/releases/latest")!
+    /// Developer override (`defaults write io.github.coru29.Rambla updateFeedURL <url>`) used to test updates
+    /// against a local copy of the release JSON instead of GitHub.
+    static var feedURL: URL {
+        UserDefaults.standard.string(forKey: "updateFeedURL").flatMap(URL.init(string:)) ?? latestReleaseAPI
+    }
 
     struct Release {
         let version: AppVersion
         let page: URL
-        let download: URL?
+        let dmg: URL?
         let notes: String
+    }
+
+    enum Failure: LocalizedError {
+        case message(String)
+        var errorDescription: String? {
+            switch self { case .message(let text): return text }
+        }
     }
 
     /// A newer release than the running one, once a check has found it.
     private(set) var available: Release?
-    /// Called when `available` changes (the menu shows it).
+    private(set) var isInstalling = false
+    /// Called when `available` or `isInstalling` change (the menu shows them).
     var onChange: (() -> Void)?
     private var scheduler: NSBackgroundActivityScheduler?
 
@@ -48,6 +63,8 @@ final class Updater {
         }
     }
 
+    // MARK: - Checking
+
     func check(userInitiated: Bool) async {
         do {
             let release = try await fetchLatest()
@@ -55,7 +72,7 @@ final class Updater {
             onChange?()
             if let available {
                 Log.info("Update available: \(available.version)")
-                if userInitiated { offerDownload() }
+                if userInitiated { offerInstall() }
             } else if userInitiated {
                 inform("Tenés la última versión", "Rambla \(currentVersion) es la versión más nueva.")
             }
@@ -66,7 +83,7 @@ final class Updater {
     }
 
     private func fetchLatest() async throws -> Release {
-        var request = URLRequest(url: Self.latestReleaseAPI, timeoutInterval: 20)
+        var request = URLRequest(url: Self.feedURL, timeoutInterval: 20)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("Rambla/\(currentVersion)", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -74,32 +91,165 @@ final class Updater {
               let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let tag = json["tag_name"] as? String, let version = AppVersion(tag),
               let page = (json["html_url"] as? String).flatMap(URL.init(string:)) else {
-            throw URLError(.cannotParseResponse)
+            throw Failure.message("No se encontró una versión publicada.")
         }
         let assets = json["assets"] as? [[String: Any]] ?? []
-        let download = assets.first { ($0["name"] as? String)?.lowercased().hasSuffix(".dmg") == true }
+        let dmg = assets.first { ($0["name"] as? String)?.lowercased().hasSuffix(".dmg") == true }
             .flatMap { $0["browser_download_url"] as? String }
             .flatMap(URL.init(string:))
-        return Release(version: version, page: page, download: download, notes: json["body"] as? String ?? "")
+        return Release(version: version, page: page, dmg: dmg, notes: json["body"] as? String ?? "")
     }
 
-    /// Shows what is new and opens the DMG download (or the release page) in the browser.
-    func offerDownload() {
-        guard let release = available else { return }
+    // MARK: - Installing
+
+    /// Asks before doing anything: install now (and relaunch), see the release, or later.
+    func offerInstall() {
+        guard let release = available, !isInstalling else { return }
         NSApp.activate()
         let alert = NSAlert()
         alert.messageText = "Rambla \(release.version) está disponible"
         let notes = release.notes.trimmingCharacters(in: .whitespacesAndNewlines)
-        alert.informativeText = "Tenés la \(currentVersion). Bajá el DMG nuevo y arrastrá Rambla a Aplicaciones para reemplazarla; el permiso de Accesibilidad se mantiene."
+        alert.informativeText = "Tenés la \(currentVersion). Rambla se descarga, se reemplaza y se vuelve a abrir; el permiso de Accesibilidad se mantiene."
             + (notes.isEmpty ? "" : "\n\nNovedades:\n\n" + String(notes.prefix(700)))
-        alert.addButton(withTitle: "Descargar")
-        alert.addButton(withTitle: "Ver novedades")
+        alert.addButton(withTitle: "Actualizar y reiniciar")
+        alert.addButton(withTitle: "Ver en GitHub")
         alert.addButton(withTitle: "Más tarde")
         switch alert.runModal() {
-        case .alertFirstButtonReturn: NSWorkspace.shared.open(release.download ?? release.page)
+        case .alertFirstButtonReturn: install(release)
         case .alertSecondButtonReturn: NSWorkspace.shared.open(release.page)
         default: break
         }
+    }
+
+    /// Test hook for `rambla debug-update`: only active while a local test feed is configured.
+    func installForTesting() async {
+        guard UserDefaults.standard.string(forKey: "updateFeedURL") != nil else {
+            Log.error("debug-update ignored: no test feed configured")
+            return
+        }
+        await check(userInitiated: false)
+        if let release = available { install(release) }
+    }
+
+    private func install(_ release: Release) {
+        guard let dmg = release.dmg else {
+            NSWorkspace.shared.open(release.page)
+            return
+        }
+        isInstalling = true
+        onChange?()
+        let appURL = Bundle.main.bundleURL
+        Log.info("Installing update \(release.version) from \(dmg.absoluteString)")
+        Task.detached(priority: .userInitiated) {
+            let outcome: Error?
+            do {
+                try await Self.downloadVerifyAndReplace(dmg: dmg, appURL: appURL, expected: release.version)
+                outcome = nil
+            } catch {
+                outcome = error
+            }
+            await Updater.shared.finishInstall(outcome, release: release, appURL: appURL)
+        }
+    }
+
+    private func finishInstall(_ error: Error?, release: Release, appURL: URL) {
+        isInstalling = false
+        onChange?()
+        guard let error else {
+            Log.info("Updated to \(release.version); relaunching")
+            Self.relaunch(appURL)
+            return
+        }
+        Log.error("Update failed: \(error.localizedDescription)")
+        NSApp.activate()
+        let alert = NSAlert()
+        alert.messageText = "No se pudo actualizar automáticamente"
+        alert.informativeText = error.localizedDescription + "\n\nPodés bajar la versión nueva desde GitHub."
+        alert.addButton(withTitle: "Abrir GitHub")
+        alert.addButton(withTitle: "Cerrar")
+        if alert.runModal() == .alertFirstButtonReturn { NSWorkspace.shared.open(release.page) }
+    }
+
+    /// Off the main thread: download, mount, verify signer and version, then swap the bundle atomically.
+    private nonisolated static func downloadVerifyAndReplace(dmg: URL, appURL: URL, expected: AppVersion) async throws {
+        let fm = FileManager.default
+        let work = fm.temporaryDirectory.appendingPathComponent("rambla-update-\(UUID().uuidString)")
+        try fm.createDirectory(at: work, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: work) }
+
+        let (downloaded, response) = try await URLSession.shared.download(from: dmg)
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw Failure.message("La descarga falló.") }
+        let image = work.appendingPathComponent("Rambla.dmg")
+        try fm.moveItem(at: downloaded, to: image)
+
+        let mount = work.appendingPathComponent("mnt")
+        try run("/usr/bin/hdiutil", ["attach", "-nobrowse", "-readonly", "-noautoopen", "-mountpoint", mount.path, image.path])
+        defer { _ = try? run("/usr/bin/hdiutil", ["detach", "-force", mount.path]) }
+
+        let newApp = mount.appendingPathComponent("Rambla.app")
+        guard fm.fileExists(atPath: newApp.path) else { throw Failure.message("El DMG no contiene Rambla.app.") }
+        try verifySameSigner(newApp)
+        let shipped = Bundle(url: newApp)?.infoDictionary?["CFBundleShortVersionString"] as? String
+        guard let version = shipped.flatMap(AppVersion.init), version == expected else {
+            throw Failure.message("La versión descargada no coincide con la publicada.")
+        }
+
+        // Stage next to the current app (same volume) so the swap is atomic.
+        let staged = appURL.deletingLastPathComponent().appendingPathComponent(".Rambla-update-\(UUID().uuidString).app")
+        do {
+            try run("/usr/bin/ditto", [newApp.path, staged.path])
+            _ = try fm.replaceItemAt(appURL, withItemAt: staged)
+        } catch {
+            try? fm.removeItem(at: staged)
+            throw Failure.message("No se pudo reemplazar \(appURL.path): \(error.localizedDescription)")
+        }
+    }
+
+    /// The new app must satisfy the running app's designated requirement: same bundle id, same certificate.
+    nonisolated static func verifySameSigner(_ app: URL) throws {
+        var selfCode: SecCode?
+        var selfStatic: SecStaticCode?
+        var requirement: SecRequirement?
+        var candidate: SecStaticCode?
+        guard SecCodeCopySelf([], &selfCode) == errSecSuccess, let selfCode,
+              SecCodeCopyStaticCode(selfCode, [], &selfStatic) == errSecSuccess, let selfStatic,
+              SecCodeCopyDesignatedRequirement(selfStatic, [], &requirement) == errSecSuccess, let requirement,
+              SecStaticCodeCreateWithPath(app as CFURL, [], &candidate) == errSecSuccess, let candidate else {
+            throw Failure.message("No se pudo leer la firma de las aplicaciones.")
+        }
+        let flags = SecCSFlags(rawValue: kSecCSCheckAllArchitectures | kSecCSStrictValidate | kSecCSCheckNestedCode)
+        let status = SecStaticCodeCheckValidity(candidate, flags, requirement)
+        guard status == errSecSuccess else {
+            throw Failure.message("La versión descargada no está firmada con el certificado de Rambla (\(status)); no se instaló.")
+        }
+    }
+
+    @discardableResult
+    private nonisolated static func run(_ tool: String, _ arguments: [String]) throws -> String {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: tool)
+        process.arguments = arguments
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+        try process.run()
+        let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            let name = URL(fileURLWithPath: tool).lastPathComponent
+            throw Failure.message("\(name) falló: \(output.trimmingCharacters(in: .whitespacesAndNewlines))")
+        }
+        return output
+    }
+
+    /// Quits normally (which brings every window back on screen) and reopens the new app once this process is gone.
+    private static func relaunch(_ appURL: URL) {
+        let pid = ProcessInfo.processInfo.processIdentifier
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-c", "while kill -0 \(pid) 2>/dev/null; do sleep 0.2; done; /usr/bin/open \"$0\"", appURL.path]
+        try? process.run()
+        NSApp.terminate(nil)
     }
 
     private func inform(_ title: String, _ text: String) {

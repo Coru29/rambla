@@ -143,7 +143,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let toggle = item(paused ? "Reanudar Rambla" : "Pausar Rambla", #selector(togglePause))
         var items: [NSMenuItem] = []
         if let update = Updater.shared.available {
-            items += [item("Descargar Rambla \(update.version)…", #selector(offerUpdate)), .separator()]
+            let title = Updater.shared.isInstalling ? "Actualizando a Rambla \(update.version)…" : "Actualizar a Rambla \(update.version)…"
+            let updateItem = item(title, #selector(offerUpdate))
+            updateItem.isEnabled = !Updater.shared.isInstalling
+            items += [updateItem, .separator()]
         }
         items += [
             toggle,
@@ -173,7 +176,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func toggleFloat() { engine.toggleFloatFocused() }
     @objc private func showLog() { NSWorkspace.shared.open(Log.fileURL) }
     @objc private func openManual() { NSWorkspace.shared.open(Self.manualURL) }
-    @objc private func offerUpdate() { Updater.shared.offerDownload() }
+    @objc private func offerUpdate() { Updater.shared.offerInstall() }
     @objc private func checkForUpdates() { Task { await Updater.shared.check(userInitiated: true) } }
 
     /// The manual in Spanish or English, following the system language.

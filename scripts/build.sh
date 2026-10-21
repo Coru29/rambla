@@ -2,7 +2,7 @@
 # Builds build/Rambla.app (release, arm64) and signs it.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-VERSION=$(tr -d '[:space:]' < VERSION)
+VERSION=${RAMBLA_VERSION:-$(tr -d '[:space:]' < VERSION)}
 BUILD=$(date +%Y%m%d%H%M)
 swift build -c release --product Rambla
 BIN="$(swift build -c release --show-bin-path)/Rambla"
