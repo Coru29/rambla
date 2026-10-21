@@ -37,7 +37,7 @@ macOS 14 Sonoma o posterior, en Apple silicon, y el permiso de Accesibilidad.
 
 ## Instalación
 
-1. Bajá `Rambla-<versión>.dmg` de [Releases](https://github.com/Coru29/rambla/releases) (o compilalo, más abajo) y arrastrá **Rambla** a Aplicaciones.
+1. Bajá **[Rambla.dmg](https://github.com/Coru29/rambla/releases/latest/download/Rambla.dmg)** de [Releases](https://github.com/Coru29/rambla/releases) (o compilalo, más abajo) y arrastrá **Rambla** a Aplicaciones.
 2. Abrila y dale permiso en **Ajustes del Sistema → Privacidad y seguridad → Accesibilidad**.
 3. Rambla no está notarizada por Apple. Si macOS dice que no puede verificar al desarrollador, hacé click derecho en la app → **Abrir**, o corré `xattr -dr com.apple.quarantine /Applications/Rambla.app`.
 
@@ -96,7 +96,7 @@ Solo hacen falta las **Command Line Tools** de Xcode (Swift 6), no Xcode complet
 git clone https://github.com/Coru29/rambla && cd rambla
 scripts/test.sh        # tests (Swift Testing)
 scripts/build.sh       # build/Rambla.app
-scripts/dmg.sh         # build/Rambla-<versión>.dmg
+scripts/dmg.sh         # build/Rambla.dmg
 scripts/install.sh     # copia a /Applications y la abre
 scripts/e2e.sh         # pruebas en vivo con una app de prueba descartable (requiere el permiso de Accesibilidad)
 ```

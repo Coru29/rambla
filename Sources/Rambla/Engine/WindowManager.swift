@@ -333,11 +333,14 @@ final class WindowManager {
     func reveal(_ key: StripKey, animate: Bool = true, mode: CenterMode? = nil) {
         guard var strip = strips[key], let focused = strip.focused, strip.columns.indices.contains(focused),
               let display = display(for: key) else { return }
+        let metrics = Layout.metrics(layoutInput(for: key, strip: strip, display: display))
         if strip.columns[focused].pinned == nil {
-            let metrics = Layout.metrics(layoutInput(for: key, strip: strip, display: display))
             strip.scroll = Layout.reveal(metrics, column: focused, current: strip.scroll, mode: mode ?? prefs.centerMode)
-            strips[key] = strip
+        } else {
+            // A pinned column is always visible; just keep the rest of the strip within range.
+            strip.scroll = min(max(strip.scroll, 0), max(0, metrics.total - metrics.area.width))
         }
+        strips[key] = strip
         apply(key, animate: animate)
     }
 

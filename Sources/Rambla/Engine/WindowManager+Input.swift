@@ -33,7 +33,9 @@ extension WindowManager {
             focusWithoutScrolling(window)
         }
         strips[key] = strip
-        apply(key, animate: true)
+        // Next to a pinned column the settled one can still poke under the pin (and be parked):
+        // a minimal reveal keeps the focused window on screen.
+        reveal(key, animate: true, mode: .never)
         onStateChanged?()
     }
 
