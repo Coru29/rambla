@@ -53,7 +53,7 @@ Rambla no necesita Grabación de pantalla, ni Monitoreo de entrada, ni desactiva
 
 ### Actualizaciones
 
-Rambla revisa una vez por día si hay una versión nueva en GitHub. Cuando la hay, el menú muestra **"Descargar Rambla X…"**: abrís el DMG nuevo y arrastrás Rambla a Aplicaciones, reemplazando la anterior. El permiso de Accesibilidad se mantiene. También podés revisar a mano con **"Buscar actualizaciones…"** en el menú, o desactivar la revisión diaria en Configuración → General.
+Rambla revisa una vez por día si hay una versión nueva en GitHub. Cuando la hay, el menú muestra **"Actualizar a Rambla X…"**: te cuenta las novedades y, si aceptás, Rambla se descarga, verifica que la versión nueva tenga la misma firma, se reemplaza y se vuelve a abrir. El permiso de Accesibilidad se mantiene. También podés revisar a mano con **"Buscar actualizaciones…"** en el menú, o desactivar la revisión diaria en Configuración → General.
 
 ## 3. Primeros pasos
 

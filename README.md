@@ -45,7 +45,7 @@ macOS 14 Sonoma or later on Apple silicon, and the Accessibility permission.
 
 ### Updates
 
-Rambla checks GitHub once a day and shows **Descargar Rambla X…** (Download) in its menu when a new version is out. Replace the app with the new DMG; the Accessibility permission is kept because every release is signed with the same certificate.
+Rambla checks GitHub once a day. When a new version is out, its menu shows **Actualizar a Rambla X…** (Update): it downloads the release, verifies that it is signed with the same certificate, replaces itself and restarts. The Accessibility permission is kept.
 
 ## Default shortcuts
 
@@ -109,7 +109,7 @@ scripts/e2e.sh         # live end-to-end checks with a throwaway test app (needs
 
 The first build creates a local self-signed code-signing identity in `.signing/` (never committed), so macOS keeps the Accessibility permission across rebuilds.
 
-**Publishing a release** (maintainers): bump `VERSION`, commit, and run `scripts/release.sh [notes.md]`. It runs the tests, builds a signed `Rambla.dmg`, tags `vX.Y.Z` and creates the GitHub release; installed copies see it within a day. Releases must always be signed with the same `.signing/` identity, so keep a backup of that folder.
+**Versions and releases**: commits follow [Conventional Commits](https://www.conventionalcommits.org) and the version is computed from them (`feat` → minor, `fix` → patch, `!` → major). `scripts/release.sh` builds the signed DMG, tags and publishes the release; installed copies update themselves within a day. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## How it works
 

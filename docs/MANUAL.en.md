@@ -55,7 +55,7 @@ Rambla does not need Screen Recording, Input Monitoring, or SIP disabled.
 
 ### Updates
 
-Once a day Rambla checks GitHub for a new version. When there is one, the menu shows **"Descargar Rambla X…"** (Download Rambla X): open the new DMG and drag Rambla to Applications, replacing the old one. The Accessibility permission is kept. You can also check by hand with **"Buscar actualizaciones…"** (Check for updates) in the menu, or turn the daily check off in Configuración → General.
+Once a day Rambla checks GitHub for a new version. When there is one, the menu shows **"Actualizar a Rambla X…"** (Update to Rambla X): it lists what is new and, if you accept, Rambla downloads itself, checks that the new version carries the same signature, replaces itself and reopens. The Accessibility permission is kept. You can also check by hand with **"Buscar actualizaciones…"** (Check for updates) in the menu, or turn the daily check off in Configuración → General.
 
 ## 3. First steps
 
