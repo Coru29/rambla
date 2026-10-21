@@ -155,7 +155,8 @@ public enum Layout {
     // MARK: - Compute
 
     /// Target frames for every window of the strip at `input.strip.scroll`: visible at their real frame, or
-    /// parked with a sliver on the display when their column is (nearly) off it. Pinned columns never park.
+    /// parked with a sliver on the display when their column is (nearly) off it, or, on a side with a pinned
+    /// column, as soon as it pokes past the scroll area into the pin. Pinned columns themselves never park.
     public static func compute(_ input: LayoutInput) -> LayoutResult {
         let slots = resolveSlots(input)
         let m = buildMetrics(input, slots: slots)
@@ -182,7 +183,7 @@ public enum Layout {
             columnFrames[column.id] = rect
 
             // Pinned columns stay put; the others are parked once (nearly) off the display.
-            let side = isPinned ? nil : parkedSide(of: rect, display: input.display, others: input.otherDisplays)
+            let side = isPinned ? nil : parkedSide(of: rect, display: input.display, others: input.otherDisplays, slots: slots)
             for (id, frame) in windowFrames(of: column, in: rect, input) {
                 if let side {
                     placements[id] = .parked(parkingFrame(for: frame, side: side, display: input.display,
@@ -218,6 +219,13 @@ public enum Layout {
 // MARK: - Internals
 
 extension Layout {
+    // A column showing at most 1 pt counts as off-screen; a fixed test, not `config.sliver` (what a parked window leaves behind).
+    private static let parkThreshold = 1.0
+    // Rounding slack: a column revealed flush against a pin must not look like it pokes under it.
+    private static let edgeNoise = 1e-6
+    // Windows never get less height than this: AX cannot size an empty window.
+    private static let minHeight = 1.0
+
     /// Where the columns live: the (at most one per side) pinned slots at the viewport edges and the scroll area between them.
     private struct Slots {
         var leftPin: Int?
@@ -278,22 +286,39 @@ extension Layout {
     }
 
     /// The side a column must be parked on, or nil if it stays visible. `column` is its screen rect.
-    private static func parkedSide(of column: CGRect, display: CGRect, others: [CGRect]) -> HDirection? {
+    ///
+    /// A side with a pinned column uses the scroll area's edge instead of the display's, and parks a column that pokes
+    /// past it at all: strip columns never slide under a pin, so nothing peeks there. The other sides use the display's
+    /// edge, and toward a neighboring display let a column peek out by at most half its width.
+    private static func parkedSide(of column: CGRect, display: CGRect, others: [CGRect], slots: Slots) -> HDirection? {
         let x = Double(column.minX), w = Double(column.width)
-        if x >= Double(display.maxX) - 1 { return .right }
-        if x + w <= Double(display.minX) + 1 { return .left }
+        let area = slots.area
 
-        // Toward a neighboring display a column may peek out by at most half its width.
-        let y = Double(column.minY), h = Double(column.height)
-        let beyondRight = x + w - Double(display.maxX)
-        if beyondRight > w / 2 {
-            let part = CGRect(x: Double(display.maxX), y: y, width: beyondRight, height: h)
-            if others.contains(where: { overlaps(part, $0) }) { return .right }
+        if slots.rightPin != nil {
+            if x + w > Double(area.maxX) + edgeNoise { return .right }
+        } else if x >= Double(display.maxX) - parkThreshold {
+            return .right
         }
-        let beyondLeft = Double(display.minX) - x
-        if beyondLeft > w / 2 {
-            let part = CGRect(x: x, y: y, width: beyondLeft, height: h)
-            if others.contains(where: { overlaps(part, $0) }) { return .left }
+        if slots.leftPin != nil {
+            if x < Double(area.minX) - edgeNoise { return .left }
+        } else if x + w <= Double(display.minX) + parkThreshold {
+            return .left
+        }
+
+        let y = Double(column.minY), h = Double(column.height)
+        if slots.rightPin == nil {
+            let beyond = x + w - Double(display.maxX)
+            if beyond > w / 2 {
+                let part = CGRect(x: Double(display.maxX), y: y, width: beyond, height: h)
+                if others.contains(where: { overlaps(part, $0) }) { return .right }
+            }
+        }
+        if slots.leftPin == nil {
+            let beyond = Double(display.minX) - x
+            if beyond > w / 2 {
+                let part = CGRect(x: x, y: y, width: beyond, height: h)
+                if others.contains(where: { overlaps(part, $0) }) { return .left }
+            }
         }
         return nil
     }
@@ -306,7 +331,7 @@ extension Layout {
         let x = Double(rect.minX), y = Double(rect.minY), w = Double(rect.width), h = Double(rect.height)
 
         if column.mode == .tabbed {
-            let frame = CGRect(x: x, y: y + config.tabBarHeight, width: w, height: max(0, h - config.tabBarHeight))
+            let frame = CGRect(x: x, y: y + config.tabBarHeight, width: w, height: max(minHeight, h - config.tabBarHeight))
             return shown.map { (column.windows[$0], frame) }
         }
 
@@ -314,14 +339,15 @@ extension Layout {
             let id = column.windows[shown[0]]
             var height = h
             if let fraction = column.heightFraction {
-                height = min(fraction * h, h)
+                height = fraction * h
             } else if config.keepOriginalHeight, let original = input.originalHeights[id] {
-                height = min(original, h)
+                height = original
             }
-            return [(id, CGRect(x: x, y: y, width: w, height: height))]
+            return [(id, CGRect(x: x, y: y, width: w, height: max(minHeight, min(height, h))))]
         }
 
-        // Stacked: the height left after the gaps is shared out by weight, top to bottom.
+        // Stacked: the height left after the gaps is shared out by weight, top to bottom. A window squeezed below
+        // the minimum (zero weight) keeps the minimum and pushes the ones under it down by the difference.
         let available = max(0, h - config.gap * Double(shown.count - 1))
         let weights = shown.map { $0 < column.heightWeights.count ? max(0, column.heightWeights[$0]) : 1 }
         let sum = weights.reduce(0, +)
@@ -329,7 +355,7 @@ extension Layout {
         var frames: [(WindowID, CGRect)] = []
         for (n, index) in shown.enumerated() {
             let share = sum > 0 ? weights[n] / sum : 1 / Double(shown.count)
-            let height = available * share
+            let height = max(minHeight, available * share)
             frames.append((column.windows[index], CGRect(x: x, y: top, width: w, height: height)))
             top += height + config.gap
         }

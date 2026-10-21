@@ -1,5 +1,6 @@
-// Generates Packaging/AppIcon.icns: sunset over the Rambla of Montevideo (the promenade, a street lamp,
-// the river) with a strip of windows above it. Full-bleed artwork; macOS 26 applies the squircle mask itself.
+// Generates Packaging/AppIcon.icns and the menu bar icon. Uruguay's colors: a celeste sky, white windows
+// in a row (like the flag's stripes) on the line of the rambla, and the golden Sol de Mayo rising behind
+// the focused one. Full-bleed artwork; macOS 26 applies the squircle mask itself.
 // Usage: swift scripts/make-icon.swift   (from the package root)
 import CoreGraphics
 import Foundation
@@ -18,91 +19,55 @@ func gradient(_ stops: [(UInt32, CGFloat)], alpha: CGFloat = 1) -> CGGradient {
                locations: stops.map(\.1))!
 }
 
-/// CoreGraphics coordinates: origin bottom-left, 1024×1024. Seen from the promenade: the Rambla and a street
-/// lamp in front, the Río de la Plata with the sun setting, and the strip of windows above.
+/// CoreGraphics coordinates: origin bottom-left, 1024×1024.
 func draw(_ ctx: CGContext) {
-    let horizon: CGFloat = 418
-    let shore: CGFloat = 214
+    let celeste: UInt32 = 0x4FADE3, celesteDeep: UInt32 = 0x3593D2, white: UInt32 = 0xFFFFFF, gold: UInt32 = 0xFCD116
 
-    // Sky: dusk purple at the top, warm orange at the horizon.
-    ctx.saveGState()
-    ctx.clip(to: CGRect(x: 0, y: horizon, width: 1024, height: 1024 - horizon))
-    ctx.drawLinearGradient(gradient([(0xFFB45E, 0), (0xF2785F, 0.2), (0xB0407A, 0.52), (0x3A1E63, 0.84), (0x1D1442, 1)]),
-                           start: CGPoint(x: 512, y: horizon), end: CGPoint(x: 512, y: 1024), options: [])
-    // Setting sun with a soft glow, half under the horizon.
-    let sun = CGPoint(x: 512, y: horizon + 4)
-    ctx.drawRadialGradient(gradient([(0xFFE3A1, 0), (0xFFB45E, 0.35), (0xF2785F, 1)], alpha: 0.55),
-                           startCenter: sun, startRadius: 0, endCenter: sun, endRadius: 320, options: [])
-    ctx.setFillColor(color(0xFFE8B0))
-    ctx.fillEllipse(in: CGRect(x: sun.x - 118, y: sun.y - 118, width: 236, height: 236))
-    ctx.restoreGState()
+    // Celeste sky, barely deeper at the bottom.
+    ctx.drawLinearGradient(gradient([(celesteDeep, 0), (celeste, 1)]),
+                           start: CGPoint(x: 512, y: 0), end: CGPoint(x: 512, y: 1024), options: [])
 
-    // Río de la Plata, with the sun's reflection.
-    ctx.saveGState()
-    ctx.clip(to: CGRect(x: 0, y: shore - 40, width: 1024, height: horizon - shore + 40))
-    ctx.drawLinearGradient(gradient([(0x163A6B, 0), (0x255A93, 0.7), (0x3A76A8, 1)]),
-                           start: CGPoint(x: 512, y: shore), end: CGPoint(x: 512, y: horizon), options: [])
-    let streaks: [(y: CGFloat, w: CGFloat, a: CGFloat)] = [(388, 240, 0.85), (346, 176, 0.6), (304, 112, 0.4)]
-    for s in streaks {
-        let r = CGRect(x: 512 - s.w / 2, y: s.y, width: s.w, height: 11)
-        ctx.addPath(CGPath(roundedRect: r, cornerWidth: 5.5, cornerHeight: 5.5, transform: nil))
-        ctx.setFillColor(color(0xFFD08A, s.a))
-        ctx.fillPath()
+    // Sol de Mayo: a disc with sixteen rays, alternating long and short, rising behind the focused window.
+    let sun = CGPoint(x: 512, y: 676)
+    ctx.setFillColor(color(gold))
+    for i in 0..<16 {
+        let angle = CGFloat(i) * .pi / 8
+        let length: CGFloat = i % 2 == 0 ? 178 : 146
+        let half: CGFloat = 0.075
+        let base: CGFloat = 96
+        ctx.move(to: CGPoint(x: sun.x + cos(angle - half) * base, y: sun.y + sin(angle - half) * base))
+        ctx.addLine(to: CGPoint(x: sun.x + cos(angle) * length, y: sun.y + sin(angle) * length))
+        ctx.addLine(to: CGPoint(x: sun.x + cos(angle + half) * base, y: sun.y + sin(angle + half) * base))
+        ctx.closePath()
     }
-    ctx.restoreGState()
+    ctx.fillPath()
+    ctx.fillEllipse(in: CGRect(x: sun.x - 104, y: sun.y - 104, width: 208, height: 208))
 
-    // The promenade in front: a gently curved edge (the bay), the railing on top of the wall.
-    func edge(_ x: CGFloat) -> CGFloat {
-        // Quadratic Bézier from (0, shore+16) via (512, shore-36) to (1024, shore+16), as y(x).
-        let t = x / 1024
-        return (1 - t) * (1 - t) * (shore + 16) + 2 * (1 - t) * t * (shore - 36) + t * t * (shore + 16)
-    }
-    let promenade = CGMutablePath()
-    promenade.move(to: CGPoint(x: -4, y: edge(0)))
-    promenade.addQuadCurve(to: CGPoint(x: 1028, y: edge(1024)), control: CGPoint(x: 512, y: shore - 36))
-    promenade.addLine(to: CGPoint(x: 1028, y: -4))
-    promenade.addLine(to: CGPoint(x: -4, y: -4))
-    promenade.closeSubpath()
-    ctx.saveGState()
-    ctx.addPath(promenade)
-    ctx.clip()
-    ctx.drawLinearGradient(gradient([(0x9E7E5E, 0), (0xC9AE88, 0.7), (0xE6D3B3, 1)]),
-                           start: CGPoint(x: 512, y: 0), end: CGPoint(x: 512, y: shore + 16), options: [])
-    ctx.restoreGState()
-
-    // One street lamp (farola) on the promenade.
-    for lampX: CGFloat in [168] {
-        let base = edge(lampX) - 70
-        ctx.setFillColor(color(0x24173F))
-        ctx.fill(CGRect(x: lampX - 7, y: base, width: 14, height: 300))
-        ctx.fill(CGRect(x: lampX - 18, y: base, width: 36, height: 16))
-        let lamp = CGPoint(x: lampX, y: base + 318)
-        ctx.drawRadialGradient(gradient([(0xFFE7A8, 0), (0xFFB45E, 1)], alpha: 0.75), startCenter: lamp, startRadius: 0,
-                               endCenter: lamp, endRadius: 58, options: [])
-        ctx.setFillColor(color(0xFFF1C9))
-        ctx.fillEllipse(in: CGRect(x: lamp.x - 19, y: lamp.y - 19, width: 38, height: 38))
-    }
-
-    // The strip of windows over the river: the focused one in the middle, the right one scrolling off.
+    // Three white windows in a row; the right one runs off the edge, like the strip.
     let windows: [(CGRect, CGFloat)] = [
-        (CGRect(x: 56, y: 598, width: 272, height: 300), 0.62),
-        (CGRect(x: 366, y: 572, width: 324, height: 352), 0.97),
-        (CGRect(x: 728, y: 598, width: 330, height: 300), 0.62),
+        (CGRect(x: 76, y: 288, width: 254, height: 312), 0.74),
+        (CGRect(x: 366, y: 262, width: 292, height: 362), 1.0),
+        (CGRect(x: 694, y: 288, width: 380, height: 312), 0.74),
     ]
     for (rect, alpha) in windows {
-        let path = CGPath(roundedRect: rect, cornerWidth: 42, cornerHeight: 42, transform: nil)
+        let path = CGPath(roundedRect: rect, cornerWidth: 40, cornerHeight: 40, transform: nil)
         ctx.saveGState()
-        ctx.setShadow(offset: CGSize(width: 0, height: -12), blur: 34, color: color(0x120A2A, 0.45))
+        ctx.setShadow(offset: CGSize(width: 0, height: -10), blur: 28, color: color(0x175E96, 0.28))
         ctx.addPath(path)
-        ctx.setFillColor(color(0xFFF8F0, alpha))
+        ctx.setFillColor(color(white, alpha))
         ctx.fillPath()
         ctx.restoreGState()
         for i in 0..<3 {
-            let dot = CGRect(x: rect.minX + 32 + CGFloat(i) * 32, y: rect.maxY - 54, width: 18, height: 18)
-            ctx.setFillColor(color(0x8A3F6E, alpha * 0.45))
+            let dot = CGRect(x: rect.minX + 30 + CGFloat(i) * 30, y: rect.maxY - 50, width: 17, height: 17)
+            ctx.setFillColor(color(celesteDeep, 0.55 * alpha))
             ctx.fillEllipse(in: dot)
         }
     }
+
+    // The rambla: one white line under the windows.
+    ctx.addPath(CGPath(roundedRect: CGRect(x: 76, y: 184, width: 872, height: 28), cornerWidth: 14, cornerHeight: 14, transform: nil))
+    ctx.setFillColor(color(white, 0.92))
+    ctx.fillPath()
 }
 
 /// Menu bar template icon on an 18×18 pt canvas: three windows standing on the promenade (the focused one

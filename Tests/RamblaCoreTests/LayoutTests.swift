@@ -20,6 +20,31 @@ import CoreGraphics
         ], focused: 0, scroll: scroll)
     }
 
+    /// A 25 % column pinned on the left (window 1) followed by three 50 % strip columns (windows 2, 3, 4).
+    /// The scroll area is 747.5 wide, so the strip columns are 368.75 wide at xs 0, 378.75 and 757.5 (total 1126.25).
+    func leftPinStrip() -> Strip {
+        var s = Strip(columns: [
+            Column(windows: [1], width: .fraction(0.25)),
+            Column(windows: [2], width: .fraction(0.5)),
+            Column(windows: [3], width: .fraction(0.5)),
+            Column(windows: [4], width: .fraction(0.5)),
+        ], focused: 3)
+        s.columns[0].pinned = .left
+        return s
+    }
+
+    /// Mirror image: three 50 % strip columns (windows 1, 2, 3) followed by a 25 % column pinned on the right (window 4).
+    func rightPinStrip() -> Strip {
+        var s = Strip(columns: [
+            Column(windows: [1], width: .fraction(0.5)),
+            Column(windows: [2], width: .fraction(0.5)),
+            Column(windows: [3], width: .fraction(0.5)),
+            Column(windows: [4], width: .fraction(0.25)),
+        ], focused: 0)
+        s.columns[3].pinned = .right
+        return s
+    }
+
     func input(_ strip: Strip, others: [CGRect] = [], hidden: Set<WindowID> = [],
                minSizes: [WindowID: CGSize] = [:], originalHeights: [WindowID: Double] = [:],
                config: LayoutConfig? = nil) -> LayoutInput {
@@ -147,6 +172,21 @@ import CoreGraphics
         #expect(Layout.reveal(m, column: 1, current: 123, mode: .never) == 123)
         #expect(Layout.reveal(m, column: 1, current: 123, mode: .always) == 123)
         #expect(Layout.reveal(m, column: 9, current: 123, mode: .onOverflow) == 123)
+    }
+
+    @Test func revealAndSettleUseTheScrollAreaWidthWithAPin() {
+        // The 25 % pin shrinks the scroll area to 747.5. The array indices are pin 0 and strip columns 1, 2, 3
+        // (xs 0, 378.75, 757.5, total 1126.25), so the farthest useful scroll is total - 747.5 = 378.75.
+        // Against the 1000 wide viewport it would wrongly be 126.25.
+        let m = Layout.metrics(input(leftPinStrip()))
+        #expect(m.area.width == 747.5)
+        #expect(m.xs == [0, 0, 378.75, 757.5])
+        #expect(m.total == 1126.25)
+        #expect(Layout.reveal(m, column: 3, current: 0, mode: .never) == m.total - 747.5)
+        #expect(Layout.reveal(m, column: 3, current: 0, mode: .never) == 378.75)
+        let settled = Layout.settle(m, scroll: 400)
+        #expect(settled.scroll == 378.75)
+        #expect(settled.column == 2)       // columns 2 and 3 tie in [378.75, 1126.25]: the lower index wins
     }
 
     // MARK: - Settle and drop
@@ -326,7 +366,7 @@ import CoreGraphics
         let centered = Layout.compute(input(threeColumns(scroll: 252.5), others: neighbor))
         #expect(centered.placements[3] == parked(-494, 0, 495, 800))
         #expect(centered.placements[2] == visible(252.5, 0, 495, 800))
-        // Rambla 200: x = 810, 305 beyond.
+        // At scroll 200: x = 810, 305 beyond.
         let farther = Layout.compute(input(threeColumns(scroll: 200), others: neighbor))
         #expect(farther.placements[3] == parked(-494, 0, 495, 800))
         // Without a neighbor the same window just peeks out.
@@ -345,12 +385,12 @@ import CoreGraphics
 
     @Test func peekLimitedToHalfAlsoOnTheLeft() {
         let neighbor = [CGRect(x: -800, y: 0, width: 800, height: 600)]
-        // Rambla 300: window 1 sits at x = -300, 300 > 247.5 beyond the left edge.
+        // At scroll 300: window 1 sits at x = -300, 300 > 247.5 beyond the left edge.
         // Parked: the left edge touches the neighbor, so the window goes to the opposite (right) edge.
         let r = Layout.compute(input(threeColumns(scroll: 300), others: neighbor))
         #expect(r.placements[1] == parked(999, 0, 495, 800))
         #expect(r.placements[2] == visible(205, 0, 495, 800))
-        // Rambla 200: 200 < 247.5, still a visible peek.
+        // At scroll 200: 200 < 247.5, still a visible peek.
         #expect(Layout.compute(input(threeColumns(scroll: 200), others: neighbor)).placements[1]
                 == visible(-200, 0, 495, 800))
         // Exactly half is still fine.
@@ -421,6 +461,51 @@ import CoreGraphics
         // With a single visible window left it takes the full height.
         let single = Layout.compute(input(Strip(columns: [col], focused: 0), hidden: [2, 3]))
         #expect(single.placements[1] == visible(0, 0, 495, 800))
+    }
+
+    @Test func stackedWeightsSkipHiddenWindows() {
+        var col = Column(windows: [1, 2, 3], width: .fraction(0.5))
+        col.heightWeights = [1, 2, 3]
+        let strip = Strip(columns: [col], focused: 0)
+        // Window 1 hidden: windows 2 and 3 share 800 - 10 = 790 as 2:3, so 316 and 474.
+        let first = Layout.compute(input(strip, hidden: [1]))
+        #expect(first.placements[1] == nil)
+        #expect(near(frame(first, 2), CGRect(x: 0, y: 0, width: 495, height: 316)))
+        #expect(near(frame(first, 3), CGRect(x: 0, y: 326, width: 495, height: 474)))
+        // Window 2 hidden instead: windows 1 and 3 keep their own weights (1:3), so 197.5 and 592.5.
+        let middle = Layout.compute(input(strip, hidden: [2]))
+        #expect(middle.placements[2] == nil)
+        #expect(near(frame(middle, 1), CGRect(x: 0, y: 0, width: 495, height: 197.5)))
+        #expect(near(frame(middle, 3), CGRect(x: 0, y: 207.5, width: 495, height: 592.5)))
+    }
+
+    @Test func heightsNeverDropBelowOnePoint() {
+        var keep = cfg
+        keep.keepOriginalHeight = true
+        // A single window whose fraction or recorded original height is zero or negative.
+        var zeroFraction = Column(windows: [1], width: .fraction(0.5)); zeroFraction.heightFraction = 0
+        var negativeFraction = Column(windows: [2], width: .fraction(0.5)); negativeFraction.heightFraction = -0.5
+        let singles = Strip(columns: [zeroFraction, negativeFraction,
+                                      Column(windows: [3], width: .fraction(0.5)),
+                                      Column(windows: [4], width: .fraction(0.5))], focused: 0)
+        let single = Layout.compute(input(singles, originalHeights: [3: 0, 4: -20], config: keep))
+        for id: WindowID in 1...4 { #expect(frame(single, id).height == 1, "window \(id)") }
+
+        // A zero (or negative) weight among positive ones leaves that window one point tall, not empty.
+        for weights in [[1.0, 0.0, 1.0], [1.0, -2.0, 1.0]] {
+            var stack = Column(windows: [5, 6, 7], width: .fraction(0.5))
+            stack.heightWeights = weights
+            let r = Layout.compute(input(Strip(columns: [stack], focused: 0)))
+            #expect(frame(r, 5).height == 390, "weights \(weights)")
+            #expect(frame(r, 6).height == 1, "weights \(weights)")
+            #expect(frame(r, 7).height == 390, "weights \(weights)")
+            #expect(frame(r, 6).minY >= frame(r, 5).maxY && frame(r, 7).minY >= frame(r, 6).maxY, "weights \(weights)")
+        }
+
+        // A tabbed column in an area shorter than its tab bar.
+        let tabs = Column(windows: [8], width: .fraction(0.5), mode: .tabbed)
+        let tall = LayoutConfig(gap: 10, tabBarHeight: 900)
+        #expect(frame(Layout.compute(input(Strip(columns: [tabs], focused: 0), config: tall)), 8).height == 1)
     }
 
     @Test func singleWindowHeightFractionTakesPrecedence() {
@@ -588,6 +673,138 @@ import CoreGraphics
         #expect(r.placements[1] == visible(0, 0, 242.5, 800))
         #expect(r.placements[2] == visible(252.5, 0, 368.75, 800))
         #expect(r.placements[3] == visible(631.25, 0, 368.75, 800))
+    }
+
+    // MARK: - Compute: strip columns next to pinned columns
+
+    @Test func columnUnderLeftPinIsParked() {
+        var s = leftPinStrip()
+        // Focusing the last column scrolls the strip to the end: 757.5 + 368.75 - 747.5.
+        s.scroll = Layout.reveal(Layout.metrics(input(s)), column: 3, current: 0, mode: .never)
+        #expect(s.scroll == 378.75)
+        let r = Layout.compute(input(s))
+        // Window 2 would land at (-126.25, 0, 368.75, 800), right on top of the pinned window, so it parks instead.
+        #expect(r.columnFrames[s.columns[1].id] == CGRect(x: -126.25, y: 0, width: 368.75, height: 800))
+        #expect(r.placements[2] == parked(-367.75, 0, 368.75, 800))
+        // The pin and the columns that fit in the scroll area are untouched.
+        #expect(r.placements[1] == visible(0, 0, 242.5, 800))
+        #expect(r.placements[3] == visible(252.5, 0, 368.75, 800))
+        #expect(r.placements[4] == visible(631.25, 0, 368.75, 800))
+    }
+
+    @Test func columnUnderRightPinIsParked() {
+        var s = rightPinStrip()
+        // Coming back from the end of the strip, focusing the first column scrolls to the start.
+        s.scroll = Layout.reveal(Layout.metrics(input(s)), column: 0, current: 378.75, mode: .never)
+        #expect(s.scroll == 0)
+        let r = Layout.compute(input(s))
+        // Window 3 would land at (757.5, 0, 368.75, 800), right on top of the pinned window, so it parks instead.
+        #expect(r.columnFrames[s.columns[2].id] == CGRect(x: 757.5, y: 0, width: 368.75, height: 800))
+        #expect(r.placements[3] == parked(999, 0, 368.75, 800))
+        #expect(r.placements[4] == visible(757.5, 0, 242.5, 800))
+        #expect(r.placements[1] == visible(0, 0, 368.75, 800))
+        #expect(r.placements[2] == visible(378.75, 0, 368.75, 800))
+    }
+
+    @Test func columnFlushAgainstAPinStaysVisible() {
+        // Left: window 2 starts exactly where the scroll area starts, 10 pt right of the pinned window.
+        let left = Layout.compute(input(leftPinStrip()))
+        #expect(left.placements[2] == visible(252.5, 0, 368.75, 800))
+        #expect(left.placements[3] == visible(631.25, 0, 368.75, 800))
+        // Right: window 2 ends exactly where the scroll area ends, 10 pt left of the pinned window.
+        let right = Layout.compute(input(rightPinStrip()))
+        #expect(right.placements[2] == visible(378.75, 0, 368.75, 800))
+    }
+
+    @Test func revealedColumnNeverParksNextToAPin() {
+        // Gaps, fractions and pin widths that are not exact in binary: a column revealed flush against a pin then only
+        // sits on the scroll area's edge up to rounding noise (some of these combinations land a hair past it), and
+        // must not be mistaken for one that pokes under the pin.
+        for gap in [3.3, 7.3] {
+            let config = LayoutConfig(gap: gap)
+            for fraction in [0.3, 0.35] {
+                for (leftPin, rightPin) in [(0.17, 0.0), (0.0, 0.13), (0.17, 0.13), (0.19, 0.11), (0.23, 0.0)] {
+                    var columns = (1...5).map { Column(windows: [WindowID($0)], width: .fraction(fraction)) }
+                    if leftPin > 0 {
+                        var pin = Column(windows: [10], width: .fraction(leftPin)); pin.pinned = .left
+                        columns.insert(pin, at: 0)
+                    }
+                    if rightPin > 0 {
+                        var pin = Column(windows: [11], width: .fraction(rightPin)); pin.pinned = .right
+                        columns.append(pin)
+                    }
+                    let strip = Strip(columns: columns, focused: 0)
+                    let m = Layout.metrics(input(strip, config: config))
+                    for index in columns.indices where columns[index].pinned == nil {
+                        for current in [-1000.0, 1000.0] {      // arrive flush right, then flush left
+                            var s = strip
+                            s.scroll = Layout.reveal(m, column: index, current: current, mode: .never)
+                            let id = columns[index].windows[0]
+                            let placement = Layout.compute(input(s, config: config)).placements[id]
+                            #expect(!isParked(placement),
+                                    "gap \(gap), fraction \(fraction), pins \(leftPin)/\(rightPin), column \(index), from \(current)")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test func anyOverlapWithAPinParksTheColumn() {
+        // The strip columns start at the scroll area's edge, which is the pinned window plus its gap (252.5).
+        var left = leftPinStrip()
+        for scroll in [0.5, 5, 100] {        // just into the gap, into the gap, over the pinned window
+            left.scroll = scroll
+            #expect(isParked(Layout.compute(input(left)).placements[2]), "left pin, scroll \(scroll)")
+        }
+        // Next to the pin there is no peeking: the half rule toward a neighbor display does not apply on a pinned side.
+        left.scroll = 100                    // window 2 is 100 pt past the area's edge, well under half its width
+        let leftNeighbor = [CGRect(x: -800, y: 0, width: 800, height: 600)]
+        #expect(isParked(Layout.compute(input(left, others: leftNeighbor)).placements[2]))
+
+        var right = rightPinStrip()
+        for scroll in [-0.5, -5, -100] {     // window 2 ends 0.5, 5, 100 pt past the area's right edge
+            right.scroll = scroll
+            #expect(isParked(Layout.compute(input(right)).placements[2]), "right pin, scroll \(scroll)")
+        }
+    }
+
+    @Test func columnsParkAtBothPins() {
+        var s = threeColumns()
+        s.columns[0].width = .fraction(0.25); s.columns[0].pinned = .left
+        s.columns[2].width = .fraction(0.25); s.columns[2].pinned = .right
+        s.columns[1].width = .fraction(1)          // 495: exactly the scroll area, 252.5...747.5
+        // Flush against both pins it is fully visible.
+        #expect(Layout.compute(input(s)).placements[2] == visible(252.5, 0, 495, 800))
+        s.scroll = 10                              // 10 pt under the left pin
+        #expect(Layout.compute(input(s)).placements[2] == parked(-494, 0, 495, 800))
+        s.scroll = -10                             // 10 pt under the right pin
+        #expect(Layout.compute(input(s)).placements[2] == parked(999, 0, 495, 800))
+    }
+
+    @Test func sidesWithoutAPinKeepTheDisplayRules() {
+        // Left pin only. At scroll 100 window 4 sits at 252.5 + 757.5 - 100 = 910, 278.75 past the display's right edge.
+        var left = leftPinStrip()
+        left.scroll = 100
+        #expect(Layout.compute(input(left)).placements[4] == visible(910, 0, 368.75, 800))
+        // Toward a neighbor display that is more than half its width, so it parks (opposite edge: the right one is taken).
+        let neighbor = [CGRect(x: 1000, y: 0, width: 800, height: 600)]
+        #expect(Layout.compute(input(left, others: neighbor)).placements[4] == parked(-367.75, 0, 368.75, 800))
+        left.scroll = 200                          // x = 810, 178.75 past the edge: less than half (184.375)
+        #expect(Layout.compute(input(left, others: neighbor)).placements[4] == visible(810, 0, 368.75, 800))
+        // Right pin only: the unpinned left side still lets window 1 peek past the display's left edge.
+        var right = rightPinStrip()
+        right.scroll = 100
+        #expect(Layout.compute(input(right)).placements[1] == visible(-100, 0, 368.75, 800))
+    }
+
+    @Test func collapsedPinDoesNotParkColumnsUnderIt() {
+        // With the pinned window hidden the side has no pin, so the plain display rules apply again.
+        var s = leftPinStrip()
+        s.scroll = 100
+        let r = Layout.compute(input(s, hidden: [1]))
+        #expect(r.metrics.area == vp)
+        #expect(r.placements[2] == visible(-100, 0, 495, 800))
     }
 
     // MARK: - Types
