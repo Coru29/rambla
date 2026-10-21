@@ -1,0 +1,205 @@
+import AppKit
+import ApplicationServices
+import RamblaCore
+
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    private(set) var menuBar: MenuBarController!
+    private var trustTimer: Timer?
+    private var trustObserver: NSObjectProtocol?
+    private var commandObserver: NSObjectProtocol?
+    private var signalSources: [DispatchSourceSignal] = []
+    private let engine = WindowManager.shared
+    private let store = PreferencesStore.shared
+    private lazy var gestures = GestureTracker(
+        onBegin: { [weak self] in self?.engine.gestureBegan() },
+        onChange: { [weak self] dx in self?.engine.gestureChanged(dx) },
+        onEnd: { [weak self] in self?.engine.gestureEnded() })
+    private lazy var mouseFocus = MouseFocus { [weak self] point in self?.engine.hover(at: point) }
+    private var overlays: OverlayCoordinator?
+
+    /// `--only-bundle <id>` (repeatable) limits management to those apps: used by the live tests.
+    private lazy var onlyBundles: Set<String>? = {
+        var result: Set<String> = []
+        var args = CommandLine.arguments.dropFirst().makeIterator()
+        while let arg = args.next() {
+            if arg == "--only-bundle", let value = args.next() { result.insert(value) }
+        }
+        return result.isEmpty ? nil : result
+    }()
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        Log.info("Rambla \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] ?? "?") started")
+        menuBar = MenuBarController(statusTitle: "Iniciando…")
+        installSignalHandlers()
+        listenForCommands()
+        if AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary) {
+            becameTrusted()
+        } else {
+            waitForTrust()
+        }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        engine.stop()
+        engine.saveNow()
+        Log.info("Rambla quit")
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls where url.scheme == "rambla" {
+            let command = [url.host, url.path.isEmpty ? nil : String(url.path.dropFirst())]
+                .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "-")
+            engine.perform(command: command)
+        }
+    }
+
+    // MARK: - Accessibility permission
+
+    private func waitForTrust() {
+        menuBar.setStatus("Falta el permiso de Accesibilidad", active: false)
+        let open = NSMenuItem(title: "Abrir Ajustes de Accesibilidad…", action: #selector(openAccessibilitySettings), keyEquivalent: "")
+        open.target = self
+        menuBar.setItems([open])
+        // macOS posts this when any app's Accessibility permission changes; the timer is a fallback
+        // that only runs while the permission is missing.
+        trustObserver = DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("com.apple.accessibility.api"), object: nil, queue: .main
+        ) { [weak self] _ in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                MainActor.assumeIsolated { self?.recheckTrust() }
+            }
+        }
+        trustTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.recheckTrust() }
+        }
+    }
+
+    private func recheckTrust() {
+        guard trustTimer != nil, AXIsProcessTrusted() else { return }
+        trustTimer?.invalidate()
+        trustTimer = nil
+        if let observer = trustObserver {
+            DistributedNotificationCenter.default().removeObserver(observer)
+            trustObserver = nil
+        }
+        becameTrusted()
+    }
+
+    private func becameTrusted() {
+        Log.info("Accessibility permission granted")
+        store.onChange = { [weak self] prefs in self?.preferencesChanged(prefs) }
+        engine.onStateChanged = { [weak self] in self?.refreshMenu() }
+        HotkeyCenter.shared.onAction = { [weak self] action, combo in
+            self?.engine.perform(action, holding: combo.modifiers.eventFlags)
+        }
+        overlays = OverlayCoordinator(engine: engine)
+        engine.start(prefs: store.prefs, onlyBundles: onlyBundles)
+        if !store.prefs.enabled { engine.setPaused(true) }
+        refreshMenu(force: true)
+    }
+
+    private func preferencesChanged(_ prefs: Preferences) {
+        engine.update(prefs: prefs)
+        if prefs.enabled == engine.isPaused { engine.setPaused(!prefs.enabled) }
+        refreshMenu(force: true)
+    }
+
+    /// Input sources that cost something while active exist only when their feature is on.
+    private func applyInputs() {
+        let prefs = store.prefs
+        let active = !engine.isPaused && prefs.enabled
+        gestures.configure(enabled: active && prefs.trackpad.enabled, fingers: prefs.trackpad.fingers)
+        mouseFocus.setEnabled(active && prefs.focusFollowsMouse)
+    }
+
+    private func applyHotkeys() {
+        let prefs = store.prefs
+        let paused = engine.isPaused || !prefs.enabled
+        HotkeyCenter.shared.apply(prefs.allShortcuts, only: paused ? [.togglePause] : nil)
+    }
+
+    // MARK: - Menu
+
+    private var menuPausedState: Bool?
+
+    /// Rebuilds the menu and re-registers shortcuts only when the paused state changes
+    /// (onStateChanged also fires on every focus change).
+    private func refreshMenu(force: Bool = false) {
+        let paused = engine.isPaused
+        guard force || paused != menuPausedState else { return }
+        menuPausedState = paused
+        // "Activo" in General and the pause command are the same switch; keep them in sync.
+        if store.prefs.enabled == paused { store.prefs.enabled = !paused }
+        menuBar.setStatus(paused ? "En pausa" : "Activo", active: !paused)
+        let toggle = item(paused ? "Reanudar Rambla" : "Pausar Rambla", #selector(togglePause))
+        let items = [
+            toggle,
+            item("Reacomodar ventanas", #selector(relayout)),
+            item("Traer todas las ventanas a la pantalla", #selector(gather)),
+            item("Flotar / volver la ventana actual", #selector(toggleFloat)),
+            .separator(),
+            item("Configuración…", #selector(openSettings), key: ","),
+            item("Mostrar registro", #selector(showLog)),
+        ]
+        menuBar.setItems(items)
+        applyHotkeys()
+        applyInputs()
+    }
+
+    private func item(_ title: String, _ action: Selector, key: String = "") -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
+        item.target = self
+        return item
+    }
+
+    @objc private func togglePause() { engine.setPaused(!engine.isPaused) }
+    @objc private func relayout() { engine.relayoutAll() }
+    @objc private func gather() { engine.gatherAll(synchronously: false) }
+    @objc private func toggleFloat() { engine.toggleFloatFocused() }
+    @objc private func showLog() { NSWorkspace.shared.open(Log.fileURL) }
+    @objc private func openSettings() { SettingsOpener.open() }
+
+    @objc private func openAccessibilitySettings() {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+    }
+
+    // MARK: - CLI, signals
+
+    private func listenForCommands() {
+        commandObserver = DistributedNotificationCenter.default().addObserver(
+            forName: CLI.commandNotification, object: nil, queue: .main
+        ) { [weak self] note in
+            guard let command = note.object as? String else { return }
+            MainActor.assumeIsolated { _ = self?.engine.perform(command: command) }
+        }
+    }
+
+    /// `kill`/logout must not leave windows parked off screen.
+    private func installSignalHandlers() {
+        for sig in [SIGTERM, SIGINT, SIGHUP] {
+            signal(sig, SIG_IGN)
+            let source = DispatchSource.makeSignalSource(signal: sig, queue: .main)
+            source.setEventHandler {
+                MainActor.assumeIsolated {
+                    WindowManager.shared.stop()
+                    WindowManager.shared.saveNow()
+                }
+                exit(0)
+            }
+            source.resume()
+            signalSources.append(source)
+        }
+    }
+}
+
+/// Settings window entry point; replaced by the real window in the settings task.
+@MainActor
+enum SettingsOpener {
+    static var handler: (() -> Void)?
+    static func open() { handler?() }
+}
+
+extension Modifiers {
+    var eventFlags: NSEvent.ModifierFlags { NSEvent.ModifierFlags(rawValue: cocoa) }
+}

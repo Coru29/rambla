@@ -1,0 +1,198 @@
+import Foundation
+
+/// Width given to a window when it first enters the strip.
+public enum NewWindowWidth: Codable, Equatable, Sendable {
+    /// The window's own width, limited to 25 %...100 % of the viewport.
+    case natural
+    /// A fixed fraction of the viewport.
+    case fraction(Double)
+}
+
+public struct FocusBorderPrefs: Codable, Equatable, Sendable {
+    public var enabled: Bool
+    public var colorHex: String
+    public var width: Double
+
+    public init(enabled: Bool = false, colorHex: String = "#0A84FF", width: Double = 3) {
+        self.enabled = enabled
+        self.colorHex = colorHex
+        self.width = width
+    }
+
+    /// Missing keys take their defaults, so older saved preferences keep loading when a field is added.
+    public init(from decoder: Decoder) throws {
+        let defaults = FocusBorderPrefs()
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? defaults.enabled
+        colorHex = try container.decodeIfPresent(String.self, forKey: .colorHex) ?? defaults.colorHex
+        width = try container.decodeIfPresent(Double.self, forKey: .width) ?? defaults.width
+    }
+}
+
+public struct DimPrefs: Codable, Equatable, Sendable {
+    public var enabled: Bool
+    /// Opacity of the black overlay, 0...1.
+    public var amount: Double
+
+    public init(enabled: Bool = false, amount: Double = 0.25) {
+        self.enabled = enabled
+        self.amount = amount
+    }
+
+    public init(from decoder: Decoder) throws {
+        let defaults = DimPrefs()
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? defaults.enabled
+        amount = try container.decodeIfPresent(Double.self, forKey: .amount) ?? defaults.amount
+    }
+}
+
+public struct TrackpadPrefs: Codable, Equatable, Sendable {
+    public var enabled: Bool
+    /// Number of fingers of the horizontal swipe (3 or 4).
+    public var fingers: Int
+    public var sensitivity: Double
+    /// Natural direction: the strip follows the fingers.
+    public var natural: Bool
+
+    public init(enabled: Bool = true, fingers: Int = 4, sensitivity: Double = 1.0, natural: Bool = true) {
+        self.enabled = enabled
+        self.fingers = fingers
+        self.sensitivity = sensitivity
+        self.natural = natural
+    }
+
+    public init(from decoder: Decoder) throws {
+        let defaults = TrackpadPrefs()
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? defaults.enabled
+        fingers = try container.decodeIfPresent(Int.self, forKey: .fingers) ?? defaults.fingers
+        sensitivity = try container.decodeIfPresent(Double.self, forKey: .sensitivity) ?? defaults.sensitivity
+        natural = try container.decodeIfPresent(Bool.self, forKey: .natural) ?? defaults.natural
+    }
+}
+
+/// A per-app override: always float it, give it an initial width, or choose where its windows open.
+public struct AppRule: Codable, Equatable, Identifiable, Sendable {
+    public enum Behavior: String, Codable, CaseIterable, Sendable { case tile, float }
+
+    public var id: UUID
+    public var bundleID: String
+    public var name: String
+    public var behavior: Behavior
+    /// Initial width as a fraction of the viewport; nil follows `Preferences.newWindowWidth`.
+    public var width: Double?
+    public var openAt: InsertPosition
+
+    public init(id: UUID = UUID(), bundleID: String, name: String, behavior: Behavior = .tile,
+                width: Double? = nil, openAt: InsertPosition = .afterFocused) {
+        self.id = id
+        self.bundleID = bundleID
+        self.name = name
+        self.behavior = behavior
+        self.width = width
+        self.openAt = openAt
+    }
+
+    /// Only `bundleID` is required; a missing `name` falls back to it.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        bundleID = try container.decode(String.self, forKey: .bundleID)
+        name = try container.decodeIfPresent(String.self, forKey: .name) ?? bundleID
+        behavior = try container.decodeIfPresent(Behavior.self, forKey: .behavior) ?? .tile
+        width = try container.decodeIfPresent(Double.self, forKey: .width)
+        openAt = try container.decodeIfPresent(InsertPosition.self, forKey: .openAt) ?? .afterFocused
+    }
+}
+
+/// Everything configurable from the settings window. Stored as JSON in UserDefaults.
+public struct Preferences: Codable, Equatable, Sendable {
+    public var enabled = true
+    public var innerGap: Double = 8
+    public var outerGap: Double = 8
+    public var presetWidths: [Double] = [0.25, 1.0 / 3, 0.5, 2.0 / 3, 0.75]
+    public var newWindowWidth: NewWindowWidth = .natural
+    public var nudgeStep = 0.05
+    public var centerMode: CenterMode = .never
+    public var keepOriginalHeight = false
+    public var animations = true
+    public var animationSpeed = 1.0
+    /// A window that another app moves (Rectangle, a title-bar double click) leaves the strip.
+    public var floatOnExternalMove = true
+    public var indicatorEnabled = true
+    public var focusBorder = FocusBorderPrefs()
+    public var dimInactive = DimPrefs()
+    public var focusFollowsMouse = false
+    public var mouseFollowsFocus = false
+    public var trackpad = TrackpadPrefs()
+    public var appRules: [AppRule] = []
+    /// UUIDs of the displays Rambla does not manage.
+    public var disabledDisplays: [String] = []
+    /// Only the actions whose shortcuts differ from `DefaultShortcuts.table` are stored here.
+    public var shortcutOverrides: [Action: [KeyCombo]] = [:]
+
+    public init() {}
+
+    /// Every field is optional in the stored JSON: a missing key takes its default (the value set above),
+    /// so adding a preference later never invalidates what users already saved.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? enabled
+        innerGap = try container.decodeIfPresent(Double.self, forKey: .innerGap) ?? innerGap
+        outerGap = try container.decodeIfPresent(Double.self, forKey: .outerGap) ?? outerGap
+        presetWidths = try container.decodeIfPresent([Double].self, forKey: .presetWidths) ?? presetWidths
+        newWindowWidth = try container.decodeIfPresent(NewWindowWidth.self, forKey: .newWindowWidth) ?? newWindowWidth
+        nudgeStep = try container.decodeIfPresent(Double.self, forKey: .nudgeStep) ?? nudgeStep
+        centerMode = try container.decodeIfPresent(CenterMode.self, forKey: .centerMode) ?? centerMode
+        keepOriginalHeight = try container.decodeIfPresent(Bool.self, forKey: .keepOriginalHeight) ?? keepOriginalHeight
+        animations = try container.decodeIfPresent(Bool.self, forKey: .animations) ?? animations
+        animationSpeed = try container.decodeIfPresent(Double.self, forKey: .animationSpeed) ?? animationSpeed
+        floatOnExternalMove = try container.decodeIfPresent(Bool.self, forKey: .floatOnExternalMove) ?? floatOnExternalMove
+        indicatorEnabled = try container.decodeIfPresent(Bool.self, forKey: .indicatorEnabled) ?? indicatorEnabled
+        focusBorder = try container.decodeIfPresent(FocusBorderPrefs.self, forKey: .focusBorder) ?? focusBorder
+        dimInactive = try container.decodeIfPresent(DimPrefs.self, forKey: .dimInactive) ?? dimInactive
+        focusFollowsMouse = try container.decodeIfPresent(Bool.self, forKey: .focusFollowsMouse) ?? focusFollowsMouse
+        mouseFollowsFocus = try container.decodeIfPresent(Bool.self, forKey: .mouseFollowsFocus) ?? mouseFollowsFocus
+        trackpad = try container.decodeIfPresent(TrackpadPrefs.self, forKey: .trackpad) ?? trackpad
+        appRules = try container.decodeIfPresent([AppRule].self, forKey: .appRules) ?? appRules
+        disabledDisplays = try container.decodeIfPresent([String].self, forKey: .disabledDisplays) ?? disabledDisplays
+        // Decoded through plain strings so an id this version does not know (a downgrade, a removed action) is
+        // skipped instead of making the whole dictionary, and with it every preference, fail to load.
+        if let stored = try container.decodeIfPresent([String: [KeyCombo]].self, forKey: .shortcutOverrides) {
+            var overrides: [Action: [KeyCombo]] = [:]
+            for (id, combos) in stored {
+                if let action = Action(rawValue: id) { overrides[action] = combos }
+            }
+            shortcutOverrides = overrides
+        }
+    }
+
+    /// The shortcuts in effect for an action: the user's override, or the default.
+    public func shortcuts(for action: Action) -> [KeyCombo] {
+        shortcutOverrides[action] ?? DefaultShortcuts.table[action] ?? []
+    }
+
+    /// Stores the user's shortcuts for an action. Setting exactly the defaults removes the override, so later
+    /// changes to the defaults still reach users who never customized that action.
+    public mutating func setShortcuts(_ combos: [KeyCombo], for action: Action) {
+        if combos == (DefaultShortcuts.table[action] ?? []) {
+            shortcutOverrides[action] = nil
+        } else {
+            shortcutOverrides[action] = combos
+        }
+    }
+
+    /// The first rule written for this app, if any.
+    public func rule(for bundleID: String?) -> AppRule? {
+        guard let bundleID else { return nil }
+        return appRules.first { $0.bundleID == bundleID }
+    }
+
+    /// The shortcuts in effect for every action (an action without any maps to an empty list).
+    public var allShortcuts: [Action: [KeyCombo]] {
+        var all: [Action: [KeyCombo]] = [:]
+        for action in Action.allCases { all[action] = shortcuts(for: action) }
+        return all
+    }
+}
