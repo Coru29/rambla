@@ -16,22 +16,3 @@ final class IndicatorController {
     func show(_ tiles: [IndicatorTile], on screen: NSScreen, holding: NSEvent.ModifierFlags?) {}
     func hide() {}
 }
-
-struct TabItem {
-    let windowID: WindowID
-    let title: String
-    let icon: NSImage?
-}
-
-struct TabBarModel {
-    let columnID: UUID
-    let frame: CGRect
-    let tabs: [TabItem]
-    let active: Int
-}
-
-@MainActor
-final class TabBarController {
-    init(onSelect: @escaping (WindowID) -> Void) {}
-    func update(_ bars: [TabBarModel]) {}
-}
