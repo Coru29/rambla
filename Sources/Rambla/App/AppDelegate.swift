@@ -94,12 +94,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.engine.perform(action, holding: combo.modifiers.eventFlags)
         }
         overlays = OverlayCoordinator(engine: engine)
+        Updater.shared.onChange = { [weak self] in self?.refreshMenu(force: true) }
+        Updater.shared.configure(automatic: store.prefs.checkForUpdates)
         engine.start(prefs: store.prefs, onlyBundles: onlyBundles)
         if !store.prefs.enabled { engine.setPaused(true) }
         refreshMenu(force: true)
     }
 
+    private var lastUpdateSetting: Bool?
+
     private func preferencesChanged(_ prefs: Preferences) {
+        if prefs.checkForUpdates != lastUpdateSetting {
+            lastUpdateSetting = prefs.checkForUpdates
+            Updater.shared.configure(automatic: prefs.checkForUpdates)
+        }
         engine.update(prefs: prefs)
         if prefs.enabled == engine.isPaused { engine.setPaused(!prefs.enabled) }
         refreshMenu(force: true)
@@ -133,7 +141,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if store.prefs.enabled == paused { store.prefs.enabled = !paused }
         menuBar.setStatus(paused ? "En pausa" : "Activo", active: !paused)
         let toggle = item(paused ? "Reanudar Rambla" : "Pausar Rambla", #selector(togglePause))
-        let items = [
+        var items: [NSMenuItem] = []
+        if let update = Updater.shared.available {
+            items += [item("Descargar Rambla \(update.version)…", #selector(offerUpdate)), .separator()]
+        }
+        items += [
             toggle,
             item("Reacomodar ventanas", #selector(relayout)),
             item("Traer todas las ventanas a la pantalla", #selector(gather)),
@@ -141,6 +153,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .separator(),
             item("Configuración…", #selector(openSettings), key: ","),
             item("Manual de uso", #selector(openManual)),
+            item("Buscar actualizaciones…", #selector(checkForUpdates)),
             item("Mostrar registro", #selector(showLog)),
         ]
         menuBar.setItems(items)
@@ -160,6 +173,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func toggleFloat() { engine.toggleFloatFocused() }
     @objc private func showLog() { NSWorkspace.shared.open(Log.fileURL) }
     @objc private func openManual() { NSWorkspace.shared.open(Self.manualURL) }
+    @objc private func offerUpdate() { Updater.shared.offerDownload() }
+    @objc private func checkForUpdates() { Task { await Updater.shared.check(userInitiated: true) } }
 
     /// The manual in Spanish or English, following the system language.
     static var manualURL: URL {

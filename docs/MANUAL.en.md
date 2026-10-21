@@ -53,6 +53,10 @@ On macOS, every new window lands on top of the others or makes you shrink them. 
 
 Rambla does not need Screen Recording, Input Monitoring, or SIP disabled.
 
+### Updates
+
+Once a day Rambla checks GitHub for a new version. When there is one, the menu shows **"Descargar Rambla X…"** (Download Rambla X): open the new DMG and drag Rambla to Applications, replacing the old one. The Accessibility permission is kept. You can also check by hand with **"Buscar actualizaciones…"** (Check for updates) in the menu, or turn the daily check off in Configuración → General.
+
 ## 3. First steps
 
 When it starts, Rambla takes the windows on the current desktop and lines them up, left to right, in the order they were. Try this:

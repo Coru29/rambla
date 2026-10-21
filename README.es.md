@@ -41,6 +41,10 @@ macOS 14 Sonoma o posterior, en Apple silicon, y el permiso de Accesibilidad.
 2. Abrila y dale permiso en **Ajustes del Sistema → Privacidad y seguridad → Accesibilidad**.
 3. Rambla no está notarizada por Apple. Si macOS dice que no puede verificar al desarrollador, hacé click derecho en la app → **Abrir**, o corré `xattr -dr com.apple.quarantine /Applications/Rambla.app`.
 
+### Actualizaciones
+
+Rambla revisa GitHub una vez por día y muestra **Descargar Rambla X…** en su menú cuando sale una versión nueva. Reemplazá la app con el DMG nuevo: el permiso de Accesibilidad se mantiene porque todas las versiones están firmadas con el mismo certificado.
+
 ## Atajos por defecto
 
 Todos se pueden cambiar en **Configuración → Atajos**.
@@ -102,6 +106,8 @@ scripts/e2e.sh         # pruebas en vivo con una app de prueba descartable (requ
 ```
 
 La primera compilación crea una identidad de firma autofirmada local en `.signing/`, que nunca se sube al repo. Gracias a eso, macOS conserva el permiso de Accesibilidad entre compilaciones.
+
+**Publicar una versión** (mantenedores): subí `VERSION`, hacé commit y corré `scripts/release.sh [notas.md]`. Corre los tests, arma `Rambla.dmg` firmado, crea el tag `vX.Y.Z` y el release en GitHub; las copias instaladas lo ven en menos de un día. Las versiones siempre tienen que firmarse con la misma identidad de `.signing/`, así que guardá una copia de esa carpeta.
 
 ## Cómo funciona
 

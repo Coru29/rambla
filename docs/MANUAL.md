@@ -51,6 +51,10 @@ En macOS, cada ventana nueva se encima con las demás o te obliga a achicarlas. 
 
 Rambla no necesita Grabación de pantalla, ni Monitoreo de entrada, ni desactivar SIP.
 
+### Actualizaciones
+
+Rambla revisa una vez por día si hay una versión nueva en GitHub. Cuando la hay, el menú muestra **"Descargar Rambla X…"**: abrís el DMG nuevo y arrastrás Rambla a Aplicaciones, reemplazando la anterior. El permiso de Accesibilidad se mantiene. También podés revisar a mano con **"Buscar actualizaciones…"** en el menú, o desactivar la revisión diaria en Configuración → General.
+
 ## 3. Primeros pasos
 
 Al arrancar, Rambla toma las ventanas del escritorio actual y las pone en fila, de izquierda a derecha, en el orden en que estaban. Probá esto:

@@ -131,6 +131,8 @@ public struct Preferences: Codable, Equatable, Sendable {
     public var disabledDisplays: [String] = []
     /// Only the actions whose shortcuts differ from `DefaultShortcuts.table` are stored here.
     public var shortcutOverrides: [Action: [KeyCombo]] = [:]
+    /// Look for a new release on GitHub once a day.
+    public var checkForUpdates = true
 
     public init() {}
 
@@ -157,6 +159,7 @@ public struct Preferences: Codable, Equatable, Sendable {
         trackpad = try container.decodeIfPresent(TrackpadPrefs.self, forKey: .trackpad) ?? trackpad
         appRules = try container.decodeIfPresent([AppRule].self, forKey: .appRules) ?? appRules
         disabledDisplays = try container.decodeIfPresent([String].self, forKey: .disabledDisplays) ?? disabledDisplays
+        checkForUpdates = try container.decodeIfPresent(Bool.self, forKey: .checkForUpdates) ?? checkForUpdates
         // Decoded through plain strings so an id this version does not know (a downgrade, a removed action) is
         // skipped instead of making the whole dictionary, and with it every preference, fail to load.
         if let stored = try container.decodeIfPresent([String: [KeyCombo]].self, forKey: .shortcutOverrides) {
