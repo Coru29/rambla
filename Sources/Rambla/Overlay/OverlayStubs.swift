@@ -35,13 +35,3 @@ final class TabBarController {
     init(onSelect: @escaping (WindowID) -> Void) {}
     func update(_ bars: [TabBarModel]) {}
 }
-
-@MainActor
-final class FocusBorderController {
-    func update(frame: CGRect?, windowID: WindowID?, prefs: FocusBorderPrefs) {}
-}
-
-@MainActor
-final class DimmerController {
-    func update(focused: WindowID?, screens: [NSScreen], prefs: DimPrefs) {}
-}
