@@ -167,6 +167,11 @@ final class WindowManager {
         observe(ws, NSWorkspace.didUnhideApplicationNotification) { [weak self] _ in self?.scheduleReconcile() }
         observe(ws, NSWorkspace.activeSpaceDidChangeNotification) { [weak self] _ in
             guard let self else { return }
+            // The focused window belongs to the Space we left: drop it so the border and dimming hide
+            // until the new Space reports its own focus.
+            focusedWindow = nil
+            overlayHook?()
+            frontmostPID.flatMap { self.workers[$0] }?.refreshFocused()
             grace(1.0)
             workers.values.forEach { $0.rescan() }
             scheduleReconcile(after: 0.15)
