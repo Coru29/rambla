@@ -9,7 +9,7 @@
   Your windows line up along an endless horizontal promenade, like the <i>rambla</i> of Montevideo.
 </p>
 
-<p align="center"><a href="https://rambla-mac.vercel.app"><b>rambla-mac.vercel.app</b></a> · <a href="README.es.md">Leer en español</a> · <a href="docs/MANUAL.md">User manual (Spanish)</a></p>
+<p align="center"><a href="https://rambla-mac.vercel.app"><b>rambla-mac.vercel.app</b></a> · <a href="README.es.md">Leer en español</a> · <a href="docs/MANUAL.en.md">User manual</a></p>
 
 ---
 

@@ -1,5 +1,7 @@
 # Manual de Rambla
 
+<p><a href="MANUAL.en.md">Read in English</a></p>
+
 Rambla ordena tus ventanas en una **tira horizontal**, como un paseo que sigue más allá de los bordes de la pantalla. Este manual explica cómo usarla, desde el primer día hasta los trucos.
 
 **Contenido**

@@ -161,7 +161,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func showLog() { NSWorkspace.shared.open(Log.fileURL) }
     @objc private func openManual() { NSWorkspace.shared.open(Self.manualURL) }
 
-    static let manualURL = URL(string: "https://github.com/Coru29/rambla/blob/main/docs/MANUAL.md")!
+    /// The manual in Spanish or English, following the system language.
+    static var manualURL: URL {
+        let spanish = Locale.preferredLanguages.first?.hasPrefix("es") ?? true
+        let file = spanish ? "MANUAL.md" : "MANUAL.en.md"
+        return URL(string: "https://github.com/Coru29/rambla/blob/main/docs/\(file)")!
+    }
     @objc private func openSettings() { SettingsOpener.open() }
 
     @objc private func openAccessibilitySettings() {
