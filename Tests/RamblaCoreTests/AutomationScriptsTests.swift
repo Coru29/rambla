@@ -1,0 +1,50 @@
+import Testing
+import Foundation
+@testable import RamblaCore
+
+@Test func cliScriptHandsEveryArgumentToTheAppBinary() {
+    #expect(AutomationScripts.cliInstallPath == "/usr/local/bin/rambla")
+    #expect(AutomationScripts.appExecutable == "/Applications/Rambla.app/Contents/MacOS/Rambla")
+    #expect(AutomationScripts.cliScript == "#!/bin/sh\nexec \"/Applications/Rambla.app/Contents/MacOS/Rambla\" \"$@\"\n")
+}
+
+@Test func raycastScriptMatchesTheRaycastTemplate() {
+    let expected = """
+    #!/bin/bash
+
+    # Required parameters:
+    # @raycast.schemaVersion 1
+    # @raycast.title Rambla: Enfocar columna izquierda
+    # @raycast.mode silent
+
+    # Optional parameters:
+    # @raycast.packageName Rambla
+
+    open -g "rambla://focus-left"
+
+    """
+    #expect(AutomationScripts.raycastScript(for: .focusLeft) == expected)
+    #expect(AutomationScripts.raycastFileName(for: .focusLeft) == "rambla-focus-left.sh")
+}
+
+@Test func raycastScriptsExistForEveryActionWithTheirOwnHeaderAndURL() {
+    var fileNames: Set<String> = []
+    for action in Action.allCases {
+        let name = AutomationScripts.raycastFileName(for: action)
+        #expect(name == "rambla-\(action.rawValue).sh")
+        fileNames.insert(name)
+
+        let script = AutomationScripts.raycastScript(for: action)
+        let lines = script.components(separatedBy: "\n")
+        #expect(lines.first == "#!/bin/bash", "\(action.rawValue)")
+        #expect(lines.contains("# @raycast.schemaVersion 1"), "\(action.rawValue)")
+        #expect(lines.contains("# @raycast.title Rambla: \(action.title)"), "\(action.rawValue)")
+        #expect(lines.contains("# @raycast.mode silent"), "\(action.rawValue)")
+        #expect(lines.contains("# @raycast.packageName Rambla"), "\(action.rawValue)")
+        #expect(lines.filter { $0.hasPrefix("# @raycast.title") }.count == 1, "a title must fit on one line: \(action.rawValue)")
+        #expect(script.hasSuffix("open -g \"rambla://\(action.rawValue)\"\n"), "\(action.rawValue)")
+        // The id must round-trip through the URL scheme the app handles.
+        #expect(URL(string: "rambla://\(action.rawValue)")?.host == action.rawValue, "\(action.rawValue)")
+    }
+    #expect(fileNames.count == Action.allCases.count, "file names must be unique")
+}
