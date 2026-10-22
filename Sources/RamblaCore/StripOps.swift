@@ -251,10 +251,18 @@ extension Strip {
     }
 
     /// Full width on (swipe up) or back to the width it had (swipe down). Unlike `toggleFullWidth`, asking for the
-    /// state the column is already in does nothing, so a second swipe up keeps the width to go back to.
+    /// state the column is already in does nothing, so a second swipe up keeps the width to go back to. A column
+    /// made narrower after `toggleFullWidth` goes full again and still remembers its old width.
     public mutating func setFullWidth(_ full: Bool) {
-        guard let f = focusedIndex, full != (columns[f].widthBeforeFull != nil) else { return }
-        toggleFullWidth()
+        guard let f = focusedIndex else { return }
+        if full {
+            guard columns[f].width != .fraction(1) else { return }
+            if columns[f].widthBeforeFull == nil { columns[f].widthBeforeFull = columns[f].width }
+            columns[f].width = .fraction(1)
+        } else if let previous = columns[f].widthBeforeFull {
+            columns[f].width = previous
+            columns[f].widthBeforeFull = nil
+        }
     }
 
     /// Changes the focused column's width by `delta` (as a fraction), keeping it within 0.1...1.0.

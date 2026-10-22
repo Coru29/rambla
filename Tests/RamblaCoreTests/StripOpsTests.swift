@@ -785,6 +785,24 @@ import Foundation
         #expect(none.columns[0].widthBeforeFull == nil)
     }
 
+    @Test func swipingUpAfterNarrowingAFullColumnGoesFullAgain() {
+        // ⌃⌘M then ⌃⌘- leaves the column a bit narrower but still remembering its old width (ruling 8): swiping up
+        // makes it full again, and swiping down still returns to that old width.
+        var s = strip([[1]], focused: 0)
+        s.columns[0].width = .fraction(1.0 / 3)
+        s.toggleFullWidth()
+        s.adjustWidth(by: -0.05, available: 1000, gap: 10)
+        #expect(s.columns[0].width == .fraction(0.95))
+        s.setFullWidth(true)
+        #expect(s.columns[0].width == .fraction(1) && s.columns[0].widthBeforeFull == .fraction(1.0 / 3))
+        s.setFullWidth(false)
+        #expect(s.columns[0].width == .fraction(1.0 / 3))
+        // A column that is already full width without anything to go back to stays as it is.
+        s.columns[0].width = .fraction(1)
+        s.setFullWidth(true)
+        #expect(s.columns[0].widthBeforeFull == nil)
+    }
+
     @Test func toggleFullWidthRestoresPointWidthsToo() {
         var s = strip([[1]], focused: 0)
         s.columns[0].width = .points(420)
