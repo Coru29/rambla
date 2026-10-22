@@ -13,8 +13,12 @@ public enum CommandPolicy {
     static let windowCommands: Set<String> = ["settings", "gather", "relayout"]
     static let diagnostics: Set<String> = ["dump", "debug-windows", "debug-update", "debug-external-move"]
 
+    /// Actions a link may not run: closing a window can lose work.
+    static let commandLineOnly: Set<Action> = [.closeWindow]
+
     public static func allows(_ word: String, from source: Source) -> Bool {
-        if Action.parse(word) != nil || windowCommands.contains(word) { return true }
+        if let action = Action.parse(word) { return source == .commandLine || !commandLineOnly.contains(action) }
+        if windowCommands.contains(word) { return true }
         return source == .commandLine && diagnostics.contains(word)
     }
 

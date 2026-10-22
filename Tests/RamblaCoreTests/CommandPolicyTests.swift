@@ -8,13 +8,14 @@ private let temp = "/var/folders/ab/xyz/T/"
     for word in ["focus-left", "cycle-width", "toggle-pause", "settings", "gather", "relayout"] {
         #expect(CommandPolicy.allows(word, from: .url), "\(word)")
     }
-    for word in ["dump", "debug-windows", "debug-update", "debug-external-move", "nonsense"] {
+    // Closing a window can lose work, so a web page must not be able to do it.
+    for word in ["close-window", "dump", "debug-windows", "debug-update", "debug-external-move", "nonsense"] {
         #expect(!CommandPolicy.allows(word, from: .url), "\(word)")
     }
 }
 
 @Test func theCommandLineMayAlsoAskForDiagnostics() {
-    for word in ["focus-left", "settings", "dump", "debug-windows", "debug-update", "debug-external-move"] {
+    for word in ["focus-left", "close-window", "settings", "dump", "debug-windows", "debug-update", "debug-external-move"] {
         #expect(CommandPolicy.allows(word, from: .commandLine), "\(word)")
     }
     #expect(!CommandPolicy.allows("nonsense", from: .commandLine))
