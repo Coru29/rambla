@@ -27,7 +27,8 @@ public struct LayoutInput: Sendable {
     public var strip: Strip
     /// Region available to the strip: the display's visible frame minus the outer margin.
     public var viewport: CGRect
-    /// Full frame of the display the strip lives on. Visibility and parking are decided against it.
+    /// Full frame of the display the strip lives on. Visibility and parking are decided against it, except on a side
+    /// with a pinned column, where the scroll area's edge decides.
     public var display: CGRect
     public var otherDisplays: [CGRect]
     /// Windows that take no space: minimized, app hidden, inactive native tab.

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Builds the app and packages it as build/Rambla-<version>.dmg (app + Applications alias).
+# Builds the app and packages it as build/Rambla.dmg (app + Applications alias).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 scripts/build.sh
