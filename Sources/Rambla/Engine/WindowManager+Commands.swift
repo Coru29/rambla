@@ -2,11 +2,16 @@ import AppKit
 import RamblaCore
 
 extension WindowManager {
-    /// Text commands from the CLI, URLs and distributed notifications. Returns false if unknown.
+    /// Text commands from `rambla://` links and from the `rambla` command. What each source may run is decided by
+    /// `CommandPolicy`. Returns false if the command is unknown or not allowed.
     @discardableResult
-    func perform(command: String) -> Bool {
+    func perform(command: String, from source: CommandPolicy.Source) -> Bool {
         let parts = command.split(separator: " ", maxSplits: 1).map(String.init)
         guard let word = parts.first else { return false }
+        guard CommandPolicy.allows(word, from: source) else {
+            Log.error("Refused command from \(source == .url ? "a link" : "the command line"): \(word)")
+            return false
+        }
         let argument = parts.count > 1 ? parts[1] : nil
         switch word {
         case "dump":
@@ -184,8 +189,12 @@ extension WindowManager {
 
     // MARK: - Debug replies
 
-    private func reply(_ data: Data, to path: String?) {
-        guard let path else { return }
+    /// Writes a diagnostics reply, only to the reply file the `rambla` command reads (see `CommandPolicy`).
+    private func reply(_ data: Data, to requested: String?) {
+        guard let requested, let path = CommandPolicy.replyPath(requested, temporaryDirectory: NSTemporaryDirectory()) else {
+            Log.error("Refused to write a reply outside Rambla's reply file")
+            return
+        }
         try? data.write(to: URL(fileURLWithPath: path), options: .atomic)
     }
 

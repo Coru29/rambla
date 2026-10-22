@@ -59,7 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         for url in urls where url.scheme == "rambla" {
             let command = [url.host, url.path.isEmpty ? nil : String(url.path.dropFirst())]
                 .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: "-")
-            engine.perform(command: command)
+            engine.perform(command: command, from: .url)
         }
     }
 
@@ -222,7 +222,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             forName: CLI.commandNotification, object: nil, queue: .main
         ) { [weak self] note in
             guard let command = note.object as? String else { return }
-            MainActor.assumeIsolated { _ = self?.engine.perform(command: command) }
+            MainActor.assumeIsolated { _ = self?.engine.perform(command: command, from: .commandLine) }
         }
     }
 
