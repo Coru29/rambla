@@ -12,7 +12,7 @@ enum CLI {
     static func run(_ args: [String]) -> Int32? {
         guard let first = args.first else { return nil }
         if first == "list" {
-            // Every action id the app, `rambla://` URLs and Raycast understand, with its name.
+            // Every action id the app understands, with its name. Links run all of them but close-window.
             let width = Action.allCases.map(\.rawValue.count).max() ?? 0
             for action in Action.allCases {
                 print(action.rawValue.padding(toLength: width + 2, withPad: " ", startingAt: 0) + action.title)

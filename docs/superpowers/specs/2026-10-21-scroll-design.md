@@ -204,7 +204,7 @@ Modificador base **⌃⌘** y **⌃⌘⇧** para la variante "mover". Ninguno ch
 - URL scheme `rambla://<acción>`, por ejemplo `rambla://focus-left`, `rambla://focus-3` o `rambla://toggle-pause`.
 - Comando de terminal `rambla <acción>`. Es el mismo binario en modo CLI: si recibe una acción como argumento, la publica por `DistributedNotificationCenter` y termina sin abrir la interfaz. `rambla list` imprime las acciones.
 - Un botón instala `/usr/local/bin/rambla` (un script que llama al binario) y pide la contraseña si hace falta.
-- Otro botón exporta scripts de Raycast (un `.sh` por acción con `open -g rambla://…`) a la carpeta que se elija.
+- Otro botón exporta scripts de Raycast (un `.sh` por acción con `open -g rambla://…`; el de `close-window`, que los enlaces no pueden ejecutar, llama al binario de la app) a la carpeta que se elija.
 
 ## Arquitectura
 
