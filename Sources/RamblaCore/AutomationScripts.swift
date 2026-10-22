@@ -15,8 +15,8 @@ public enum AutomationScripts {
         "rambla-\(action.rawValue).sh"
     }
 
-    /// A Raycast script command that runs one action through the `rambla://` URL scheme. `open -g` keeps whatever app
-    /// is in front, and the `silent` mode makes Raycast close itself without showing any output.
+    /// A Raycast script command that runs one action, and the `silent` mode makes Raycast close itself without showing
+    /// any output.
     public static func raycastScript(for action: Action) -> String {
         """
         #!/bin/bash
@@ -29,8 +29,16 @@ public enum AutomationScripts {
         # Optional parameters:
         # @raycast.packageName Rambla
 
-        open -g "rambla://\(action.rawValue)"
+        \(raycastCommand(for: action))
 
         """
+    }
+
+    /// Through the `rambla://` URL scheme, where `open -g` keeps whatever app is in front. An action links may not run
+    /// (`CommandPolicy`) goes to the app binary, which runs it like the `rambla` command without that command installed.
+    static func raycastCommand(for action: Action) -> String {
+        CommandPolicy.commandLineOnly.contains(action)
+            ? "\"\(appExecutable)\" \(action.rawValue)"
+            : "open -g \"rambla://\(action.rawValue)\""
     }
 }

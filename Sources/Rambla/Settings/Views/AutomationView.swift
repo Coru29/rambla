@@ -34,7 +34,7 @@ struct AutomationView: View {
         } header: {
             Text("Por URL")
         } footer: {
-            Text("Sirven en la app Atajos de macOS, en Raycast, Alfred o Hammerspoon, y desde la Terminal con el comando open. Cada acción tiene su id, que aparece en `rambla list`.")
+            Text("Sirven en la app Atajos de macOS, en Raycast, Alfred o Hammerspoon, y desde la Terminal con el comando open. Cada acción tiene su id, que aparece en `rambla list`. Cerrar ventana no funciona por URL, porque cualquier página web puede abrir una.")
         }
     }
 

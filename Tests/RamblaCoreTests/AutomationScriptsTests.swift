@@ -42,9 +42,20 @@ import Foundation
         #expect(lines.contains("# @raycast.mode silent"), "\(action.rawValue)")
         #expect(lines.contains("# @raycast.packageName Rambla"), "\(action.rawValue)")
         #expect(lines.filter { $0.hasPrefix("# @raycast.title") }.count == 1, "a title must fit on one line: \(action.rawValue)")
-        #expect(script.hasSuffix("open -g \"rambla://\(action.rawValue)\"\n"), "\(action.rawValue)")
+        // Every script runs its action the way the app accepts it: a link, or the app binary for what links may not run.
+        if script.hasSuffix("open -g \"rambla://\(action.rawValue)\"\n") {
+            #expect(CommandPolicy.allows(action.rawValue, from: .url), "a link cannot run \(action.rawValue)")
+        } else {
+            #expect(script.hasSuffix("\n\"\(AutomationScripts.appExecutable)\" \(action.rawValue)\n"), "\(action.rawValue)")
+            #expect(CommandPolicy.allows(action.rawValue, from: .commandLine), "\(action.rawValue)")
+        }
         // The id must round-trip through the URL scheme the app handles.
         #expect(URL(string: "rambla://\(action.rawValue)")?.host == action.rawValue, "\(action.rawValue)")
     }
     #expect(fileNames.count == Action.allCases.count, "file names must be unique")
+}
+
+@Test func closeWindowRunsThroughTheAppBinaryBecauseLinksCannotCloseWindows() {
+    #expect(AutomationScripts.raycastScript(for: .closeWindow)
+        .hasSuffix("\n\"/Applications/Rambla.app/Contents/MacOS/Rambla\" close-window\n"))
 }
