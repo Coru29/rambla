@@ -50,11 +50,13 @@ final class WindowManager {
     private(set) var requested: [WindowID: CGRect] = [:]
     private var hiddenSince: [WindowID: CFAbsoluteTime] = [:]
     /// Displays that have strips but are not connected, and since when (a resolution change, a dock or a wake can drop
-    /// a display for a while). Time asleep does not count: waking starts the count again.
-    private var displayGoneSince: [String: CFAbsoluteTime] = [:]
+    /// a display for a while). In uptime, which does not count time asleep, and waking starts the count again.
+    private var displayGoneSince: [String: TimeInterval] = [:]
+    /// Some monitors leave the list of displays while the screens sleep: they are asleep, not gone.
+    private var screensAsleep = false
     /// How long a display must stay disconnected before its windows join the strips where they are now: long enough
     /// for a dock or a monitor that is slow to come back after a wake.
-    private static let goneDisplayDelay: CFAbsoluteTime = 15
+    private static let goneDisplayDelay: TimeInterval = 15
     /// The reconcile that checks again once a gone display's time is up. Separate from `scheduleReconcile`, which would
     /// otherwise hold every other reconcile until then.
     private var goneDisplayCheck: DispatchWorkItem?
@@ -194,15 +196,21 @@ final class WindowManager {
             workers.values.forEach { $0.rescan() }
             scheduleReconcile(after: 0.15)
         }
-        observe(ws, NSWorkspace.didWakeNotification) { [weak self] _ in
-            self?.displayGoneSince.removeAll()
-            self?.grace(2.5)
-            self?.scheduleReconcile(after: 0.8)
-        }
+        observe(ws, NSWorkspace.didWakeNotification) { [weak self] _ in self?.screensWoke() }
+        observe(ws, NSWorkspace.screensDidSleepNotification) { [weak self] _ in self?.screensAsleep = true }
+        observe(ws, NSWorkspace.screensDidWakeNotification) { [weak self] _ in self?.screensWoke() }
         observe(NotificationCenter.default, NSApplication.didChangeScreenParametersNotification) { [weak self] _ in
             self?.grace(2.5)
             self?.scheduleReconcile(after: 0.4)
         }
+    }
+
+    /// After a wake, of the Mac or only of its screens, a monitor can take a while to come back.
+    private func screensWoke() {
+        screensAsleep = false
+        displayGoneSince.removeAll()
+        grace(2.5)
+        scheduleReconcile(after: 0.8)
     }
 
     private func observe(_ center: NotificationCenter, _ name: Notification.Name, _ block: @escaping @MainActor (Notification) -> Void) {
@@ -436,7 +444,7 @@ final class WindowManager {
             worker(for: id)?.forgetWindow(id)
             removeWindow(id)
         }
-        dropStripsOfDisconnectedDisplays(now: now)
+        dropStripsOfDisconnectedDisplays(now: ProcessInfo.processInfo.systemUptime)
 
         let keys = currentKeys
         for display in enabledDisplays {
@@ -519,9 +527,10 @@ final class WindowManager {
     /// macOS moves the windows of an unplugged display to the remaining ones, but they stayed in that display's strips,
     /// which no longer lay anything out: untiled and out of reach of the shortcuts. Once the display has been gone for
     /// `goneDisplayDelay`, its strips are dropped and the windows join the strips of the displays they are on now.
-    private func dropStripsOfDisconnectedDisplays(now: CFAbsoluteTime) {
+    private func dropStripsOfDisconnectedDisplays(now: TimeInterval) {
         let connected = Set(displays.map(\.uuid))
         for uuid in connected { displayGoneSince[uuid] = nil }
+        guard !screensAsleep else { return }
         for uuid in Set(strips.keys.map(\.displayUUID)) where !connected.contains(uuid) {
             let since = displayGoneSince[uuid] ?? now
             displayGoneSince[uuid] = since
