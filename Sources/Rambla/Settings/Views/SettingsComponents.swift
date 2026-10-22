@@ -1,0 +1,150 @@
+import AppKit
+import RamblaCore
+import SwiftUI
+
+/// A labelled slider with its current value on the right: every slider in the settings window looks the same.
+/// The slider itself is continuous and the value is snapped to `step` as it changes, because a `step:` makes
+/// macOS draw one tick mark per step (forty of them for a gap).
+struct SliderRow: View {
+    let title: String
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    let step: Double
+    let display: (Double) -> String
+
+    init(_ title: String, value: Binding<Double>, in range: ClosedRange<Double>, step: Double,
+         display: @escaping (Double) -> String) {
+        self.title = title
+        _value = value
+        self.range = range
+        self.step = step
+        self.display = display
+    }
+
+    var body: some View {
+        LabeledContent(title) {
+            HStack(spacing: 8) {
+                Slider(value: snapped, in: range)
+                    .frame(width: 200)
+                    .accessibilityLabel(title)
+                    .accessibilityValue(display(value))
+                Text(display(value))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .frame(width: 56, alignment: .trailing)
+            }
+        }
+    }
+
+    private var snapped: Binding<Double> {
+        Binding(
+            get: { value },
+            set: { value = Self.snap($0, to: step, in: range) }
+        )
+    }
+
+    /// The multiple of `step` (counted from the start of the range) closest to `raw`, kept inside the range.
+    static func snap(_ raw: Double, to step: Double, in range: ClosedRange<Double>) -> Double {
+        var value = raw.isFinite ? raw : range.lowerBound
+        if step > 0 { value = range.lowerBound + ((value - range.lowerBound) / step).rounded() * step }
+        value = min(max(value, range.lowerBound), range.upperBound)
+        return (value * 1e6).rounded() / 1e6   // 0.5 + 3 * 0.1 must be 0.8, not 0.8000000000000002
+    }
+}
+
+/// Number formats shared by the settings pages (Spanish: decimal comma, a space before the percent sign).
+enum SettingsFormat {
+    /// 0.5 -> "50 %", 1/3 -> "33,3 %".
+    static func percent(_ fraction: Double) -> String {
+        let value = (fraction * 100).formatted(.number.precision(.fractionLength(0...1)))
+        return "\(value) %"
+    }
+
+    /// 0.5 -> "50 %" and 2/3 -> "66 %": whole percent, rounded down (a tiny epsilon keeps 0.29 from showing as 28).
+    static func wholePercent(_ fraction: Double) -> String {
+        "\(Int((fraction * 100 + 1e-6).rounded(.down))) %"
+    }
+
+    /// 8 -> "8 pt".
+    static func points(_ value: Double) -> String { "\(Int(value.rounded())) pt" }
+
+    /// 1.5 -> "1,5×".
+    static func multiplier(_ value: Double) -> String {
+        "\(value.formatted(.number.precision(.fractionLength(1))))×"
+    }
+}
+
+/// The results of `SystemChecks.run`, refreshed on demand (never on a timer).
+@MainActor
+final class ChecksModel: ObservableObject {
+    @Published private(set) var results: [CheckResult] = []
+
+    func refresh(prefs: Preferences) {
+        results = SystemChecks.run(prefs: prefs)
+    }
+}
+
+/// One line of a checks list: status icon, title and detail, and a button that opens the matching System Settings pane.
+struct CheckRow: View {
+    let result: CheckResult
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: symbol)
+                .font(.title3)
+                .foregroundStyle(tint)
+                .frame(width: 22)
+                .accessibilityLabel(statusName)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(result.title)
+                if !result.detail.isEmpty {
+                    Text(result.detail)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 8)
+            if let url = result.settingsURL {
+                Button("Abrir Ajustes") { NSWorkspace.shared.open(url) }
+            }
+        }
+    }
+
+    private var symbol: String {
+        switch result.status {
+        case .ok: return "checkmark.circle.fill"
+        case .warning: return "exclamationmark.triangle.fill"
+        case .info: return "info.circle.fill"
+        }
+    }
+
+    private var tint: Color {
+        switch result.status {
+        case .ok: return .green
+        case .warning: return .orange
+        case .info: return .accentColor
+        }
+    }
+
+    private var statusName: String {
+        switch result.status {
+        case .ok: return "Correcto"
+        case .warning: return "Atención"
+        case .info: return "Información"
+        }
+    }
+}
+
+/// Shows an open panel as a sheet on the settings window (or free-standing if there is none) and reports the chosen URL.
+@MainActor
+func presentOpenPanel(_ panel: NSOpenPanel, completion: @escaping (URL?) -> Void) {
+    let finish: (NSApplication.ModalResponse) -> Void = { response in
+        completion(response == .OK ? panel.url : nil)
+    }
+    if let window = NSApp.keyWindow {
+        panel.beginSheetModal(for: window, completionHandler: finish)
+    } else {
+        panel.begin(completionHandler: finish)
+    }
+}
