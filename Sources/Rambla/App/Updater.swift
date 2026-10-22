@@ -36,6 +36,8 @@ final class Updater {
     /// Called when `available` or `isInstalling` change (the menu shows them).
     var onChange: (() -> Void)?
     private var scheduler: NSBackgroundActivityScheduler?
+    /// The check 30 s after launch (or after the option is turned on): cancelled when the option is turned off.
+    private var launchCheck: Task<Void, Never>?
 
     var currentVersion: AppVersion {
         AppVersion(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "") ?? AppVersion("0")!
@@ -44,6 +46,8 @@ final class Updater {
     func configure(automatic: Bool) {
         scheduler?.invalidate()
         scheduler = nil
+        launchCheck?.cancel()
+        launchCheck = nil
         guard automatic else { return }
         let scheduler = NSBackgroundActivityScheduler(identifier: "io.github.coru29.Rambla.updates")
         scheduler.repeats = true
@@ -57,8 +61,9 @@ final class Updater {
             }
         }
         self.scheduler = scheduler
-        Task { @MainActor [weak self] in
+        launchCheck = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(30))
+            guard !Task.isCancelled else { return }
             await self?.check(userInitiated: false)
         }
     }
