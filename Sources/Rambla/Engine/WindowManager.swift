@@ -220,10 +220,34 @@ final class WindowManager {
 
     private static let screenUnlocked = Notification.Name("com.apple.screenIsUnlocked")
 
-    /// Every app lists its windows again; one reconcile takes all the answers.
-    private func readWindowsAgain() {
+    /// Every app lists its windows again, and one reconcile takes all the answers after the same wait as at launch.
+    /// Right after an unlock Accessibility may still list nothing: while no window is known, it tries twice more.
+    private func readWindowsAgain(retries: Int = 2) {
         workers.values.forEach { $0.rescan() }
-        scheduleReconcile(after: 0.3)
+        scheduleReconcile(after: 0.6)
+        guard retries > 0 else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.isRunning, self.windows.isEmpty else { return }
+                self.readWindowsAgain(retries: retries - 1)
+            }
+        }
+    }
+
+    /// The sleep and wake notifications keep `screensAsleep`; a display that is awake also ends it, in case a wake
+    /// notification was missed. A monitor can leave the list while it sleeps, so with no display awake to ask, the
+    /// notifications decide.
+    private func screensAreAsleep() -> Bool {
+        if screensAsleep, Self.anyDisplayAwake() { screensAsleep = false }
+        return screensAsleep
+    }
+
+    private static func anyDisplayAwake() -> Bool {
+        var count: UInt32 = 0
+        guard CGGetOnlineDisplayList(0, nil, &count) == .success, count > 0 else { return false }
+        var ids = [CGDirectDisplayID](repeating: 0, count: Int(count))
+        guard CGGetOnlineDisplayList(count, &ids, &count) == .success else { return false }
+        return ids.prefix(Int(count)).contains { CGDisplayIsAsleep($0) == 0 }
     }
 
     private func observe(_ center: NotificationCenter, _ name: Notification.Name, _ block: @escaping @MainActor (Notification) -> Void) {
@@ -543,7 +567,7 @@ final class WindowManager {
     private func dropStripsOfDisconnectedDisplays(now: TimeInterval) {
         let connected = Set(displays.map(\.uuid))
         for uuid in connected { displayGoneSince[uuid] = nil }
-        guard !screensAsleep else { return }
+        guard !screensAreAsleep() else { return }
         for uuid in Set(strips.keys.map(\.displayUUID)) where !connected.contains(uuid) {
             let since = displayGoneSince[uuid] ?? now
             displayGoneSince[uuid] = since

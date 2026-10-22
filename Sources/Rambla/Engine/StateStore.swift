@@ -71,9 +71,9 @@ extension WindowManager {
     /// The first time a strip is seen this session, rebuild it from the saved layout (matching windows by
     /// id, then by app + title); windows the save does not know are added afterwards in x order.
     func restoreFromSavedState(keys: [StripKey], candidates: [WindowRecord]) {
-        // Without a window to place (Rambla started while the screen was locked), wait for one instead of using up
-        // the restore of the strips seen now.
-        guard let state = restoreState, !candidates.isEmpty else { return }
+        // Without a window to place in a strip (Rambla started while the screen was locked, when Accessibility lists
+        // none), wait for one instead of using up the restore of the strips seen now.
+        guard let state = restoreState, candidates.contains(where: { $0.kind == .tile }) else { return }
         let live = candidates.map { RamblaCore.WindowRef(id: $0.id, bundleID: $0.bundleID ?? "", title: $0.title) }
         let matches = StateMatcher.match(saved: state.refs, live: live)
         for key in keys where !restoredKeys.contains(key) {
