@@ -225,16 +225,37 @@ private func savedColumn(_ windows: [WindowID], _ width: ColumnWidth = .fraction
     let saved = [WindowRef(id: 7, bundleID: terminal, title: "zsh")]
     let sameID = WindowRef(id: 7, bundleID: terminal, title: "vim")
     let sameTitle = WindowRef(id: 30, bundleID: terminal, title: "zsh")
-    // In the login session they were saved in, ids are the live ones: a new "zsh" window is another window.
-    #expect(StateMatcher.match(saved: saved, live: [sameTitle], session: "today", current: "today").isEmpty)
-    #expect(StateMatcher.match(saved: saved, live: [sameTitle, sameID], session: "today", current: "today") == [7: 7])
+    // In the login session they were saved in, a live id is that window: while window 7 exists, a new "zsh" window
+    // is another window.
+    #expect(StateMatcher.match(saved: saved, live: [sameTitle], session: "today", current: "today", alive: [7]).isEmpty)
+    #expect(StateMatcher.match(saved: saved, live: [sameTitle, sameID], session: "today", current: "today",
+                               alive: [7, 30]) == [7: 7])
+    // Once window 7 is gone (closed, or its app restarted), its title may find it again.
+    #expect(StateMatcher.match(saved: saved, live: [sameTitle], session: "today", current: "today", alive: [30]) == [7: 30])
+    #expect(StateMatcher.match(saved: saved, live: [sameTitle], session: "today", current: "today", alive: [30],
+                               byTitle: false).isEmpty)
     // After a logout or a restart ids are handed out again: only the title tells.
-    #expect(StateMatcher.match(saved: saved, live: [sameID, sameTitle], session: "earlier", current: "today") == [7: 30])
-    #expect(StateMatcher.match(saved: saved, live: [sameID], session: "earlier", current: "today").isEmpty)
-    #expect(StateMatcher.match(saved: saved, live: [sameTitle], session: "earlier", current: "today",
+    #expect(StateMatcher.match(saved: saved, live: [sameID, sameTitle], session: "earlier", current: "today",
+                               alive: [7, 30]) == [7: 30])
+    #expect(StateMatcher.match(saved: saved, live: [sameID], session: "earlier", current: "today", alive: [7]).isEmpty)
+    #expect(StateMatcher.match(saved: saved, live: [sameTitle], session: "earlier", current: "today", alive: [30],
                                byTitle: false).isEmpty)
     // Files from before 1.1.0 do not say: ids first, then titles.
-    #expect(StateMatcher.match(saved: saved, live: [sameTitle, sameID], session: nil, current: "today") == [7: 7])
-    #expect(StateMatcher.match(saved: saved, live: [sameTitle], session: nil, current: "today") == [7: 30])
-    #expect(StateMatcher.match(saved: saved, live: [sameTitle], session: nil, current: "today", byTitle: false).isEmpty)
+    #expect(StateMatcher.match(saved: saved, live: [sameTitle, sameID], session: nil, current: "today",
+                               alive: [7, 30]) == [7: 7])
+    #expect(StateMatcher.match(saved: saved, live: [sameTitle], session: nil, current: "today", alive: [30]) == [7: 30])
+    #expect(StateMatcher.match(saved: saved, live: [sameTitle], session: nil, current: "today", alive: [30],
+                               byTitle: false).isEmpty)
+}
+
+@Test func anAmbiguousTitleCanBeLeftUnmatched() {
+    // Two Terminal windows with the default title: which one was saved cannot be told.
+    let saved = [WindowRef(id: 7, bundleID: "com.apple.Terminal", title: "user — -zsh — 80×24")]
+    let twins = [WindowRef(id: 30, bundleID: "com.apple.Terminal", title: "user — -zsh — 80×24"),
+                 WindowRef(id: 31, bundleID: "com.apple.Terminal", title: "user — -zsh — 80×24")]
+    #expect(StateMatcher.match(saved: saved, live: twins, session: "earlier", current: "today", alive: [30, 31]) == [7: 30])
+    #expect(StateMatcher.match(saved: saved, live: twins, session: "earlier", current: "today", alive: [30, 31],
+                               uniqueTitles: true).isEmpty)
+    #expect(StateMatcher.match(saved: saved, live: [twins[0]], session: "earlier", current: "today", alive: [30],
+                               uniqueTitles: true) == [7: 30])
 }

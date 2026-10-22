@@ -94,7 +94,18 @@ private func ref(_ id: WindowID, _ app: String = "app") -> WindowRef {
 
     let reloaded = try #require(StripArchive(loading: state, at: now).strip(displayUUID: "D", spaceKey: "s5"))
     #expect(reloaded.refs == [docs])
-    #expect(StateMatcher.match(saved: reloaded.refs, live: [inbox], session: reloaded.session, current: "today").isEmpty)
+    #expect(StateMatcher.match(saved: reloaded.refs, live: [inbox], session: reloaded.session, current: "today",
+                               alive: [812]).isEmpty)
+}
+
+@Test func aStripFromBefore1_1_0KeepsTheWindowsItWasSavedWith() {
+    // Saved again by 1.1.0 it still has no session, but it has its own refs by then: the shared list, where a newer
+    // window may have one of its ids, must not replace them.
+    let docs = WindowRef(id: 812, bundleID: "com.apple.Safari", title: "Docs")
+    let inbox = WindowRef(id: 812, bundleID: "com.apple.mail", title: "Inbox")
+    let old = SavedStrip(displayUUID: "D", spaceKey: "s5", strip: strip([812]), lastSeen: now, session: nil, refs: [docs])
+    let file = SavedState(session: "today", refs: [inbox, docs], strips: [old])
+    #expect(StripArchive(loading: file, at: now).strip(displayUUID: "D", spaceKey: "s5")?.refs == [docs])
 }
 
 @Test func archivedStripsTooOldToComeBackAreDropped() {

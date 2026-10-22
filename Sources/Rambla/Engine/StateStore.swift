@@ -68,6 +68,9 @@ extension WindowManager {
         var saved: [SavedStrip] = []
         for (key, strip) in strips where !strip.columns.isEmpty {
             guard let spaceKey = spaceKeys[key] else { continue }
+            // A desktop not rebuilt yet keeps its saved arrangement in the file: a window that went there meanwhile
+            // (moved to it from Mission Control, say) joins it when the desktop is rebuilt.
+            if !restoredKeys.contains(key), archive.strip(displayUUID: key.displayUUID, spaceKey: spaceKey) != nil { continue }
             let mine = strip.allWindows.compactMap(ref)
             saved.append(SavedStrip(displayUUID: key.displayUUID, spaceKey: spaceKey, strip: strip, session: StateStore.session,
                                     refs: mine))
@@ -87,10 +90,11 @@ extension WindowManager {
 
     /// The first time a display and Space are in view this session, rebuild their strip from the archive; the windows
     /// it does not know are added afterwards in x order. Windows are matched the way the session the strip was saved in
-    /// allows (`StateMatcher`). A display that comes back takes back, for `returnWindow`, the windows of the strips
-    /// archived when it was unplugged, from the strips they joined meanwhile, as long as they are on screen and the
-    /// user did not float them.
-    func restoreFromSavedState(keys: [StripKey], candidates: [WindowRecord], visible: Set<WindowID>) {
+    /// allows (`StateMatcher`; `alive` holds every window that exists). A display that comes back takes back, for
+    /// `returnWindow`, the windows of the strips archived when it was unplugged, from the strips they joined meanwhile,
+    /// as long as they are on screen and the user did not float them.
+    func restoreFromSavedState(keys: [StripKey], candidates: [WindowRecord], visible: Set<WindowID>, alive: Set<WindowID>) {
+        let now = CFAbsoluteTimeGetCurrent()
         for key in keys where !restoredKeys.contains(key) {
             guard let spaceKey = spaceKeys[key], let display = displays.first(where: { $0.uuid == key.displayUUID })
             else { continue }
@@ -98,11 +102,14 @@ extension WindowManager {
             guard let saved = archive.strip(displayUUID: key.displayUUID, spaceKey: spaceKey)
                 ?? (returning && !display.spaceKeys.isEmpty
                     ? archive.strayStrip(displayUUID: key.displayUUID, spaces: display.spaceKeys) : nil) else {
-                restoredKeys.insert(key)
+                // Nothing saved for it, unless macOS has not listed a returning display's desktops yet: its strip may
+                // be under another key, so look again with the next change.
+                if !returning || !display.spaceKeys.isEmpty { restoredKeys.insert(key) }
                 continue
             }
-            // Apps are still listing their windows: rebuilt now, the strip would get only the first ones.
-            guard !waitingForWindowLists else { continue }
+            // Apps are still listing their windows, or still opening after a Mac restart: rebuilt now, the strip would
+            // get only the first ones.
+            guard !waitingForWindowLists, !waitsForApps(saved, now: now) else { continue }
             let takesBack = returning && saved.unplugged
             let pool: [WindowRecord]
             if takesBack {
@@ -117,8 +124,10 @@ extension WindowManager {
                     $0.kind == .tile && Displays.best(for: $0.frame, in: displays)?.uuid == key.displayUUID
                 }) else { continue }
             }
+            // Taking windows back from other strips goes by id, or after a Mac restart by a title only one window has.
             let map = StateMatcher.match(saved: saved.refs, live: pool.compactMap { ref($0.id) }, session: saved.session,
-                                         current: StateStore.session)
+                                         current: StateStore.session, alive: alive,
+                                         byTitle: !takesBack || saved.session != StateStore.session, uniqueTitles: takesBack)
             var restored = saved.strip.remapped(map)
             guard !restored.columns.isEmpty else {
                 // None of its windows is here. A display that is coming back tries again with the next change. Any
@@ -150,7 +159,7 @@ extension WindowManager {
         let live = candidates.filter { !placed.contains($0.id) }.compactMap { ref($0.id) }
         let saved = file.refs.filter { pendingFloating.contains($0.id) }
         let matches = StateMatcher.match(saved: saved, live: live, session: file.session, current: StateStore.session,
-                                         byTitle: startingUp)
+                                         alive: alive, byTitle: startingUp)
         for (savedID, liveID) in matches {
             pendingFloating.remove(savedID)
             markFloating(liveID)

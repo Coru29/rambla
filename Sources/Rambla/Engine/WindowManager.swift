@@ -100,6 +100,10 @@ final class WindowManager {
     private var awaitingWindowLists: Set<pid_t> = []
     private var awaitingUntil: CFAbsoluteTime = 0
     private static let windowListWait: CFAbsoluteTime = 2
+    /// Apps that have listed their windows at least once: one Accessibility cannot reach never answers.
+    private var listedOnce: Set<pid_t> = []
+    /// When Rambla last learnt of a window it did not know.
+    private var lastWindowAppeared: CFAbsoluteTime = 0
     /// Saved ids of the floating windows not matched yet; each one floats a single live window.
     var pendingFloating: Set<WindowID> = []
     /// When Rambla started: saved windows are matched by title only for `restoreByTitleWindow` seconds after it.
@@ -131,11 +135,15 @@ final class WindowManager {
         archive = StripArchive(loading: restoreState, at: Date())
         pendingFloating = Set(restoreState?.floating ?? [])
         launchTime = CFAbsoluteTimeGetCurrent()
-        // A display may have been plugged back while Rambla was not running.
-        for display in displays { returningDisplays[display.uuid] = launchTime + Self.returnWindow }
+        lastWindowAppeared = launchTime
+        // A display may have been plugged back while Rambla was not running. After a Mac restart its windows can take
+        // a while to come back, as their apps open again (`waitsForApps`).
+        for display in displays {
+            returningDisplays[display.uuid] = launchTime + Self.restoreByTitleWindow + Self.returnWindow
+        }
         observeSystem()
         NSWorkspace.shared.runningApplications.forEach(register)
-        awaitWindowLists()
+        awaitWindowLists(from: Set(workers.keys))
         if let only = onlyBundles { Log.info("Test mode: managing only \(only.sorted().joined(separator: ", "))") }
         // Give every app's worker a moment to report its windows so the saved layout restores in one go.
         scheduleReconcile(after: 0.6)
@@ -248,7 +256,7 @@ final class WindowManager {
     /// Every app lists its windows again, and one reconcile takes all the answers after the same wait as at launch.
     /// Right after an unlock Accessibility may still list nothing: while no window is known, it tries twice more.
     private func readWindowsAgain(retries: Int = 2) {
-        rescanAll()
+        rescanAll(waitingForAll: true)
         scheduleReconcile(after: 0.6)
         guard retries > 0 else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
@@ -310,26 +318,42 @@ final class WindowManager {
     private func unregister(_ pid: pid_t) {
         appLaunchTimes[pid] = nil
         awaitingWindowLists.remove(pid)
+        listedOnce.remove(pid)
         guard let worker = workers.removeValue(forKey: pid) else { return }
         worker.stop()
         for (id, record) in windows where record.pid == pid { removeWindow(id) }
         scheduleReconcile()
     }
 
-    /// Every app lists its windows again; saved strips wait for the answers.
-    private func rescanAll() {
+    /// Every app lists its windows again; saved strips wait for the answers of those that answered before, or of all
+    /// of them after an unlock (while the screen is locked Accessibility may not answer at all).
+    private func rescanAll(waitingForAll: Bool = false) {
         workers.values.forEach { $0.rescan() }
-        awaitWindowLists()
+        awaitWindowLists(from: waitingForAll ? Set(workers.keys) : listedOnce.intersection(workers.keys))
     }
 
-    private func awaitWindowLists() {
-        awaitingWindowLists = Set(workers.keys)
+    private func awaitWindowLists(from apps: Set<pid_t>) {
+        awaitingWindowLists = apps
         awaitingUntil = CFAbsoluteTimeGetCurrent() + Self.windowListWait
         checkDisplaysAgain(after: Self.windowListWait + 0.05)
     }
 
     /// Some app has not listed its windows yet (`awaitingWindowLists`).
     var waitingForWindowLists: Bool { !awaitingWindowLists.isEmpty && CFAbsoluteTimeGetCurrent() < awaitingUntil }
+
+    /// After a Mac restart Rambla can start before macOS opens the apps again. For `restoreByTitleWindow` after launch,
+    /// a strip saved in an earlier login session waits until each of its apps shows a window and no new window has
+    /// appeared for a second (three while one of its apps has none: it may not come back).
+    func waitsForApps(_ saved: SavedStrip, now: CFAbsoluteTime) -> Bool {
+        let deadline = launchTime + Self.restoreByTitleWindow
+        guard let session = saved.session, session != StateStore.session, now < deadline else { return false }
+        let shown = Set(windows.values.compactMap(\.bundleID))
+        let quiet: CFAbsoluteTime = Set(saved.refs.map(\.bundleID)).subtracting([""]).isSubset(of: shown) ? 1 : 3
+        let ready = lastWindowAppeared + quiet
+        guard now < ready else { return false }
+        checkDisplaysAgain(after: min(ready, deadline) - now + 0.05)
+        return true
+    }
 
     func worker(for id: WindowID) -> AppWorker? {
         windows[id].flatMap { workers[$0.pid] }
@@ -342,6 +366,7 @@ final class WindowManager {
         switch event {
         case .appWindows(let pid, let snapshots):
             awaitingWindowLists.remove(pid)
+            listedOnce.insert(pid)
             // An app launched while Rambla runs often shows its first window before its observer exists:
             // those windows are new too, so they open next to the focused column.
             let launchedRecently = appLaunchTimes[pid].map { CFAbsoluteTimeGetCurrent() - $0 < 10 } ?? false
@@ -389,6 +414,7 @@ final class WindowManager {
                 id: snapshot.id, pid: snapshot.pid, bundleID: snapshot.traits.bundleID, traits: snapshot.traits,
                 frame: snapshot.frame, title: snapshot.title, kind: kind,
                 originalHeight: snapshot.frame.height, minSize: nil, isFresh: fresh)
+            lastWindowAppeared = CFAbsoluteTimeGetCurrent()
         }
     }
 
@@ -574,7 +600,7 @@ final class WindowManager {
         var managed = Set(strips.values.flatMap(\.allWindows))
         let candidates = windows.values
             .filter { $0.kind != .ignore && visible.contains($0.id) && !managed.contains($0.id) && !floating.contains($0.id) }
-        restoreFromSavedState(keys: keys, candidates: candidates, visible: visible)
+        restoreFromSavedState(keys: keys, candidates: candidates, visible: visible, alive: existing)
         managed = Set(strips.values.flatMap(\.allWindows))
         let orphans = windows.values
             .filter { $0.kind == .tile && visible.contains($0.id) && !managed.contains($0.id) && !floating.contains($0.id) }
@@ -604,6 +630,8 @@ final class WindowManager {
         for key in keys {
             if revealKeys.contains(key) { reveal(key) } else { apply(key, animate: true) }
         }
+        // Strips that wait for the apps' window lists need a reconcile once the wait is over, whichever came first.
+        if waitingForWindowLists { checkDisplaysAgain(after: awaitingUntil - CFAbsoluteTimeGetCurrent() + 0.05) }
         onStateChanged?()
     }
 

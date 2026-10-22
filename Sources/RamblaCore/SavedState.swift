@@ -70,7 +70,7 @@ public struct StripArchive: Equatable, Sendable {
     public init() {}
 
     /// The archive at launch: every strip of the saved file, dated now when the file has no date. Strips from before
-    /// 1.1.0 (no session) take their windows' refs from the file's shared list.
+    /// 1.1.0 (no session, no refs of their own) take their windows' refs from the file's shared list.
     public init(loading state: SavedState?, at now: Date) {
         guard let state else { return }
         var shared: [WindowID: WindowRef] = [:]
@@ -78,7 +78,7 @@ public struct StripArchive: Equatable, Sendable {
         strips = state.strips.map { strip in
             var strip = strip
             if strip.lastSeen == nil { strip.lastSeen = now }
-            if strip.session == nil { strip.refs = strip.strip.allWindows.compactMap { shared[$0] } }
+            if strip.session == nil, strip.refs.isEmpty { strip.refs = strip.strip.allWindows.compactMap { shared[$0] } }
             return strip
         }
     }
@@ -178,24 +178,28 @@ public struct SavedState: Codable, Equatable, Sendable {
 public enum StateMatcher {
     /// Maps saved window ids to the live windows they most likely are, the way the login session they were saved in
     /// allows (`session`; files from before 1.1.0 do not say):
-    /// - in this one (`current`) ids are the live ones, so only the same id counts: a window that shares a saved title
-    ///   is another window;
+    /// - in this one (`current`) an id names one window for good: while it is `alive`, only that window is it (a new
+    ///   window sharing its title is another one); once it is gone (closed, or its app restarted) its title may find
+    ///   it again;
     /// - in an earlier one ids were handed out again, so only the app and the title count;
     /// - when unknown, ids first and then titles.
-    /// Titles count only with `byTitle`: past the first moments of a session, a new window sharing a saved title is
-    /// another window too.
+    /// Titles count only with `byTitle`, and with `uniqueTitles` a title that several live windows of the app share
+    /// matches none of them.
     public static func match(saved: [WindowRef], live: [WindowRef], session: String?, current: String,
-                             byTitle: Bool = true) -> [WindowID: WindowID] {
+                             alive: Set<WindowID>, byTitle: Bool = true, uniqueTitles: Bool = false) -> [WindowID: WindowID] {
         let sameSession = session == current
-        return match(saved: saved, live: live, byID: session == nil || sameSession, byTitle: byTitle && !sameSession)
+        return match(saved: saved, live: live, byID: session == nil || sameSession, byTitle: byTitle,
+                     uniqueTitles: uniqueTitles, titleAllowed: { !sameSession || !alive.contains($0.id) })
     }
 
     /// Maps saved window ids to the live windows they most likely are; saved windows with no match are absent.
     /// Pass 1 (`byID`) pairs windows with the same id and the same app (same login session). Pass 2 (`byTitle`) pairs
-    /// what is left by app and identical non-empty title, in order (after a restart). Each live window is used at most
-    /// once, and pass 1 claims its windows first so a title match can never steal a window whose id is known.
-    public static func match(saved: [WindowRef], live: [WindowRef], byID: Bool = true,
-                             byTitle: Bool = true) -> [WindowID: WindowID] {
+    /// what is left (that `titleAllowed`) by app and identical non-empty title, in order (after a restart). Each live
+    /// window is used at most once, and pass 1 claims its windows first so a title match can never steal a window
+    /// whose id is known.
+    public static func match(saved: [WindowRef], live: [WindowRef], byID: Bool = true, byTitle: Bool = true,
+                             uniqueTitles: Bool = false,
+                             titleAllowed: (WindowRef) -> Bool = { _ in true }) -> [WindowID: WindowID] {
         var mapping: [WindowID: WindowID] = [:]
         var claimed = Set<Int>()   // indices into `live`
 
@@ -209,10 +213,9 @@ public enum StateMatcher {
             claimed.insert(index)
         }
 
-        for ref in saved where byTitle && mapping[ref.id] == nil && !ref.title.isEmpty {
-            guard let index = live.indices.first(where: {
-                !claimed.contains($0) && live[$0].bundleID == ref.bundleID && live[$0].title == ref.title
-            }) else { continue }
+        for ref in saved where byTitle && mapping[ref.id] == nil && !ref.title.isEmpty && titleAllowed(ref) {
+            let same = live.indices.filter { live[$0].bundleID == ref.bundleID && live[$0].title == ref.title }
+            guard !uniqueTitles || same.count == 1, let index = same.first(where: { !claimed.contains($0) }) else { continue }
             mapping[ref.id] = live[index].id
             claimed.insert(index)
         }
