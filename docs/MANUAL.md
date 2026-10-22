@@ -49,7 +49,7 @@ En macOS, cada ventana nueva se encima con las demás o te obliga a achicarlas. 
 3. macOS te pide el permiso de **Accesibilidad**, que es lo que permite mover ventanas de otras apps. Andá a **Ajustes del Sistema → Privacidad y seguridad → Accesibilidad** y activá **Rambla**. Si no aparece el aviso, el menú de Rambla tiene "Abrir Ajustes de Accesibilidad…".
 4. Listo: Rambla detecta el permiso sola y ordena tus ventanas.
 
-> Rambla no está notarizada por Apple. Si macOS dice que no puede verificar al desarrollador, hacé click derecho en la app → **Abrir**.
+> Rambla no está notarizada por Apple, así que la primera vez macOS no la abre. Andá a **Ajustes del Sistema → Privacidad y seguridad** y tocá **«Abrir de todos modos»**. En macOS 14 alcanza con click derecho en la app → **Abrir**.
 
 Rambla no necesita Grabación de pantalla, ni Monitoreo de entrada, ni desactivar SIP.
 

@@ -49,7 +49,7 @@ On macOS, every new window lands on top of the others or makes you shrink them. 
 3. macOS asks for the **Accessibility** permission, which is what lets Rambla move other apps' windows. Go to **System Settings → Privacy & Security → Accessibility** and turn **Rambla** on. If the prompt does not show up, Rambla's menu has **Open Accessibility Settings…**.
 4. That's it: Rambla notices the permission by itself and arranges your windows.
 
-> Rambla is not notarized by Apple. If macOS says it cannot verify the developer, right-click the app and choose **Open**.
+> Rambla is not notarized by Apple, so macOS will not open it the first time. Go to **System Settings → Privacy & Security** and click **Open Anyway**. On macOS 14, right-clicking the app and choosing **Open** is enough.
 
 Rambla does not need Screen Recording, Input Monitoring, or SIP disabled.
 

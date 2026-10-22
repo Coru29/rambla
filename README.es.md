@@ -50,7 +50,7 @@ macOS 14 Sonoma o posterior, en Apple silicon, y el permiso de Accesibilidad.
 
 1. Bajá **[Rambla.dmg](https://github.com/Coru29/rambla/releases/latest/download/Rambla.dmg)** de [Releases](https://github.com/Coru29/rambla/releases) (o compilalo, más abajo) y arrastrá **Rambla** a Aplicaciones.
 2. Abrila y dale permiso en **Ajustes del Sistema → Privacidad y seguridad → Accesibilidad**.
-3. Rambla no está notarizada por Apple. Si macOS dice que no puede verificar al desarrollador, hacé click derecho en la app → **Abrir**, o corré `xattr -dr com.apple.quarantine /Applications/Rambla.app`.
+3. Rambla no está notarizada por Apple, así que la primera vez macOS no la abre. Andá a **Ajustes del Sistema → Privacidad y seguridad** y tocá **«Abrir de todos modos»** (en macOS 14 alcanza con click derecho en la app → **Abrir**), o corré `xattr -dr com.apple.quarantine /Applications/Rambla.app`.
 
 ### Actualizaciones
 
