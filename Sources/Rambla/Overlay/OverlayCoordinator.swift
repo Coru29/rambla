@@ -11,7 +11,9 @@ final class OverlayCoordinator {
     private lazy var tabBars = TabBarController { [weak self] id in self?.engine.focusTab(id) }
     private lazy var overview = OverviewController(
         onChoose: { [weak self] id, key in self?.focusFromOverview(id, in: key) },
-        onMove: { [weak self] from, to, key, window in self?.moveFromOverview(from: from, to: to, in: key, selecting: window) })
+        onMove: { [weak self] column, target, key, window in
+            self?.moveFromOverview(column, toPlaceOf: target, in: key, selecting: window)
+        })
     private let border = FocusBorderController()
     private let dimmer = DimmerController()
     private var indicatorKey: StripKey?
@@ -158,9 +160,12 @@ final class OverlayCoordinator {
         return content
     }
 
-    /// A column moved in the overview: the strip behind it changes, and the overview shows it as it is now.
-    private func moveFromOverview(from: Int, to: Int, in key: StripKey, selecting window: WindowID?) -> OverviewContent? {
-        guard let display = engine.display(for: key) else { return nil }
+    /// A column moved in the overview: the strip behind it changes, and the overview shows it as it is now. Columns
+    /// are found by id, since the strip may have changed since the overview was made.
+    private func moveFromOverview(_ column: UUID, toPlaceOf target: UUID, in key: StripKey,
+                                  selecting window: WindowID?) -> OverviewContent? {
+        guard let display = engine.display(for: key), let strip = engine.strips[key],
+              let from = strip.index(ofColumn: column), let to = strip.index(ofColumn: target) else { return nil }
         engine.moveColumn(in: key, from: from, to: to)
         return overviewContent(for: key, display: display, selecting: window)
     }

@@ -142,9 +142,12 @@ extension WindowManager {
         focus(window: window, in: key)
     }
 
+    /// Moves a column (the strip indicator's or the overview's drag): the focused window keeps the focus and stays in
+    /// view, where the keyboard still is.
     func moveColumn(in key: StripKey, from: Int, to: Int) {
         guard var strip = strips[key], strip.columns.indices.contains(from), strip.columns.indices.contains(to) else { return }
         strip.moveColumn(from: from, to: to)
+        if let id = focusedWindow, strip.contains(id) { strip.focus(window: id) }
         strips[key] = strip
         reveal(key)
         onStateChanged?()

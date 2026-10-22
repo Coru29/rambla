@@ -186,11 +186,13 @@ private func overview(_ strip: Strip, hidden: Set<WindowID> = [], area: Double =
     #expect(o.cards.map(\.column) == [3, 0, 1, 2, 4])
     #expect(o.cards.map(\.id) == [3, 0, 1, 2, 4].map { s.columns[$0].id })
     #expect(o.movable == 1...3)
-    // A to where C is: the strip moves column 0 to index 2.
+    // A to where C is: the strip moves column A (index 0) to C's place (index 2).
     let move = try #require(o.columnMove(card: 1, to: 3))
-    #expect(move.from == 0 && move.to == 2)
+    #expect(move.column == s.columns[0].id && move.toPlaceOf == s.columns[2].id)
     var moved = s
-    moved.moveColumn(from: move.from, to: move.to)
+    let from = try #require(s.columns.firstIndex { $0.id == move.column })
+    let to = try #require(s.columns.firstIndex { $0.id == move.toPlaceOf })
+    moved.moveColumn(from: from, to: to)
     #expect(moved.visualOrder(hidden: []).map { moved.columns[$0].windows[0] } == [4, 2, 3, 1, 5])
     // Pinned columns stay put, and a card dropped where it was moves nothing.
     #expect(o.columnMove(card: 0, to: 2) == nil)

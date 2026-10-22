@@ -154,11 +154,12 @@ public struct Overview: Equatable, Sendable {
         return movable.lowerBound + before.count
     }
 
-    /// Moving the column of `card` to the place of the card at `slot`: the arguments `Strip.moveColumn(from:to:)`
-    /// takes. Nil for a pinned column, a place outside the unpinned ones, or the card's own place.
-    public func columnMove(card: Int, to slot: Int) -> (from: Int, to: Int)? {
+    /// Moving the column of `card` to the place of the card at `slot`: the column that moves and the one whose place
+    /// it takes, by id, since the strip may have changed since the overview was made. Nil for a pinned column, a place
+    /// outside the unpinned ones, or the card's own place.
+    public func columnMove(card: Int, to slot: Int) -> (column: UUID, toPlaceOf: UUID)? {
         guard let movable, movable.contains(card), movable.contains(slot), slot != card else { return nil }
-        return (cards[card].column, cards[slot].column)
+        return (cards[card].id, cards[slot].id)
     }
 
     /// The window of the `number`th card from 1, the one its column shows. Like ⌃⌘1…9, it counts only the columns

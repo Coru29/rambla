@@ -83,16 +83,16 @@ final class OverviewState: ObservableObject {
 @MainActor
 final class OverviewController {
     private let onChoose: (WindowID, StripKey) -> Void
-    /// Moves a column of the strip (`Strip.moveColumn(from:to:)`) and gives the overview of the strip as it is then,
-    /// with that window chosen; nil when nothing moved.
-    private let onMove: (_ from: Int, _ to: Int, _ key: StripKey, _ selecting: WindowID?) -> OverviewContent?
+    /// Moves a column of the strip to the place of another, both by id, and gives the overview of the strip as it is
+    /// then, with that window chosen; nil when either column is gone.
+    private let onMove: (_ column: UUID, _ toPlaceOf: UUID, _ key: StripKey, _ selecting: WindowID?) -> OverviewContent?
     private let state = OverviewState()
     private var panel: OverviewPanel?
     private var observers: [(NotificationCenter, NSObjectProtocol)] = []
     private(set) var shownKey: StripKey?
 
     init(onChoose: @escaping (WindowID, StripKey) -> Void,
-         onMove: @escaping (_ from: Int, _ to: Int, _ key: StripKey, _ selecting: WindowID?) -> OverviewContent?) {
+         onMove: @escaping (_ column: UUID, _ toPlaceOf: UUID, _ key: StripKey, _ selecting: WindowID?) -> OverviewContent?) {
         self.onChoose = onChoose
         self.onMove = onMove
     }
@@ -155,7 +155,7 @@ final class OverviewController {
               let move = overview.columnMove(card: card, to: slot) else { return false }
         let moved = overview.cards[card]
         let window = overview.selection.card == card ? overview.window(at: overview.selection) : moved.windows[moved.active]
-        guard let content = onMove(move.from, move.to, key, window) else { return false }
+        guard let content = onMove(move.column, move.toPlaceOf, key, window) else { return false }
         state.content = content
         return true
     }
@@ -337,6 +337,7 @@ struct OverviewView: View {
         let drawn = content.drawn
         let gap = drawn.cards.count > 1 ? drawn.cards[1].lowerBound - drawn.cards[0].upperBound : 0
         let (order, slot) = arrangement(overview, drawn)
+        let ids = overview.cards.map(\.id)
         return GeometryReader { geometry in
             ScrollViewReader { proxy in
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -361,6 +362,8 @@ struct OverviewView: View {
                     .contentShape(Rectangle())
                     .onTapGesture(perform: dismiss)
                 }
+                // The strip changed under a drag (a shortcut moved a column meanwhile): the drag's card is not that one.
+                .onChange(of: ids) { _, _ in drag = nil }
                 .onAppear { proxy.scrollTo(overview.cards[overview.selection.card].id, anchor: .center) }
                 .onChange(of: overview.selection) { _, selection in
                     guard overview.cards.indices.contains(selection.card) else { return }
@@ -403,8 +406,9 @@ struct OverviewView: View {
         var order = Array(overview.cards.indices)
         guard let drag, order.indices.contains(drag.card) else { return (order, nil) }
         let span = drawn.cards[drag.card]
-        let slot = drag.landing
-            ?? overview.dropSlot(forCard: drag.card, center: (span.lowerBound + span.upperBound) / 2 + drag.offset, in: drawn)
+        let slot = min(drag.landing
+            ?? overview.dropSlot(forCard: drag.card, center: (span.lowerBound + span.upperBound) / 2 + drag.offset, in: drawn),
+            order.count - 1)
         order.remove(at: drag.card)
         order.insert(drag.card, at: slot)
         return (order, slot)
@@ -433,7 +437,14 @@ struct OverviewView: View {
     }
 
     /// The dragged card, lifted, under the pointer; it never passes the pinned columns.
+    @ViewBuilder
     private func lifted(_ drag: CardDrag, _ content: OverviewContent, _ drawn: Overview.Drawn) -> some View {
+        if content.overview.cards.indices.contains(drag.card) {
+            liftedCard(drag, content, drawn)
+        }
+    }
+
+    private func liftedCard(_ drag: CardDrag, _ content: OverviewContent, _ drawn: Overview.Drawn) -> some View {
         let overview = content.overview
         let span = drawn.cards[drag.card]
         let width = span.upperBound - span.lowerBound
