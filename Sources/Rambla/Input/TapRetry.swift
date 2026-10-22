@@ -8,15 +8,24 @@ final class TapRetry {
     private var delay: TimeInterval = 1
     private var pending: DispatchWorkItem?
 
-    init(name: String) {
+    nonisolated init(name: String) {
         self.name = name
     }
+
+    /// An attempt is scheduled: until it runs, the feature leaves trying to it (a settings change trying at once would
+    /// only fail again sooner, and log it).
+    var isWaiting: Bool { pending != nil }
 
     /// Schedules `attempt` after the current wait, and doubles the wait for the next failure.
     func failed(then attempt: @escaping @MainActor () -> Void) {
         pending?.cancel()
         Log.error("\(name) could not be created; trying again in \(Int(delay)) s")
-        let item = DispatchWorkItem { MainActor.assumeIsolated(attempt) }
+        let item = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                self?.pending = nil
+                attempt()
+            }
+        }
         pending = item
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
         delay = min(delay * 2, 60)

@@ -34,7 +34,7 @@ final class ScrollWheelTracker: @unchecked Sendable {
     private var session: Session?
     // Main thread only.
     private var enabled = false
-    private lazy var retry = MainActor.assumeIsolated { TapRetry(name: "Scroll wheel tap") }
+    private let retry = TapRetry(name: "Scroll wheel tap")
 
     init(handlers: Handlers) {
         self.handlers = handlers
@@ -45,7 +45,7 @@ final class ScrollWheelTracker: @unchecked Sendable {
         lock.withLock { self.modifiers = modifiers }
         self.enabled = enabled
         if !enabled { retry.reset() }
-        if enabled, session == nil {
+        if enabled, session == nil, !retry.isWaiting {
             let session = Session(tracker: self)
             self.session = session
             session.start()
@@ -81,7 +81,10 @@ final class ScrollWheelTracker: @unchecked Sendable {
         DispatchQueue.main.async {
             MainActor.assumeIsolated {
                 guard self.session === started else { return }
-                guard !ok else { return self.retry.reset() }
+                if ok {
+                    self.retry.reset()
+                    return
+                }
                 self.session = nil
                 self.retry.failed { [weak self] in
                     guard let self, self.enabled, self.session == nil else { return }

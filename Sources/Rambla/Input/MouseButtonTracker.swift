@@ -7,9 +7,10 @@ private let mouseButtonCallback: CGEventTapCallBack = { proxy, type, event, user
     return session.handle(proxy: proxy, type: type, event: event)
 }
 
-/// "Botones del mouse": moving the mouse with the chosen buttons held slides the strip, and a move up or down changes
-/// the focused column's width (`MouseButtonGesture` decides which presses and moves are Rambla's). It also records a
-/// new combination for the settings.
+/// "Botones del mouse": moving the mouse with the chosen buttons held slides the strip, a move up gives the focused
+/// column the full width, and a move down gives back its width when the buttons are let go, or opens the overview when
+/// it goes further (`MouseButtonGesture` decides which presses and moves are Rambla's). It also records a new
+/// combination for the settings.
 ///
 /// The taps sit where the mouse's events enter the window server, ahead of the other apps' taps (Mac Mouse Fix has
 /// its own there), so a chord of buttons that another app also uses on their own reaches Rambla first. A press that is
@@ -53,7 +54,7 @@ final class MouseButtonTracker: @unchecked Sendable {
     private var session: Session?
     private var enabled = false
     private var buttons: [Int] = []
-    private lazy var retry = MainActor.assumeIsolated { TapRetry(name: "Mouse button taps") }
+    private let retry = TapRetry(name: "Mouse button taps")
 
     init(handlers: Handlers) {
         self.handlers = handlers
@@ -108,7 +109,7 @@ final class MouseButtonTracker: @unchecked Sendable {
             self.session = nil
             session.stop()
         }
-        if wanted, session == nil {
+        if wanted, session == nil, !retry.isWaiting {
             // With the gestures off, an empty chord: every press stays the apps' (only a recording is Rambla's).
             let session = Session(tracker: self, buttons: enabled ? buttons : [])
             self.session = session
@@ -156,7 +157,10 @@ final class MouseButtonTracker: @unchecked Sendable {
         DispatchQueue.main.async {
             MainActor.assumeIsolated {
                 guard self.session === started else { return }
-                guard !ok else { return self.retry.reset() }
+                if ok {
+                    self.retry.reset()
+                    return
+                }
                 self.session = nil
                 self.retry.failed { [weak self] in self?.update(restart: false) }
             }

@@ -21,6 +21,8 @@ final class GestureTracker {
 
     private var tap: CFMachPort?
     private var source: CFRunLoopSource?
+    private var enabled = false
+    private let retry = TapRetry(name: "Trackpad gesture tap")
     private var fingers = 4
     private var vertical = true
     /// This swipe already went up or down: the rest of it is ignored.
@@ -29,7 +31,9 @@ final class GestureTracker {
     private var last: CGPoint?
     private var active = false
     private var velocity = VelocityTracker()
-    /// Ends a swipe whose lift came without touches (`TrackpadSwipe.liftTimeout`).
+    /// When the swipe's fingers last reported (event time), and the one check that ends the swipe there once
+    /// `TrackpadSwipe.liftTimeout` passes without another report: its lift came without touches.
+    private var lastTouch: TimeInterval?
     private var liftCheck: DispatchWorkItem?
 
     init(onBegin: @escaping () -> Void, onChange: @escaping (_ dx: Double) -> Void,
@@ -44,15 +48,12 @@ final class GestureTracker {
         self.fingers = fingers
         self.vertical = vertical
         self.enabled = enabled
-        if enabled, tap == nil { install() }
+        if enabled, tap == nil, !retry.isWaiting { install() }
         if !enabled {
             retry.reset()
             uninstall()
         }
     }
-
-    private var enabled = false
-    private let retry = TapRetry(name: "Trackpad gesture tap")
 
     private func install() {
         let mask = CGEventMask(1) << 29 // NSEvent.EventType.gesture
@@ -85,6 +86,7 @@ final class GestureTracker {
     private func reset(at time: TimeInterval) {
         liftCheck?.cancel()
         liftCheck = nil
+        lastTouch = nil
         if active { onEnd(velocity.velocity(at: time)) }
         active = false
         verticalDone = false
@@ -93,15 +95,24 @@ final class GestureTracker {
         velocity.reset()
     }
 
+    /// Ends the swipe at its last touch, so it keeps the speed it had, once `liftTimeout` has passed since; until then
+    /// it looks again. One check at a time, however many events come.
     private func scheduleLiftCheck() {
+        guard liftCheck == nil, let lastTouch else { return }
         let check = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated {
-                guard let self, self.liftCheck != nil else { return }
-                self.reset(at: ProcessInfo.processInfo.systemUptime)
+                guard let self, self.liftCheck != nil, let touch = self.lastTouch else { return }
+                self.liftCheck = nil
+                if ProcessInfo.processInfo.systemUptime - touch >= TrackpadSwipe.liftTimeout {
+                    self.reset(at: touch)
+                } else {
+                    self.scheduleLiftCheck()
+                }
             }
         }
         liftCheck = check
-        DispatchQueue.main.asyncAfter(deadline: .now() + TrackpadSwipe.liftTimeout, execute: check)
+        let wait = lastTouch + TrackpadSwipe.liftTimeout - ProcessInfo.processInfo.systemUptime
+        DispatchQueue.main.asyncAfter(deadline: .now() + max(wait, 0.01), execute: check)
     }
 
     /// `defaults write io.github.coru29.Rambla debugGestures -bool true` logs every touch event (read at launch).
@@ -139,14 +150,13 @@ final class GestureTracker {
                                    fingers: fingers) {
         case .ignore:
             // Between two real events, or the lift itself: if no touch follows soon, the fingers are gone.
-            if start != nil, liftCheck == nil { scheduleLiftCheck() }
+            scheduleLiftCheck()
             return
         case .end:
             reset(at: nsEvent.timestamp)
             return
         case .track:
-            liftCheck?.cancel()
-            liftCheck = nil
+            lastTouch = nsEvent.timestamp
         }
         let count = Double(touching.count)
         let mean = CGPoint(x: touching.reduce(0) { $0 + $1.normalizedPosition.x } / count,
