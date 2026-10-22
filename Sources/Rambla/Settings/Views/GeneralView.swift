@@ -8,6 +8,7 @@ struct GeneralView: View {
     @ObservedObject private var store = PreferencesStore.shared
     /// A copy of `backend.launchAtLogin`: the backend is not observable, and registering can fail.
     @State private var launchAtLogin = false
+    @State private var launchAtLoginNeedsApproval = false
 
     var body: some View {
         Form {
@@ -39,8 +40,18 @@ struct GeneralView: View {
                     set: { newValue in
                         backend.launchAtLogin = newValue
                         launchAtLogin = backend.launchAtLogin   // shows what macOS accepted
+                        launchAtLoginNeedsApproval = backend.launchAtLoginNeedsApproval
                     }
                 ))
+                if launchAtLoginNeedsApproval {
+                    HStack {
+                        Text("macOS pide que lo apruebes en Ítems de inicio.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Abrir Ítems de inicio") { backend.openLoginItemsSettings() }
+                    }
+                }
             }
         } footer: {
             Text("En pausa, Rambla trae las ventanas de vuelta a la pantalla y libera sus atajos.")
@@ -119,6 +130,7 @@ struct GeneralView: View {
 
     private func syncLaunchAtLogin() {
         launchAtLogin = backend?.launchAtLogin ?? false
+        launchAtLoginNeedsApproval = backend?.launchAtLoginNeedsApproval ?? false
     }
 
     // MARK: - Width of new windows

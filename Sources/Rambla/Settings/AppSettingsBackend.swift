@@ -35,6 +35,12 @@ final class AppSettingsBackend: SettingsBackend {
         }
     }
 
+    var launchAtLoginNeedsApproval: Bool { LoginItem.needsApproval }
+
+    func openLoginItemsSettings() {
+        LoginItem.openApprovalSettings()
+    }
+
     func installCLI() -> String? { Automation.installCLI() }
 
     func exportRaycastScripts(to folder: URL) -> String? { Automation.exportRaycast(to: folder) }

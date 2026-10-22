@@ -191,6 +191,7 @@ struct WelcomeShortcutsPage: View {
 struct WelcomeDonePage: View {
     @State private var launchAtLogin = LoginItem.isEnabled
     @State private var launchAtLoginFailed = false
+    @State private var launchAtLoginNeedsApproval = LoginItem.needsApproval
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -207,12 +208,23 @@ struct WelcomeDonePage: View {
                 Text("No se pudo cambiar esta opción.")
                     .font(.callout)
                     .foregroundStyle(.red)
+            } else if launchAtLoginNeedsApproval {
+                HStack {
+                    Text("macOS pide que lo apruebes en Ítems de inicio.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    Button("Abrir Ítems de inicio") { LoginItem.openApprovalSettings() }
+                        .controlSize(.small)
+                }
             }
             Link("Abrir el manual", destination: AppDelegate.manualURL)
             Spacer(minLength: 0)
         }
         .welcomePagePadding()
-        .onAppear { launchAtLogin = LoginItem.isEnabled }
+        .onAppear {
+            launchAtLogin = LoginItem.isEnabled
+            launchAtLoginNeedsApproval = LoginItem.needsApproval
+        }
     }
 
     private func setLaunchAtLogin(_ wanted: Bool) {
@@ -225,6 +237,7 @@ struct WelcomeDonePage: View {
         }
         // Show what macOS really did, which is not always what was asked.
         launchAtLogin = LoginItem.isEnabled
+        launchAtLoginNeedsApproval = LoginItem.needsApproval
     }
 }
 

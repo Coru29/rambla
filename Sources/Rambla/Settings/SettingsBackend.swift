@@ -9,6 +9,9 @@ protocol SettingsBackend: AnyObject {
     var hotkeyFailures: Set<KeyCombo> { get }
     var rectangleConflicts: [ShortcutConflict] { get }
     var launchAtLogin: Bool { get set }
+    /// macOS registered the login item but waits for the user to allow it.
+    var launchAtLoginNeedsApproval: Bool { get }
+    func openLoginItemsSettings()
     /// Returns an error message, or nil on success.
     func installCLI() -> String?
     func exportRaycastScripts(to folder: URL) -> String?
