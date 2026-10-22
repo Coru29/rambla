@@ -322,6 +322,11 @@ final class WindowManager {
 
     func focusChanged(_ id: WindowID?) {
         focusedWindow = id
+        if let id, key(containing: id) == nil, floating.contains(id) || windows[id]?.kind == .float {
+            // A floating window can end up under the strip (a swipe focuses the column it lands on). When its app
+            // comes to the front (Dock, ⌘Tab, a click), it must be on top, not behind the strip's windows.
+            worker(for: id)?.raise(id)
+        }
         guard let id, let key = key(containing: id), isCurrent(key) else {
             overlayHook?()
             return
