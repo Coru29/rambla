@@ -38,6 +38,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             waitForTrust()
         }
+        // Even before the permission is granted: that is when the guide helps most. Not while testing.
+        if onlyBundles == nil { WelcomeWindowController.shared.showIfFirstLaunch() }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -60,7 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuBar.setStatus("Falta el permiso de Accesibilidad", active: false)
         let open = NSMenuItem(title: "Abrir Ajustes de Accesibilidad…", action: #selector(openAccessibilitySettings), keyEquivalent: "")
         open.target = self
-        menuBar.setItems([open])
+        menuBar.setItems([open, item(String(localized: "Bienvenida…"), #selector(openWelcome))])
         // macOS posts this when any app's Accessibility permission changes; the timer is a fallback
         // that only runs while the permission is missing.
         trustObserver = DistributedNotificationCenter.default().addObserver(
@@ -155,6 +157,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             item("Flotar / volver la ventana actual", #selector(toggleFloat)),
             .separator(),
             item("Configuración…", #selector(openSettings), key: ","),
+            item(String(localized: "Bienvenida…"), #selector(openWelcome)),
             item("Manual de uso", #selector(openManual)),
             item("Buscar actualizaciones…", #selector(checkForUpdates)),
             item("Mostrar registro", #selector(showLog)),
@@ -176,6 +179,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func toggleFloat() { engine.toggleFloatFocused() }
     @objc private func showLog() { NSWorkspace.shared.open(Log.fileURL) }
     @objc private func openManual() { NSWorkspace.shared.open(Self.manualURL) }
+    @objc private func openWelcome() { WelcomeWindowController.shared.show() }
     @objc private func offerUpdate() { Updater.shared.offerInstall() }
     @objc private func checkForUpdates() { Task { await Updater.shared.check(userInitiated: true) } }
 
