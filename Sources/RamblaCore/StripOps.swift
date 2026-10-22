@@ -268,7 +268,8 @@ extension Strip {
     /// Changes the focused column's width by `delta` (as a fraction), keeping it within 0.1...1.0.
     public mutating func adjustWidth(by delta: Double, available: Double, gap: Double) {
         guard let f = focusedIndex else { return }
-        let current = columns[f].width.asFraction(available: available, gap: gap)
+        // A column wider than the area is shown at the area's width: start from what is shown.
+        let current = min(columns[f].width.asFraction(available: available, gap: gap), 1)
         columns[f].width = .fraction(min(max(current + delta, 0.1), 1.0))
     }
 

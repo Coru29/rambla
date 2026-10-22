@@ -812,6 +812,15 @@ import Foundation
         #expect(s.columns[0].width == .points(420))
     }
 
+    @Test func narrowerOnAColumnWiderThanTheScreenNarrowsWhatIsShown() {
+        // A 1200 pt column next to a pin is shown at the 747.5 pt the pin leaves: the first ⌃⌘- must make it visibly
+        // narrower, not land on the full width it already shows.
+        var s = strip([[1]], focused: 0)
+        s.columns[0].width = .points(1200)
+        s.adjustWidth(by: -0.05, available: 747.5, gap: 10)
+        #expect(s.columns[0].width == .fraction(0.95))
+    }
+
     @Test func adjustWidthClamps() {
         var s = strip([[1]], focused: 0)
         s.columns[0].width = .fraction(0.95)
