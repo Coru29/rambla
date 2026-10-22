@@ -97,6 +97,8 @@ private struct WelcomeKeyCap: View {
 /// A row of the Mac checks (a title and what it found), with a status icon.
 struct WelcomeCheckRow: View {
     let check: CheckResult
+    /// Runs after the row's fix, to read the system again.
+    var onFix: () -> Void = {}
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -104,17 +106,27 @@ struct WelcomeCheckRow: View {
                 .foregroundStyle(color)
                 .frame(width: 16)
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 1) {
-                // The wording comes from RamblaCore, which is not localized yet.
-                Text(verbatim: check.title).font(.callout.weight(.semibold))
-                Text(verbatim: check.detail)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 1) {
+                    // The wording comes from RamblaCore, which is not localized yet.
+                    Text(verbatim: check.title).font(.callout.weight(.semibold))
+                    Text(verbatim: check.detail)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .accessibilityElement(children: .combine)
+                if let fix = check.fix {
+                    Button(fix.title) {
+                        SystemChecks.apply(fix)
+                        onFix()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                }
             }
             Spacer(minLength: 0)
         }
-        .accessibilityElement(children: .combine)
     }
 
     private var symbol: String {

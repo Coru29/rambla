@@ -108,6 +108,9 @@ public enum MacChecks {
     public static let desktopAndDockURL = URL(string: "x-apple.systempreferences:com.apple.Desktop-Settings.extension")!
     public static let trackpadURL = URL(string: "x-apple.systempreferences:com.apple.Trackpad-Settings.extension")!
 
+    /// The rows about the trackpad gesture, which the trackpad pages show next to the gesture's settings.
+    public static let trackpadCheckIDs = ["trackpad-gesture", "three-finger-drag"]
+
     /// The macOS value of the swipe-between-full-screen-apps gesture, which is what switches Spaces.
     private static let switchSpacesGesture = 2
     /// The macOS value of the three-finger swipe between pages (back and forward in browsers and Finder).

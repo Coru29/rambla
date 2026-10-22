@@ -327,3 +327,11 @@ private func trackpadRow(three: [Int], four: [Int], fingers: Int, canChange: Boo
         "rectangle": nil,
     ])
 }
+
+@Test func macChecksTrackpadRowIDsNameRealRows() {
+    // The trackpad pages pick their rows by these ids: renaming a row must not silently empty them.
+    let ids = MacChecks.evaluate(MacSettings(), trackpad: TrackpadPrefs()).map(\.id)
+    for id in MacChecks.trackpadCheckIDs {
+        #expect(ids.contains(id), "\(id)")
+    }
+}

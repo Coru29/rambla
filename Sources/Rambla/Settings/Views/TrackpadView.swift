@@ -75,9 +75,9 @@ struct TrackpadView: View {
 
     // MARK: - Checks
 
-    /// The Mac checks about the trackpad gesture (ids from RamblaCore's MacChecks).
+    /// The Mac checks about the trackpad gesture.
     private var related: [CheckResult] {
-        checks.results.filter { ["trackpad-gesture", "three-finger-drag"].contains($0.id) }
+        checks.results.filter { MacChecks.trackpadCheckIDs.contains($0.id) }
     }
 
     private func refresh() {

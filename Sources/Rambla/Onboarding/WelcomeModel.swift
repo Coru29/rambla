@@ -97,8 +97,8 @@ final class WelcomeModel: ObservableObject {
 
     // MARK: - Trackpad rows
 
-    /// The rows of the Mac checks that are about the trackpad gesture (`trackpad-gesture`, `three-finger-drag`).
+    /// The rows of the Mac checks that are about the trackpad gesture.
     static func trackpadRows(from checks: [CheckResult]) -> [CheckResult] {
-        checks.filter { $0.id.contains("trackpad") || $0.id.contains("three-finger") }
+        checks.filter { MacChecks.trackpadCheckIDs.contains($0.id) }
     }
 }

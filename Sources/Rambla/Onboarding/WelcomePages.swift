@@ -122,7 +122,7 @@ struct WelcomeTrackpadPage: View {
                 .padding(12)
             }
             VStack(alignment: .leading, spacing: 8) {
-                ForEach(rows) { WelcomeCheckRow(check: $0) }
+                ForEach(rows) { WelcomeCheckRow(check: $0, onFix: reload) }
             }
             .padding(.horizontal, 2)
             Button("Abrir Ajustes del Trackpad") {
