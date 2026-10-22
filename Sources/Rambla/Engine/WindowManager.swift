@@ -689,6 +689,8 @@ final class WindowManager {
             return
         }
         guard !inGrace, !dragTracker.isFrozen(id) else { return }
+        // Exactly where Rambla put it: the app reported Rambla's own move late (it applies AX writes asynchronously).
+        if let wanted = requested[id], frame.approximatelyEquals(wanted, tolerance: 2) { return }
         let reference = requested[id] ?? previous ?? frame
         if FrameChange.isAnchoredResize(from: reference, to: frame) {
             // The app resized itself (terminals snap to their character grid keeping a corner fixed).
