@@ -43,7 +43,7 @@ En macOS, cada ventana nueva se encima con las demás o te obliga a achicarlas. 
 ## 2. Instalación y permiso
 
 1. Abrí el `.dmg` y arrastrá **Rambla** a la carpeta **Aplicaciones**.
-2. Abrí Rambla desde Aplicaciones. Va a aparecer un ícono en la barra de menú: tres ventanas sobre la rambla.
+2. Abrí Rambla desde Aplicaciones. Va a aparecer un ícono en la barra de menú: tres ventanas sobre la rambla. La primera vez se abre también una guía corta (**Bienvenida**) que te acompaña con el permiso, el trackpad y los atajos básicos; la volvés a abrir desde el menú cuando quieras.
 3. macOS te pide el permiso de **Accesibilidad**, que es lo que permite mover ventanas de otras apps. Andá a **Ajustes del Sistema → Privacidad y seguridad → Accesibilidad** y activá **Rambla**. Si no aparece el aviso, el menú de Rambla tiene "Abrir Ajustes de Accesibilidad…".
 4. Listo: Rambla detecta el permiso sola y ordena tus ventanas.
 
@@ -200,6 +200,7 @@ Abrila desde el ícono de la barra de menú → **Configuración…**. Mientras 
 | Traer todas las ventanas a la pantalla | Rescata cualquier ventana estacionada en un borde |
 | Flotar / volver la ventana actual | Lo mismo que ⌃⌘T |
 | Configuración… | Abre la configuración |
+| Bienvenida… | Vuelve a abrir la guía del primer arranque: permiso, trackpad y atajos básicos |
 | Manual de uso | Abre este manual |
 | Mostrar registro | Abre el registro de actividad, útil si algo falla |
 

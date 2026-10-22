@@ -45,7 +45,7 @@ On macOS, every new window lands on top of the others or makes you shrink them. 
 ## 2. Install and permission
 
 1. Open the `.dmg` and drag **Rambla** to the **Applications** folder.
-2. Open Rambla from Applications. An icon appears in the menu bar: three windows on the promenade.
+2. Open Rambla from Applications. An icon appears in the menu bar: three windows on the promenade. The first time, a short guide (**Bienvenida**, Welcome) also opens and walks you through the permission, the trackpad and the basic shortcuts; you can open it again from the menu at any time.
 3. macOS asks for the **Accessibility** permission, which is what lets Rambla move other apps' windows. Go to **System Settings → Privacy & Security → Accessibility** and turn **Rambla** on. If the prompt does not show up, Rambla's menu has "Abrir Ajustes de Accesibilidad…" (Open Accessibility Settings).
 4. That's it: Rambla notices the permission by itself and arranges your windows.
 
@@ -202,6 +202,7 @@ Open them from the menu bar icon → **Configuración…**. While the window is 
 | Traer todas las ventanas a la pantalla (Bring all windows on screen) | Rescues any window parked at an edge |
 | Flotar / volver la ventana actual (Float / put back the current window) | Same as ⌃⌘T |
 | Configuración… (Settings…) | Opens the settings |
+| Bienvenida… (Welcome…) | Opens the first-run guide again: permission, trackpad and basic shortcuts |
 | Manual de uso (User manual) | Opens this manual |
 | Mostrar registro (Show log) | Opens the activity log, useful if something goes wrong |
 
