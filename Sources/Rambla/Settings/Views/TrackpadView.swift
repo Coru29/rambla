@@ -55,12 +55,9 @@ struct TrackpadView: View {
 
     // MARK: - Checks
 
-    /// The checks about the trackpad gesture. `SystemChecks` names them freely, so match on what they say.
+    /// The Mac checks about the trackpad gesture (ids from RamblaCore's MacChecks).
     private var related: [CheckResult] {
-        checks.results.filter { result in
-            let text = (result.id + " " + result.title).lowercased()
-            return ["trackpad", "gesture", "gesto", "swipe", "finger", "dedos"].contains { text.contains($0) }
-        }
+        checks.results.filter { ["trackpad-gesture", "three-finger-drag"].contains($0.id) }
     }
 
     private func refresh() {

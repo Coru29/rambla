@@ -13,6 +13,8 @@ extension WindowManager {
             reply(dumpJSON(), to: argument)
         case "debug-windows":
             reply(debugWindowsJSON(), to: argument)
+        case "settings":
+            SettingsOpener.open()
         case "gather":
             gatherAll(synchronously: false)
         case "relayout":

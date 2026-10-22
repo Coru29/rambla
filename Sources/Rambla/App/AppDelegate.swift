@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         onEnd: { [weak self] in self?.engine.gestureEnded() })
     private lazy var mouseFocus = MouseFocus { [weak self] point in self?.engine.hover(at: point) }
     private var overlays: OverlayCoordinator?
+    private let settingsBackend = AppSettingsBackend()
 
     /// `--only-bundle <id>` (repeatable) limits management to those apps: used by the live tests.
     private lazy var onlyBundles: Set<String>? = {
@@ -94,23 +95,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.engine.perform(action, holding: combo.modifiers.eventFlags)
         }
         overlays = OverlayCoordinator(engine: engine)
+        SettingsWindowController.shared.backend = settingsBackend
+        SettingsOpener.handler = { SettingsWindowController.shared.show() }
         Updater.shared.onChange = { [weak self] in self?.refreshMenu(force: true) }
         Updater.shared.configure(automatic: store.prefs.checkForUpdates)
+        lastPrefs = store.prefs
         engine.start(prefs: store.prefs, onlyBundles: onlyBundles)
         if !store.prefs.enabled { engine.setPaused(true) }
         refreshMenu(force: true)
     }
 
-    private var lastUpdateSetting: Bool?
+    private var lastPrefs: Preferences?
 
+    /// Settings sliders change preferences many times a second: only redo the parts that depend on what changed.
     private func preferencesChanged(_ prefs: Preferences) {
-        if prefs.checkForUpdates != lastUpdateSetting {
-            lastUpdateSetting = prefs.checkForUpdates
+        let old = lastPrefs
+        lastPrefs = prefs
+        if old?.checkForUpdates != prefs.checkForUpdates {
             Updater.shared.configure(automatic: prefs.checkForUpdates)
         }
         engine.update(prefs: prefs)
         if prefs.enabled == engine.isPaused { engine.setPaused(!prefs.enabled) }
-        refreshMenu(force: true)
+        if old?.allShortcuts != prefs.allShortcuts { applyHotkeys() }
+        if old?.trackpad != prefs.trackpad || old?.focusFollowsMouse != prefs.focusFollowsMouse { applyInputs() }
+        refreshMenu()
     }
 
     /// Input sources that cost something while active exist only when their feature is on.
