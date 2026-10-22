@@ -47,12 +47,26 @@ public struct WheelGesture: Sendable {
         case slide(Double, first: Bool)
         /// The slide ended: let the strip settle, carrying this speed (points per second).
         case release(velocity: Double)
+        /// The previous slide lost its end event and this event ended it: release it, then act on `next`.
+        indirect case releaseThen(velocity: Double, next: Output)
+
+        /// Whether the app under the pointer should still get the event.
+        public var passesEvent: Bool {
+            switch self {
+            case .pass: return true
+            case .releaseThen(_, let next): return next.passesEvent
+            default: return false
+            }
+        }
     }
 
     /// The shortest time between two wheel steps, so a spun wheel does not fly over the whole strip.
     public static let stepInterval = 0.06
     /// A continuous scroll without phases (some mouse drivers) ends after this long without events.
     public static let idleTimeout = 0.15
+    /// A phased swipe whose end event never came (the tap was off for a moment, the mouse dropped) is released after
+    /// this long without events, so the other apps get their scrolling back.
+    public static let stalledTimeout = 0.5
 
     private enum State: Sendable {
         case idle
@@ -97,10 +111,19 @@ public struct WheelGesture: Sendable {
         }
     }
 
-    /// Ends a slide without phases once the events have stopped for `idleTimeout`. The app calls it from a timer.
+    /// When the app should call `idle(at:)` next: while a slide is under way, the moment it would time out.
+    public var nextIdleCheck: Double? {
+        guard case .sliding(let phased) = state else { return nil }
+        return lastSlide + (phased ? Self.stalledTimeout : Self.idleTimeout)
+    }
+
+    /// Ends a slide once its events have stopped: `idleTimeout` for one without phases (that is how it ends), and
+    /// `stalledTimeout` for a phased one whose end event got lost. The app calls it from a timer.
     public mutating func idle(at time: Double) -> Output {
-        guard case .sliding(phased: false) = state, time - lastSlide >= Self.idleTimeout else { return .pass }
-        return release(at: time)
+        guard let deadline = nextIdleCheck, time >= deadline else { return .pass }
+        let output = release(at: time)
+        state = .idle   // no momentum follows a slide that ended this way
+        return output
     }
 
     /// Drops whatever was under way (the feature was turned off): a slide is released without speed.
@@ -145,6 +168,13 @@ public struct WheelGesture: Sendable {
     private mutating func slide(_ e: Event, phased: Bool) -> Output {
         if phased, e.phase == .ended || e.phase == .cancelled {
             return release(at: e.time)
+        }
+        if phased, e.phase == .began || e.phase == .mayBegin || !e.continuous {
+            // A new swipe or a wheel notch while a swipe is still open: its end event got lost. Close it and let
+            // this event start over (the app gets it if it is not Rambla's).
+            _ = release(at: e.time)
+            state = .idle
+            return .releaseThen(velocity: 0, next: handle(e))
         }
         if !phased, e.phase == .began || e.momentum != .none {
             // A phased swipe after a phaseless one: close the first slide and treat this one as new.

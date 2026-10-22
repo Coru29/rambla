@@ -64,6 +64,10 @@ final class ScrollWheelTracker: @unchecked Sendable {
                 handlers.slide(points)
             }
         case .release(let velocity): call = { handlers.slideEnded(velocity) }
+        case .releaseThen(let velocity, let next):
+            perform(.release(velocity: velocity))
+            perform(next)
+            return
         }
         guard let call else { return }
         DispatchQueue.main.async { MainActor.assumeIsolated(call) }
@@ -140,6 +144,8 @@ final class ScrollWheelTracker: @unchecked Sendable {
         /// Returns the event to pass it on, or nil to keep it from the app.
         fileprivate func handle(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
             if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+                // Events went by while the tap was off, maybe the end of a swipe: start clean.
+                tracker.perform(gesture.cancel())
                 if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
                 return Unmanaged.passUnretained(event)
             }
@@ -159,15 +165,20 @@ final class ScrollWheelTracker: @unchecked Sendable {
                                    : Double(event.getIntegerValueField(.scrollWheelEventDeltaAxis1)))
             let output = gesture.handle(input)
             tracker.perform(output)
-            if case .slide = output, let idleTimer {
-                // Ends a slide whose events carry no phases once they stop (a phased one ends with its own event).
-                CFRunLoopTimerSetNextFireDate(idleTimer, CFAbsoluteTimeGetCurrent() + WheelGesture.idleTimeout + 0.01)
-            }
-            return output == .pass ? Unmanaged.passUnretained(event) : nil
+            armIdleTimer()
+            return output.passesEvent ? Unmanaged.passUnretained(event) : nil
+        }
+
+        /// While a slide is under way, wakes up when it would time out (see `WheelGesture.nextIdleCheck`).
+        private func armIdleTimer() {
+            guard let idleTimer, let deadline = gesture.nextIdleCheck else { return }
+            let delay = max(0, deadline - ProcessInfo.processInfo.systemUptime) + 0.01
+            CFRunLoopTimerSetNextFireDate(idleTimer, CFAbsoluteTimeGetCurrent() + delay)
         }
 
         private func idle() {
             tracker.perform(gesture.idle(at: ProcessInfo.processInfo.systemUptime))
+            armIdleTimer()
         }
 
         /// `kCGScrollWheelEventScrollPhase`: 1 began, 2 changed, 4 ended, 8 cancelled, 128 may begin.

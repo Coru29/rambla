@@ -114,8 +114,41 @@ private func swipe(_ phase: Event.Phase, _ deltaY: Double = 0, deltaX: Double = 
 @Test func idleDoesNothingWithoutASlide() {
     var wheel = WheelGesture()
     #expect(wheel.idle(at: 5) == .pass)
+    #expect(wheel.nextIdleCheck == nil)
+}
+
+@Test func aSwipeThatLostItsEndIsReleasedAfterAPause() {
+    // A phased swipe normally ends with its own event; if that event never comes (the tap was off for a moment,
+    // the mouse dropped), every app's scrolling would stay Rambla's.
+    var wheel = WheelGesture()
     #expect(wheel.handle(swipe(.began, -10, at: 6)) == .slide(10, first: true))
-    #expect(wheel.idle(at: 7) == .pass)                                // a phased swipe ends with its own event
+    #expect(wheel.nextIdleCheck == 6 + WheelGesture.stalledTimeout)
+    #expect(wheel.idle(at: 6.3) == .pass)
+    #expect(wheel.idle(at: 6.6) == .release(velocity: 0))
+    #expect(wheel.handle(notch(-1, at: 7, keys: false)) == .pass)
+}
+
+@Test func aNewSwipeOrANotchEndsASwipeThatLostItsEnd() {
+    var wheel = WheelGesture()
+    #expect(wheel.handle(swipe(.began, -10, at: 0)) == .slide(10, first: true))
+    let next = wheel.handle(swipe(.began, -5, at: 0.2, keys: false))
+    #expect(next == .releaseThen(velocity: 0, next: .pass))
+    #expect(next.passesEvent)
+    #expect(wheel.handle(swipe(.changed, -5, at: 0.21, keys: false)) == .pass)
+
+    var other = WheelGesture()
+    #expect(other.handle(swipe(.began, -10, at: 0)) == .slide(10, first: true))
+    #expect(other.handle(notch(-1, at: 0.1, keys: false)) == .releaseThen(velocity: 0, next: .pass))
+    #expect(other.handle(swipe(.began, -10, at: 1)) == .slide(10, first: true))
+    #expect(other.handle(swipe(.began, -10, at: 1.2)) == .releaseThen(velocity: 0, next: .slide(10, first: true)))
+}
+
+@Test func theNextIdleCheckFollowsTheKindOfSlide() {
+    var wheel = WheelGesture()
+    #expect(wheel.handle(swipe(.none, -5, at: 2)) == .slide(5, first: true))
+    #expect(wheel.nextIdleCheck == 2 + WheelGesture.idleTimeout)
+    #expect(wheel.idle(at: 2.2) == .release(velocity: 0))
+    #expect(wheel.nextIdleCheck == nil)
 }
 
 @Test func cancelReleasesASlideAndForgetsTheSwipe() {
