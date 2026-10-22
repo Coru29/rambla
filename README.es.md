@@ -9,7 +9,7 @@
   Tus ventanas en fila a lo largo de un paseo horizontal sin fin, como la rambla de Montevideo.
 </p>
 
-<p align="center"><a href="https://rambla-mac.vercel.app"><b>rambla-mac.vercel.app</b></a> · <a href="docs/MANUAL.md"><b>Manual de uso</b></a> · <a href="README.md">Read in English</a></p>
+<p align="center"><a href="https://rambla-mac.app"><b>rambla-mac.app</b></a> · <a href="docs/MANUAL.md"><b>Manual de uso</b></a> · <a href="README.md">Read in English</a></p>
 
 <p align="center">
   <a href="https://github.com/Coru29/rambla/actions/workflows/ci.yml"><img src="https://github.com/Coru29/rambla/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
