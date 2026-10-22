@@ -125,6 +125,8 @@ private func swipe(_ phase: Event.Phase, _ deltaY: Double = 0, deltaX: Double = 
     #expect(wheel.nextIdleCheck == 6 + WheelGesture.stalledTimeout)
     #expect(wheel.idle(at: 6.3) == .pass)
     #expect(wheel.idle(at: 6.6) == .release(velocity: 0))
+    // If the fingers were only resting, the rest of that swipe is still Rambla's: it must not scroll the app.
+    #expect(wheel.handle(swipe(.changed, -10, at: 6.7)) == .swallow)
     #expect(wheel.handle(notch(-1, at: 7, keys: false)) == .pass)
 }
 

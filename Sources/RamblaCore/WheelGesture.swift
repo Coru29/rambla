@@ -121,9 +121,9 @@ public struct WheelGesture: Sendable {
     /// `stalledTimeout` for a phased one whose end event got lost. The app calls it from a timer.
     public mutating func idle(at time: Double) -> Output {
         guard let deadline = nextIdleCheck, time >= deadline else { return .pass }
-        let output = release(at: time)
-        state = .idle   // no momentum follows a slide that ended this way
-        return output
+        // A stalled phased swipe goes on gliding: if the fingers were only resting, the rest of it is still Rambla's,
+        // and the next swipe or notch starts over.
+        return release(at: time)
     }
 
     /// Drops whatever was under way (the feature was turned off): a slide is released without speed.
