@@ -55,7 +55,7 @@ Rambla does not need Screen Recording, Input Monitoring, or SIP disabled.
 
 ### Updates
 
-Once a day Rambla checks GitHub for a new version. When there is one, the menu shows **Update to Rambla X…**: it lists what is new and, if you accept, Rambla downloads itself, checks that the new version carries the same signature, replaces itself and reopens. The Accessibility permission is kept. You can also check by hand with **Check for Updates…** in the menu, or turn the daily check off in Settings → General.
+Rambla checks GitHub for a new version when it starts and once a day. When there is one, the menu shows **Update to Rambla X…**: it lists what is new and, if you accept, Rambla downloads itself, checks that the new version carries the same signature, replaces itself and reopens. The Accessibility permission is kept. You can also check by hand with **Check for Updates…** in the menu, or turn the automatic check off in Settings → General → **Check for updates automatically**.
 
 ## 3. First steps
 
@@ -137,7 +137,7 @@ A column can hold several windows.
 
 **Rambla gets along with Rectangle.** You can keep using Rectangle as always:
 
-- Rambla's shortcuts use **⌃⌘** and Rectangle's use **⌃⌥**, so they don't clash.
+- Rambla's shortcuts use **⌃⌘** and Rectangle's use **⌃⌥**, so they don't clash. With Rectangle's Spectacle set a couple do: the Mac page tells you which.
 - If you use Rectangle on a window of the strip (left half, maximize, center…), **that window leaves the strip and stays floating where Rectangle put it**. Rambla does not fight Rectangle.
 - To put it back on the strip: ⌃⌘T with that window focused, or **Rearrange Windows** in the menu, which brings back every window that left this way. They also come back by themselves when Rambla restarts or updates; the ones you took out with ⌃⌘T stay floating.
 - The same happens with Rectangle's snap areas (dragging a window to the edge of the screen).

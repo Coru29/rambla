@@ -21,7 +21,7 @@
 
 Every window is a column on one horizontal strip that keeps going past the edges of your screen. Opening a window adds a column next to the one you are using **instead of shrinking everything else**, and the strip slides to show whatever you focus. It is the [niri](https://github.com/YaLTeR/niri) / PaperWM idea, built as a light native Mac app and inspired by the paid [ChainYourMac](https://chainyourmac.com).
 
-> The interface is in Spanish for now. Translations are welcome.
+> The interface follows your Mac's language: Spanish or English (any other language gets English). Translations are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Features
 
@@ -35,14 +35,14 @@ Every window is a column on one horizontal strip that keeps going past the edges
 - **Focus border** and **dim inactive windows** (optional), focus follows mouse / mouse follows focus (optional).
 - **Per-app rules** (tile or float, initial width, where new windows open) and per-display on/off.
 - **Remembers the layout** across restarts; launch at login.
-- **Plays well with [Rectangle](https://rectangleapp.com)**: default shortcuts use ⌃⌘, so they never clash with Rectangle's ⌃⌥, and if Rectangle (or any other app) moves a window, that window leaves the strip and stays where it was put. The Mac page of the settings lists any shortcut that collides with your Rectangle setup.
+- **Plays well with [Rectangle](https://rectangleapp.com)**: default shortcuts use ⌃⌘, so they don't clash with Rectangle's default ⌃⌥ set (with its Spectacle set a couple do, and Rambla tells you), and if Rectangle (or any other app) moves a window, that window leaves the strip and stays where it was put. The Mac page of the settings lists any shortcut that collides with your Rectangle setup.
 - **Automation**: `rambla://` URLs, a `rambla` command-line tool and Raycast script export.
 - **English and Spanish**: the interface follows your Mac's language.
 - **Light**: native Swift (AppKit + SwiftUI settings), no Electron, no polling — about 0 % CPU and ~12 MB of memory when idle.
 
 ## Privacy
 
-Rambla collects no data and has no telemetry. It does not read window contents or record the screen. Its only network request is a daily check of GitHub for a new release, which you can turn off in Configuración → General. See [SECURITY.md](SECURITY.md).
+Rambla collects no data and has no telemetry. It does not read window contents or record the screen. Its only network request is a check of GitHub for a new release, shortly after it starts and once a day, which you can turn off in Settings → General. See [SECURITY.md](SECURITY.md).
 
 ## Requirements
 
@@ -56,11 +56,11 @@ macOS 14 Sonoma or later on Apple silicon, and the Accessibility permission.
 
 ### Updates
 
-Rambla checks GitHub once a day. When a new version is out, its menu shows **Actualizar a Rambla X…** (Update): it downloads the release, verifies that it is signed with the same certificate, replaces itself and restarts. The Accessibility permission is kept.
+Rambla checks GitHub when it starts and once a day. When a new version is out, its menu shows **Update to Rambla X…**: it downloads the release, verifies that it is signed with the same certificate, replaces itself and restarts. The Accessibility permission is kept.
 
 ## Default shortcuts
 
-All of them can be changed in **Settings → Atajos**.
+All of them can be changed in **Settings → Shortcuts**.
 
 | Shortcut | Action |
 |---|---|
@@ -99,11 +99,11 @@ Rambla checks these for you in **Settings → Mac**:
 
 ```sh
 open -g "rambla://focus-left"        # any action id, e.g. focus-3, cycle-width, toggle-pause
-rambla focus-right                   # after Settings → Automatización → Install the `rambla` command
+rambla focus-right                   # after Settings → Automation → Install `rambla` Command
 rambla list                          # all actions
 ```
 
-Settings → Automatización can also export one Raycast script per action.
+Settings → Automation can also export one Raycast script per action.
 
 ## Build from source
 
@@ -118,14 +118,14 @@ scripts/install.sh     # copy to /Applications and launch
 scripts/e2e.sh         # live end-to-end checks with a throwaway test app (needs the Accessibility permission)
 ```
 
-The first build creates a local self-signed code-signing identity in `.signing/` (never committed), so macOS keeps the Accessibility permission across rebuilds.
+The first build creates a local self-signed code-signing identity in `.signing/` (never committed), so macOS keeps the Accessibility permission across rebuilds. That identity is yours, not the project's: installing your build over a release makes macOS ask for the Accessibility permission again, and that copy no longer accepts the official updates.
 
 **Versions and releases**: commits follow [Conventional Commits](https://www.conventionalcommits.org) and the version is computed from them (`feat` → minor, `fix` → patch, `!` → major). `scripts/release.sh` builds the signed DMG, tags and publishes the release; installed copies update themselves within a day. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## How it works
 
 - `RamblaCore` is a pure Swift library with the model (strips, columns), the layout engine, the strip operations, preferences and shortcut tables. It has no AppKit and is covered by unit tests.
-- The app runs **one thread per managed app** for all Accessibility calls, so a frozen app never blocks the others. Everything is event-driven (AX notifications, workspace notifications, Carbon hot keys); the only timer runs while an animation is playing.
+- The app runs **one thread per managed app** for all Accessibility calls, so a frozen app never blocks the others. Everything is event-driven (AX notifications, workspace notifications, Carbon hot keys); timers run only while something needs them: an animation, the strip indicator while ⌃⌘ is held, the permission check until it is granted, and the daily update check.
 - macOS moves windows that are fully off screen back into view, so windows outside the visible part of the strip are **parked with 1 pt visible** at a screen edge. When Rambla quits or pauses, every parked window is brought back on screen.
 - Private APIs are kept to the minimum that yabai and AeroSpace also use (window ids, Spaces, focusing an exact window), loaded at runtime so a missing symbol degrades instead of crashing. SIP stays on.
 

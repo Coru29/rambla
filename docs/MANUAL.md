@@ -55,7 +55,7 @@ Rambla no necesita Grabación de pantalla, ni Monitoreo de entrada, ni desactiva
 
 ### Actualizaciones
 
-Rambla revisa una vez por día si hay una versión nueva en GitHub. Cuando la hay, el menú muestra **"Actualizar a Rambla X…"**: te cuenta las novedades y, si aceptás, Rambla se descarga, verifica que la versión nueva tenga la misma firma, se reemplaza y se vuelve a abrir. El permiso de Accesibilidad se mantiene. También podés revisar a mano con **"Buscar actualizaciones…"** en el menú, o desactivar la revisión diaria en Configuración → General.
+Rambla revisa si hay una versión nueva en GitHub al arrancar y una vez por día. Cuando la hay, el menú muestra **"Actualizar a Rambla X…"**: te cuenta las novedades y, si aceptás, Rambla se descarga, verifica que la versión nueva tenga la misma firma, se reemplaza y se vuelve a abrir. El permiso de Accesibilidad se mantiene. También podés revisar a mano con **"Buscar actualizaciones…"** en el menú, o desactivar la revisión automática en Configuración → General → **Buscar actualizaciones automáticamente**.
 
 ## 3. Primeros pasos
 
@@ -137,7 +137,7 @@ Una columna puede tener varias ventanas.
 
 **Rambla convive con Rectangle.** Podés seguir usando Rectangle como siempre:
 
-- Los atajos de Rambla usan **⌃⌘** y los de Rectangle **⌃⌥**, así que no chocan.
+- Los atajos de Rambla usan **⌃⌘** y los de Rectangle **⌃⌥**, así que no chocan. Si usás el set Spectacle de Rectangle, un par sí: la página Mac te dice cuáles.
 - Si usás Rectangle sobre una ventana de la tira (mitad izquierda, maximizar, centrar…), **esa ventana sale de la tira y queda flotando donde la puso Rectangle**. Rambla no se pelea con Rectangle.
 - Para devolverla a la tira: ⌃⌘T con esa ventana enfocada, o **Reacomodar ventanas** en el menú (devuelve todas las que salieron así). También vuelven solas cuando Rambla se reinicia o se actualiza; las que sacaste vos con ⌃⌘T siguen flotando.
 - Lo mismo pasa con las snap areas de Rectangle (arrastrar una ventana al borde de la pantalla).

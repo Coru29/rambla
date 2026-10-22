@@ -33,14 +33,14 @@ Cada ventana es una columna de una tira horizontal que sigue más allá de los b
 - Opcionales: **borde en la ventana enfocada**, **atenuar las inactivas**, el foco sigue al mouse y el mouse sigue al foco.
 - **Reglas por app**: mosaico o flotante, ancho inicial y dónde se abren. Además, se puede activar o desactivar por pantalla.
 - **Recuerda el layout** al reiniciar y puede arrancar con la Mac.
-- **Convive con [Rectangle](https://rectangleapp.com)**: los atajos usan ⌃⌘, así que nunca chocan con los ⌃⌥ de Rectangle. Si Rectangle (u otra app) mueve una ventana, esa ventana sale de la tira y queda donde la pusieron. La página Mac de la configuración avisa si algún atajo choca con tu Rectangle.
+- **Convive con [Rectangle](https://rectangleapp.com)**: los atajos usan ⌃⌘, así que no chocan con los ⌃⌥ del set normal de Rectangle (con su set Spectacle chocan un par, y Rambla te avisa). Si Rectangle (u otra app) mueve una ventana, esa ventana sale de la tira y queda donde la pusieron. La página Mac de la configuración avisa si algún atajo choca con tu Rectangle.
 - **Automatización**: enlaces `rambla://`, comando de terminal `rambla` y exportación de scripts para Raycast.
 - **Español e inglés**: la interfaz sigue el idioma de tu Mac.
 - **Liviana**: Swift nativo (AppKit, con la configuración en SwiftUI), sin Electron y sin polling. En reposo usa cerca de 0 % de CPU y ~12 MB de memoria.
 
 ## Privacidad
 
-Rambla no recolecta datos y no tiene telemetría. No lee el contenido de las ventanas ni graba la pantalla. Su única conexión es una consulta diaria a GitHub para ver si hay una versión nueva, que podés apagar en Configuración → General. Más detalles en [SECURITY.md](SECURITY.md).
+Rambla no recolecta datos y no tiene telemetría. No lee el contenido de las ventanas ni graba la pantalla. Su única conexión es una consulta a GitHub para ver si hay una versión nueva, al arrancar y una vez por día, que podés apagar en Configuración → General. Más detalles en [SECURITY.md](SECURITY.md).
 
 ## Requisitos
 
@@ -54,7 +54,7 @@ macOS 14 Sonoma o posterior, en Apple silicon, y el permiso de Accesibilidad.
 
 ### Actualizaciones
 
-Rambla revisa GitHub una vez por día. Cuando sale una versión nueva, su menú muestra **Actualizar a Rambla X…**: descarga el release, verifica que esté firmado con el mismo certificado, se reemplaza y se reinicia. El permiso de Accesibilidad se mantiene.
+Rambla revisa GitHub al arrancar y una vez por día. Cuando sale una versión nueva, su menú muestra **Actualizar a Rambla X…**: descarga el release, verifica que esté firmado con el mismo certificado, se reemplaza y se reinicia. El permiso de Accesibilidad se mantiene.
 
 ## Atajos por defecto
 
@@ -123,7 +123,7 @@ La primera compilación crea una identidad de firma autofirmada local en `.signi
 ## Cómo funciona
 
 - `RamblaCore` es una biblioteca Swift pura con el modelo (tiras y columnas), el motor de layout, las operaciones de la tira, las preferencias y las tablas de atajos. No usa AppKit y tiene tests unitarios.
-- La app usa **un hilo por cada app gestionada** para las llamadas de Accesibilidad, así una app colgada nunca traba a las demás. Todo funciona por eventos (notificaciones de Accesibilidad y del sistema, atajos Carbon); el único timer corre mientras hay una animación.
+- La app usa **un hilo por cada app gestionada** para las llamadas de Accesibilidad, así una app colgada nunca traba a las demás. Todo funciona por eventos (notificaciones de Accesibilidad y del sistema, atajos Carbon); los timers corren solo mientras hacen falta: una animación, la barra indicadora mientras apretás ⌃⌘, el chequeo del permiso hasta que lo das y la revisión diaria de actualizaciones.
 - macOS devuelve a la pantalla las ventanas que quedan totalmente afuera. Por eso las ventanas fuera de la parte visible de la tira se **estacionan con 1 pt visible** en un borde. Al salir o pausar, todas vuelven a la pantalla.
 - Las APIs privadas son las mínimas, las mismas que usan yabai y AeroSpace: IDs de ventana, Spaces y enfocar una ventana exacta. Se cargan en tiempo de ejecución, así que si falta un símbolo la app sigue funcionando en lugar de romperse. SIP queda activado.
 
