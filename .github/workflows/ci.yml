@@ -23,6 +23,10 @@ jobs:
       - name: Release build
         run: swift build -c release --product Rambla
 
+      # Every text the app shows needs its English line in Packaging/en.lproj/Localizable.strings.
+      - name: English translation is complete
+        run: scripts/check-localization.sh
+
       # Pull requests are squash-merged with their title as the commit message, and versions are computed
       # from those messages: the title must be a Conventional Commit (individual commits can be anything).
       - name: Pull request title follows Conventional Commits

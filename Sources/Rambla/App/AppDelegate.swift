@@ -36,7 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Log.info("Rambla \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] ?? "?") started")
-        menuBar = MenuBarController(statusTitle: "Iniciando…")
+        menuBar = MenuBarController(statusTitle: String(localized: "Iniciando…"))
         installSignalHandlers()
         listenForCommands()
         if AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary) {
@@ -65,8 +65,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Accessibility permission
 
     private func waitForTrust() {
-        menuBar.setStatus("Falta el permiso de Accesibilidad", active: false)
-        let open = NSMenuItem(title: "Abrir Ajustes de Accesibilidad…", action: #selector(openAccessibilitySettings), keyEquivalent: "")
+        menuBar.setStatus(String(localized: "Falta el permiso de Accesibilidad"), active: false)
+        let open = NSMenuItem(title: String(localized: "Abrir Ajustes de Accesibilidad…"), action: #selector(openAccessibilitySettings), keyEquivalent: "")
         open.target = self
         menuBar.setItems([open, item(String(localized: "Bienvenida…"), #selector(openWelcome))])
         // macOS posts this when any app's Accessibility permission changes; the timer is a fallback
@@ -157,26 +157,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuPausedState = paused
         // "Activo" in General and the pause command are the same switch; keep them in sync.
         if store.prefs.enabled == paused { store.prefs.enabled = !paused }
-        menuBar.setStatus(paused ? "En pausa" : "Activo", active: !paused)
-        let toggle = item(paused ? "Reanudar Rambla" : "Pausar Rambla", #selector(togglePause))
+        menuBar.setStatus(paused ? String(localized: "En pausa") : String(localized: "Activo"), active: !paused)
+        let toggle = item(paused ? String(localized: "Reanudar Rambla") : String(localized: "Pausar Rambla"), #selector(togglePause))
         var items: [NSMenuItem] = []
         if let update = Updater.shared.available {
-            let title = Updater.shared.isInstalling ? "Actualizando a Rambla \(update.version)…" : "Actualizar a Rambla \(update.version)…"
+            let version = update.version.description
+            let title = Updater.shared.isInstalling ? String(localized: "Actualizando a Rambla \(version)…")
+                                                    : String(localized: "Actualizar a Rambla \(version)…")
             let updateItem = item(title, #selector(offerUpdate))
             updateItem.isEnabled = !Updater.shared.isInstalling
             items += [updateItem, .separator()]
         }
         items += [
             toggle,
-            item("Reacomodar ventanas", #selector(relayout)),
-            item("Traer todas las ventanas a la pantalla", #selector(gather)),
-            item("Flotar / volver la ventana actual", #selector(toggleFloat)),
+            item(String(localized: "Reacomodar ventanas"), #selector(relayout)),
+            item(String(localized: "Traer todas las ventanas a la pantalla"), #selector(gather)),
+            item(String(localized: "Flotar / volver la ventana actual"), #selector(toggleFloat)),
             .separator(),
-            item("Configuración…", #selector(openSettings), key: ","),
+            item(String(localized: "Configuración…"), #selector(openSettings), key: ","),
             item(String(localized: "Bienvenida…"), #selector(openWelcome)),
-            item("Manual de uso", #selector(openManual)),
-            item("Buscar actualizaciones…", #selector(checkForUpdates)),
-            item("Mostrar registro", #selector(showLog)),
+            item(String(localized: "Manual de uso"), #selector(openManual)),
+            item(String(localized: "Buscar actualizaciones…"), #selector(checkForUpdates)),
+            item(String(localized: "Mostrar registro"), #selector(showLog)),
         ]
         menuBar.setItems(items)
         applyHotkeys()
@@ -199,9 +201,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func offerUpdate() { Updater.shared.offerInstall() }
     @objc private func checkForUpdates() { Task { await Updater.shared.check(userInitiated: true) } }
 
-    /// The manual in Spanish or English, following the system language.
+    /// The manual in the language Rambla is showing (Spanish or English).
     static var manualURL: URL {
-        let spanish = Locale.preferredLanguages.first?.hasPrefix("es") ?? true
+        let spanish = Bundle.main.preferredLocalizations.first == "es"
         let file = spanish ? "MANUAL.md" : "MANUAL.en.md"
         return URL(string: "https://github.com/Coru29/rambla/blob/main/docs/\(file)")!
     }

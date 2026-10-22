@@ -111,7 +111,7 @@ struct GeneralView: View {
 
     private var adjustSection: some View {
         Section {
-            SliderRow("Paso de ajuste", value: nudgePercent, in: 2...20, step: 1) { "\(Int($0.rounded())) %" }
+            SliderRow("Paso de ajuste", value: nudgePercent, in: 2...20, step: 1) { SettingsFormat.percent($0 / 100) }
         } footer: {
             Text("Cuánto cambian «Más ancha» y «Más angosta» el ancho de la columna.")
         }
@@ -150,8 +150,8 @@ struct GeneralView: View {
 
         var label: String {
             switch self {
-            case .natural: return "Propio de la ventana"
-            case .fraction(let fraction): return SettingsFormat.wholePercent(fraction)
+            case .natural: return String(localized: "Propio de la ventana")
+            case .fraction(let fraction): return SettingsFormat.percent(fraction)
             }
         }
     }
@@ -194,7 +194,7 @@ struct GeneralView: View {
                     .textFieldStyle(.roundedBorder)
                     .multilineTextAlignment(.trailing)
                     .frame(width: 70)
-                Text("%").foregroundStyle(.secondary)
+                Text(verbatim: "%").foregroundStyle(.secondary)
                 Button { removePreset(at: index) } label: {
                     Image(systemName: "minus.circle")
                 }

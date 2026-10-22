@@ -118,8 +118,8 @@ struct ShortcutRecorder: View {
     @State private var isRecording = false
     @State private var hint: String?
 
-    init(combo: Binding<KeyCombo?>, conflictText: String?, placeholder: String = "Sin atajo",
-         accessibilityTitle: String = "Atajo") {
+    init(combo: Binding<KeyCombo?>, conflictText: String?, placeholder: String = String(localized: "Sin atajo"),
+         accessibilityTitle: String = String(localized: "Atajo")) {
         _combo = combo
         self.conflictText = conflictText
         self.placeholder = placeholder
@@ -175,7 +175,7 @@ struct ShortcutRecorder: View {
     private var note: String? { isRecording ? hint : conflictText }
 
     private var label: String {
-        if isRecording { return "Escribí el atajo…" }
+        if isRecording { return String(localized: "Escribí el atajo…") }
         if let combo { return KeyNames.display(combo) }
         return placeholder
     }
@@ -186,7 +186,7 @@ struct ShortcutRecorder: View {
     }
 
     private var accessibilityValue: String {
-        if isRecording { return "Grabando" }
+        if isRecording { return String(localized: "Grabando") }
         if let combo { return KeyNames.display(combo) }
         return placeholder
     }
@@ -209,7 +209,7 @@ struct ShortcutRecorder: View {
             case .cancelled:
                 stopped()
             case .needsModifier:
-                hint = "Incluí ⌃, ⌥ o ⌘"
+                hint = String(localized: "Incluí ⌃, ⌥ o ⌘")
             }
         }
     }

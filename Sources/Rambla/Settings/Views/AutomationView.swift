@@ -64,7 +64,7 @@ struct AutomationView: View {
             .disabled(exportOutcome == .working)
             outcomeView(exportOutcome)
         } header: {
-            Text("Raycast")
+            Text(verbatim: "Raycast")
         } footer: {
             Text("Crea un script por acción. Después, en Raycast, agregá la carpeta desde Extensions → Script Commands → Add Directories.")
         }
@@ -81,7 +81,7 @@ struct AutomationView: View {
                 if let message = backend.installCLI() {
                     installOutcome = .failure(message)
                 } else {
-                    installOutcome = .success("Listo: ya podés usar «rambla» en la Terminal.")
+                    installOutcome = .success(String(localized: "Listo: ya podés usar «rambla» en la Terminal."))
                 }
             }
         }
@@ -90,9 +90,9 @@ struct AutomationView: View {
     private func export() {
         guard let backend else { return }
         let panel = NSOpenPanel()
-        panel.title = "Exportar scripts de Raycast"
-        panel.message = "Elegí la carpeta donde guardar los scripts."
-        panel.prompt = "Exportar acá"
+        panel.title = String(localized: "Exportar scripts de Raycast")
+        panel.message = String(localized: "Elegí la carpeta donde guardar los scripts.")
+        panel.prompt = String(localized: "Exportar acá")
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.canCreateDirectories = true

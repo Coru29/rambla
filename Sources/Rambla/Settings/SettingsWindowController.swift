@@ -42,7 +42,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "Configuración de Rambla"
+        window.title = String(localized: "Configuración de Rambla")
         window.contentView = hosting
         window.contentMinSize = size
         window.isReleasedWhenClosed = false
@@ -58,6 +58,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         guard let closing = notification.object as? NSWindow, closing === window else { return }
         ShortcutRecording.shared.cancel()   // a recorder left listening would keep every hot key released
+        if NSColorPanel.sharedColorPanelExists { NSColorPanel.shared.close() }   // opened by the border color well
         closing.delegate = nil
         window = nil
         hostingView = nil

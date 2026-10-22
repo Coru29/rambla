@@ -8,15 +8,15 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .general: return "General"
-        case .shortcuts: return "Atajos"
-        case .trackpad: return "Trackpad y mouse"
-        case .appearance: return "Apariencia"
-        case .apps: return "Apps"
-        case .displays: return "Pantallas"
-        case .mac: return "Mac"
-        case .automation: return "Automatización"
-        case .about: return "Acerca de"
+        case .general: return String(localized: "General")
+        case .shortcuts: return String(localized: "Atajos")
+        case .trackpad: return String(localized: "Trackpad y mouse")
+        case .appearance: return String(localized: "Apariencia")
+        case .apps: return String(localized: "Apps")
+        case .displays: return String(localized: "Pantallas")
+        case .mac: return String(localized: "Mac")
+        case .automation: return String(localized: "Automatización")
+        case .about: return String(localized: "Acerca de")
         }
     }
 

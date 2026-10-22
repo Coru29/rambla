@@ -42,7 +42,7 @@ final class MenuBarController: NSObject {
         menu.addItem(.separator())
         customItems.forEach { menu.addItem($0) }
         if !customItems.isEmpty { menu.addItem(.separator()) }
-        let quit = NSMenuItem(title: "Salir de Rambla", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        let quit = NSMenuItem(title: String(localized: "Salir de Rambla"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quit)
     }
 }

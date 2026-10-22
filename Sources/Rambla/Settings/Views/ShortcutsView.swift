@@ -51,9 +51,9 @@ struct ShortcutsView: View {
                 .lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
             ShortcutRecorder(combo: slot(action, 0), conflictText: notes.text(for: action, combos: combos, index: 0),
-                             accessibilityTitle: "\(action.title), atajo 1")
+                             accessibilityTitle: String(localized: "\(action.title), atajo 1"))
             ShortcutRecorder(combo: slot(action, 1), conflictText: notes.text(for: action, combos: combos, index: 1),
-                             placeholder: "Otro atajo", accessibilityTitle: "\(action.title), atajo 2")
+                             placeholder: String(localized: "Otro atajo"), accessibilityTitle: String(localized: "\(action.title), atajo 2"))
                 .disabled(combos.isEmpty)
         }
     }
@@ -118,27 +118,27 @@ private struct ConflictNotes {
     func text(for action: Action, combos: [KeyCombo], index: Int) -> String? {
         guard combos.indices.contains(index) else { return nil }
         let combo = combos[index]
-        if let other = users[combo]?.first(where: { $0 != action }) { return "Ya lo usa «\(other.title)»" }
-        if let name = rectangle[Key(action: action, combo: combo)] { return "Lo usa Rectangle (\(name))" }
-        if failures.contains(combo) { return "macOS no lo dejó registrar" }
+        if let other = users[combo]?.first(where: { $0 != action }) { return String(localized: "Ya lo usa «\(other.title)»") }
+        if let name = rectangle[Key(action: action, combo: combo)] { return String(localized: "Lo usa Rectangle (\(name))") }
+        if failures.contains(combo) { return String(localized: "macOS no lo dejó registrar") }
         return nil
     }
 
-    /// Rectangle's own action ids in Spanish; an id this table does not know is shown as Rectangle names it.
+    /// Rectangle's own action ids by name (translated); an id this table does not know is shown as Rectangle names it.
     private static func rectangleName(_ id: String) -> String {
         let names: [String: String] = [
-            "leftHalf": "Mitad izquierda", "rightHalf": "Mitad derecha",
-            "topHalf": "Mitad superior", "bottomHalf": "Mitad inferior",
-            "topLeft": "Esquina superior izquierda", "topRight": "Esquina superior derecha",
-            "bottomLeft": "Esquina inferior izquierda", "bottomRight": "Esquina inferior derecha",
-            "maximize": "Maximizar", "almostMaximize": "Casi maximizar", "maximizeHeight": "Maximizar alto",
-            "previousDisplay": "Pantalla anterior", "nextDisplay": "Pantalla siguiente",
-            "larger": "Agrandar", "smaller": "Achicar", "center": "Centrar", "restore": "Restaurar",
-            "firstThird": "Primer tercio", "centerThird": "Tercio central", "lastThird": "Último tercio",
-            "firstTwoThirds": "Primeros dos tercios", "centerTwoThirds": "Dos tercios centrales",
-            "lastTwoThirds": "Últimos dos tercios",
-            "moveLeft": "Mover a la izquierda", "moveRight": "Mover a la derecha",
-            "moveUp": "Mover hacia arriba", "moveDown": "Mover hacia abajo",
+            "leftHalf": String(localized: "Mitad izquierda"), "rightHalf": String(localized: "Mitad derecha"),
+            "topHalf": String(localized: "Mitad superior"), "bottomHalf": String(localized: "Mitad inferior"),
+            "topLeft": String(localized: "Esquina superior izquierda"), "topRight": String(localized: "Esquina superior derecha"),
+            "bottomLeft": String(localized: "Esquina inferior izquierda"), "bottomRight": String(localized: "Esquina inferior derecha"),
+            "maximize": String(localized: "Maximizar"), "almostMaximize": String(localized: "Casi maximizar"), "maximizeHeight": String(localized: "Maximizar alto"),
+            "previousDisplay": String(localized: "Pantalla anterior"), "nextDisplay": String(localized: "Pantalla siguiente"),
+            "larger": String(localized: "Agrandar"), "smaller": String(localized: "Achicar"), "center": String(localized: "Centrar"), "restore": String(localized: "Restaurar"),
+            "firstThird": String(localized: "Primer tercio"), "centerThird": String(localized: "Tercio central"), "lastThird": String(localized: "Último tercio"),
+            "firstTwoThirds": String(localized: "Primeros dos tercios"), "centerTwoThirds": String(localized: "Dos tercios centrales"),
+            "lastTwoThirds": String(localized: "Últimos dos tercios"),
+            "moveLeft": String(localized: "Mover a la izquierda"), "moveRight": String(localized: "Mover a la derecha"),
+            "moveUp": String(localized: "Mover hacia arriba"), "moveDown": String(localized: "Mover hacia abajo"),
         ]
         return names[id] ?? id
     }

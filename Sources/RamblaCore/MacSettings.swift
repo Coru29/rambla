@@ -79,7 +79,7 @@ public struct MacCheck: Equatable, Sendable {
 
         public var title: String {
             switch self {
-            case .turnOffSwipe: return "Apagarlo en macOS"
+            case .turnOffSwipe: return String(localized: "Apagarlo en macOS")
             }
         }
     }
@@ -102,7 +102,8 @@ public struct MacCheck: Equatable, Sendable {
     }
 }
 
-/// Turns the raw macOS settings into the rows of the Mac page. UI copy is Spanish.
+/// Turns the raw macOS settings into the rows of the Mac page. The copy is Spanish, translated through
+/// Localizable.strings (in tests, without the app's translations, it stays Spanish).
 public enum MacChecks {
     public static let accessibilityURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
     public static let desktopAndDockURL = URL(string: "x-apple.systempreferences:com.apple.Desktop-Settings.extension")!
@@ -137,11 +138,11 @@ public enum MacChecks {
 
     private static func accessibility(_ s: MacSettings) -> MacCheck {
         MacCheck(
-            id: "accessibility", title: "Accesibilidad",
+            id: "accessibility", title: String(localized: "Accesibilidad"),
             status: s.accessibilityTrusted ? .ok : .warning,
             detail: s.accessibilityTrusted
-                ? "Permiso concedido."
-                : "Falta el permiso. Sin él Rambla no puede mover ni enfocar ventanas.",
+                ? String(localized: "Permiso concedido.")
+                : String(localized: "Falta el permiso. Sin él Rambla no puede mover ni enfocar ventanas."),
             settingsURL: accessibilityURL)
     }
 
@@ -149,47 +150,48 @@ public enum MacChecks {
     private static func separateSpaces(_ s: MacSettings) -> MacCheck {
         let shared = s.displaysShareSpaces == true
         return MacCheck(
-            id: "separate-spaces", title: "Spaces separados",
+            id: "separate-spaces", title: String(localized: "Spaces separados"),
             status: shared ? .warning : .ok,
             detail: shared
-                ? "Las pantallas comparten los mismos Spaces. Conviene activar «Las pantallas tienen Spaces independientes» (hay que cerrar sesión para que se aplique)."
-                : "Cada pantalla tiene sus propios Spaces.")
+                ? String(localized: "Las pantallas comparten los mismos Spaces. Conviene activar «Las pantallas tienen Spaces independientes» (hay que cerrar sesión para que se aplique).")
+                : String(localized: "Cada pantalla tiene sus propios Spaces."))
     }
 
     /// Absent counts as on, because that is the macOS default.
     private static func rearrangeSpaces(_ s: MacSettings) -> MacCheck {
         let rearranges = s.rearrangeSpaces != false
         return MacCheck(
-            id: "rearrange-spaces", title: "Reorganizar Spaces",
+            id: "rearrange-spaces", title: String(localized: "Reorganizar Spaces"),
             status: rearranges ? .warning : .ok,
             detail: rearranges
-                ? "Recomendado: apagado. macOS reordena los Spaces según el uso reciente y cuesta saber qué tira hay en cada uno (Escritorio y Dock → Mission Control)."
-                : "Los Spaces conservan su orden.",
+                ? String(localized: "Recomendado: apagado. macOS reordena los Spaces según el uso reciente y cuesta saber qué tira hay en cada uno (Escritorio y Dock → Mission Control).")
+                : String(localized: "Los Spaces conservan su orden."),
             settingsURL: desktopAndDockURL)
     }
 
     private static func stageManager(_ s: MacSettings) -> MacCheck {
         let on = s.stageManager == true
         return MacCheck(
-            id: "stage-manager", title: "Stage Manager",
+            id: "stage-manager", title: String(localized: "Stage Manager"),
             status: on ? .warning : .ok,
             detail: on
-                ? "Stage Manager (Organizador visual) está activado y acomoda las ventanas por su cuenta, lo que choca con Rambla. Conviene apagarlo."
-                : "Apagado.")
+                ? String(localized: "Stage Manager (Organizador visual) está activado y acomoda las ventanas por su cuenta, lo que choca con Rambla. Conviene apagarlo.")
+                : String(localized: "Apagado."))
     }
 
     private static func tiling(_ s: MacSettings) -> MacCheck {
         let active = [
-            (s.tilingByEdgeDrag, "arrastrar a los bordes"),
-            (s.tilingToMenuBar, "arrastrar a la barra de menús"),
-            (s.tilingWithOption, "arrastrar con la tecla Opción"),
+            (s.tilingByEdgeDrag, String(localized: "arrastrar a los bordes")),
+            (s.tilingToMenuBar, String(localized: "arrastrar a la barra de menús")),
+            (s.tilingWithOption, String(localized: "arrastrar con la tecla Opción")),
         ].compactMap { $0.0 == true ? $0.1 : nil }
+        let list = active.joined(separator: ", ")
         return MacCheck(
-            id: "macos-tiling", title: "Mosaico por arrastre de macOS",
+            id: "macos-tiling", title: String(localized: "Mosaico por arrastre de macOS"),
             status: active.isEmpty ? .ok : .warning,
             detail: active.isEmpty
-                ? "Apagado."
-                : "macOS acomoda las ventanas al arrastrarlas (\(active.joined(separator: ", "))) y compite con Rambla. Conviene apagarlo en Escritorio y Dock.")
+                ? String(localized: "Apagado.")
+                : String(localized: "macOS acomoda las ventanas al arrastrarlas (\(list)) y compite con Rambla. Conviene apagarlo en Escritorio y Dock."))
     }
 
     /// Only the swipe with Rambla's finger count matters. Three fingers collide with both "swipe between pages" (1)
@@ -200,44 +202,51 @@ public enum MacChecks {
     /// fingers, so a four-finger Rambla swipe also switches desktops while the pane reads «3 dedos», and the pane has
     /// no way to turn off only the four-finger one. Rambla can (`Fix.turnOffSwipe`), when the back end is there.
     private static func trackpadGesture(_ s: MacSettings, _ trackpad: TrackpadPrefs) -> MacCheck {
-        let id = "trackpad-gesture", title = "Gesto del trackpad"
+        let id = "trackpad-gesture", title = String(localized: "Gesto del trackpad")
         guard trackpad.enabled else {
             return MacCheck(id: id, title: title, status: .ok,
-                            detail: "El gesto de Rambla está desactivado: no hay conflicto.", settingsURL: trackpadURL)
+                            detail: String(localized: "El gesto de Rambla está desactivado: no hay conflicto."),
+                            settingsURL: trackpadURL)
         }
         let fingers = trackpad.fingers
         let threeSwitches = s.threeFingerSwipe.contains(switchSpacesGesture)
         let fourSwitches = s.fourFingerSwipe.contains(switchSpacesGesture)
         let threePages = s.threeFingerSwipe.contains(swipePagesGesture)
-        let detail: String
+        let canFix = s.canChangeTrackpadGestures
+        let button = MacCheck.Fix.turnOffSwipe(fingers: fingers).title
+        let problem: String, remedy: String
         switch fingers {
         case 4 where fourSwitches && threeSwitches:
-            detail = "macOS también cambia de escritorio con 4 dedos: su opción «3 dedos» de «Cambiar entre apps en pantalla completa» activa también el de 4, y Ajustes no deja apagar solo ese. "
-                + (s.canChangeTrackpadGestures
-                    ? "«\(MacCheck.Fix.turnOffSwipe(fingers: 4).title)» lo apaga y macOS sigue cambiando de escritorio con 3 dedos."
-                    : "Elegí «Desactivado» en Trackpad → Más gestos, o pasá Rambla a 3 dedos y macOS a «4 dedos».")
+            problem = String(localized: "macOS también cambia de escritorio con 4 dedos: su opción «3 dedos» de «Cambiar entre apps en pantalla completa» activa también el de 4, y Ajustes no deja apagar solo ese.")
+            remedy = canFix
+                ? String(localized: "«\(button)» lo apaga y macOS sigue cambiando de escritorio con 3 dedos.")
+                : String(localized: "Elegí «Desactivado» en Trackpad → Más gestos, o pasá Rambla a 3 dedos y macOS a «4 dedos».")
         case 4 where fourSwitches:
-            detail = "macOS cambia de escritorio con 4 dedos, el mismo gesto que usa Rambla. "
-                + (s.canChangeTrackpadGestures
-                    ? "«\(MacCheck.Fix.turnOffSwipe(fingers: 4).title)» lo apaga; para cambiar de escritorio quedan ⌃← y ⌃→."
-                    : "Elegí «Desactivado» en Trackpad → Más gestos → «Cambiar entre apps en pantalla completa».")
+            problem = String(localized: "macOS cambia de escritorio con 4 dedos, el mismo gesto que usa Rambla.")
+            remedy = canFix
+                ? String(localized: "«\(button)» lo apaga; para cambiar de escritorio quedan ⌃← y ⌃→.")
+                : String(localized: "Elegí «Desactivado» en Trackpad → Más gestos → «Cambiar entre apps en pantalla completa».")
         case 3 where threeSwitches:
-            detail = "macOS también cambia de escritorio con 3 dedos («Cambiar entre apps en pantalla completa»). "
-                + (s.canChangeTrackpadGestures
-                    ? "«\(MacCheck.Fix.turnOffSwipe(fingers: 3).title)» apaga ese gesto"
-                        + (fourSwitches ? " y macOS sigue cambiando de escritorio con 4 dedos." : "; para cambiar de escritorio quedan ⌃← y ⌃→.")
-                    : "Elegí «4 dedos» o «Desactivado» en Trackpad → Más gestos.")
+            problem = String(localized: "macOS también cambia de escritorio con 3 dedos («Cambiar entre apps en pantalla completa»).")
+            if !canFix {
+                remedy = String(localized: "Elegí «4 dedos» o «Desactivado» en Trackpad → Más gestos.")
+            } else if fourSwitches {
+                remedy = String(localized: "«\(button)» apaga ese gesto y macOS sigue cambiando de escritorio con 4 dedos.")
+            } else {
+                remedy = String(localized: "«\(button)» apaga ese gesto; para cambiar de escritorio quedan ⌃← y ⌃→.")
+            }
         case 3 where threePages:
-            detail = "macOS pasa de página con 3 dedos y lo haría a la vez que Rambla mueve la tira. "
-                + (s.canChangeTrackpadGestures
-                    ? "«\(MacCheck.Fix.turnOffSwipe(fingers: 3).title)» apaga ese gesto."
-                    : "Elegí «Ir a la izquierda o la derecha con 2 dedos» en Trackpad → Más gestos → «Cambiar de página».")
+            problem = String(localized: "macOS pasa de página con 3 dedos y lo haría a la vez que Rambla mueve la tira.")
+            remedy = canFix
+                ? String(localized: "«\(button)» apaga ese gesto.")
+                : String(localized: "Elegí «Ir a la izquierda o la derecha con 2 dedos» en Trackpad → Más gestos → «Cambiar de página».")
         default:
             return MacCheck(id: id, title: title, status: .ok,
-                            detail: "macOS no usa el deslizamiento horizontal de \(fingers) dedos.", settingsURL: trackpadURL)
+                            detail: String(localized: "macOS no usa el deslizamiento horizontal de \(fingers) dedos."),
+                            settingsURL: trackpadURL)
         }
-        return MacCheck(id: id, title: title, status: .warning, detail: detail, settingsURL: trackpadURL,
-                        fix: s.canChangeTrackpadGestures ? .turnOffSwipe(fingers: fingers) : nil)
+        return MacCheck(id: id, title: title, status: .warning, detail: problem + " " + remedy, settingsURL: trackpadURL,
+                        fix: canFix ? .turnOffSwipe(fingers: fingers) : nil)
     }
 
     /// Three-finger drag takes over every three-finger movement, so it only collides with a three-finger Rambla gesture.
@@ -245,26 +254,26 @@ public enum MacChecks {
         let on = s.threeFingerDrag.contains(true)
         let conflict = on && trackpad.enabled && trackpad.fingers == 3
         return MacCheck(
-            id: "three-finger-drag", title: "Arrastre con tres dedos",
+            id: "three-finger-drag", title: String(localized: "Arrastre con tres dedos"),
             status: conflict ? .warning : .ok,
             detail: conflict
-                ? "El arrastre con tres dedos choca con el deslizamiento de 3 dedos de Rambla. Conviene usar 4 dedos en Rambla o apagarlo en Accesibilidad → Control del puntero → Opciones del trackpad."
-                : (on ? "Activado, pero no choca con el gesto de Rambla." : "Apagado."))
+                ? String(localized: "El arrastre con tres dedos choca con el deslizamiento de 3 dedos de Rambla. Conviene usar 4 dedos en Rambla o apagarlo en Accesibilidad → Control del puntero → Opciones del trackpad.")
+                : (on ? String(localized: "Activado, pero no choca con el gesto de Rambla.") : String(localized: "Apagado.")))
     }
 
     /// Informational while the shortcuts do not collide; a warning as soon as one does.
     private static func rectangle(_ s: MacSettings) -> MacCheck? {
         guard case .running(let conflicts) = s.rectangle else { return nil }
-        let intro = "Rectangle detectado — convivencia activa."
         guard !conflicts.isEmpty else {
-            return MacCheck(id: "rectangle", title: "Rectangle", status: .info, detail: "\(intro) Atajos en conflicto: 0.")
+            return MacCheck(id: "rectangle", title: "Rectangle", status: .info,
+                            detail: String(localized: "Rectangle detectado — convivencia activa. Atajos en conflicto: 0."))
         }
         var titles: [String] = []
         for conflict in conflicts where !titles.contains(conflict.action.title) { titles.append(conflict.action.title) }
         var named = titles.prefix(namedConflicts).joined(separator: ", ")
-        if titles.count > namedConflicts { named += " y \(titles.count - namedConflicts) más" }
+        if titles.count > namedConflicts { named = String(localized: "\(named) y \(titles.count - namedConflicts) más") }
         return MacCheck(
             id: "rectangle", title: "Rectangle", status: .warning,
-            detail: "\(intro) Atajos en conflicto: \(conflicts.count) (\(named)). Se cambian en la sección Atajos.")
+            detail: String(localized: "Rectangle detectado — convivencia activa. Atajos en conflicto: \(conflicts.count) (\(named)). Se cambian en la sección Atajos."))
     }
 }

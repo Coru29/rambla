@@ -74,11 +74,12 @@ final class Updater {
                 Log.info("Update available: \(available.version)")
                 if userInitiated { offerInstall() }
             } else if userInitiated {
-                inform("Tenés la última versión", "Rambla \(currentVersion) es la versión más nueva.")
+                let current = currentVersion.description
+                inform(String(localized: "Tenés la última versión"), String(localized: "Rambla \(current) es la versión más nueva."))
             }
         } catch {
             Log.error("Update check failed: \(error.localizedDescription)")
-            if userInitiated { inform("No se pudo buscar actualizaciones", error.localizedDescription) }
+            if userInitiated { inform(String(localized: "No se pudo buscar actualizaciones"), error.localizedDescription) }
         }
     }
 
@@ -91,7 +92,7 @@ final class Updater {
               let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let tag = json["tag_name"] as? String, let version = AppVersion(tag),
               let page = (json["html_url"] as? String).flatMap(URL.init(string:)) else {
-            throw Failure.message("No se encontró una versión publicada.")
+            throw Failure.message(String(localized: "No se encontró una versión publicada."))
         }
         let assets = json["assets"] as? [[String: Any]] ?? []
         let dmg = assets.first { ($0["name"] as? String)?.lowercased().hasSuffix(".dmg") == true }
@@ -107,13 +108,14 @@ final class Updater {
         guard let release = available, !isInstalling else { return }
         NSApp.activate()
         let alert = NSAlert()
-        alert.messageText = "Rambla \(release.version) está disponible"
+        let version = release.version.description, current = currentVersion.description
+        alert.messageText = String(localized: "Rambla \(version) está disponible")
         let notes = release.notes.trimmingCharacters(in: .whitespacesAndNewlines)
-        alert.informativeText = "Tenés la \(currentVersion). Rambla se descarga, se reemplaza y se vuelve a abrir; el permiso de Accesibilidad se mantiene."
-            + (notes.isEmpty ? "" : "\n\nNovedades:\n\n" + String(notes.prefix(700)))
-        alert.addButton(withTitle: "Actualizar y reiniciar")
-        alert.addButton(withTitle: "Ver en GitHub")
-        alert.addButton(withTitle: "Más tarde")
+        alert.informativeText = String(localized: "Tenés la \(current). Rambla se descarga, se reemplaza y se vuelve a abrir; el permiso de Accesibilidad se mantiene.")
+            + (notes.isEmpty ? "" : "\n\n" + String(localized: "Novedades:") + "\n\n" + String(notes.prefix(700)))
+        alert.addButton(withTitle: String(localized: "Actualizar y reiniciar"))
+        alert.addButton(withTitle: String(localized: "Ver en GitHub"))
+        alert.addButton(withTitle: String(localized: "Más tarde"))
         switch alert.runModal() {
         case .alertFirstButtonReturn: install(release)
         case .alertSecondButtonReturn: NSWorkspace.shared.open(release.page)
@@ -163,10 +165,10 @@ final class Updater {
         Log.error("Update failed: \(error.localizedDescription)")
         NSApp.activate()
         let alert = NSAlert()
-        alert.messageText = "No se pudo actualizar automáticamente"
-        alert.informativeText = error.localizedDescription + "\n\nPodés bajar la versión nueva desde GitHub."
-        alert.addButton(withTitle: "Abrir GitHub")
-        alert.addButton(withTitle: "Cerrar")
+        alert.messageText = String(localized: "No se pudo actualizar automáticamente")
+        alert.informativeText = error.localizedDescription + "\n\n" + String(localized: "Podés bajar la versión nueva desde GitHub.")
+        alert.addButton(withTitle: String(localized: "Abrir GitHub"))
+        alert.addButton(withTitle: String(localized: "Cerrar"))
         if alert.runModal() == .alertFirstButtonReturn { NSWorkspace.shared.open(release.page) }
     }
 
@@ -178,7 +180,7 @@ final class Updater {
         defer { try? fm.removeItem(at: work) }
 
         let (downloaded, response) = try await URLSession.shared.download(from: dmg)
-        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw Failure.message("La descarga falló.") }
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw Failure.message(String(localized: "La descarga falló.")) }
         let image = work.appendingPathComponent("Rambla.dmg")
         try fm.moveItem(at: downloaded, to: image)
 
@@ -187,11 +189,11 @@ final class Updater {
         defer { _ = try? run("/usr/bin/hdiutil", ["detach", "-force", mount.path]) }
 
         let newApp = mount.appendingPathComponent("Rambla.app")
-        guard fm.fileExists(atPath: newApp.path) else { throw Failure.message("El DMG no contiene Rambla.app.") }
+        guard fm.fileExists(atPath: newApp.path) else { throw Failure.message(String(localized: "El DMG no contiene Rambla.app.")) }
         try verifySameSigner(newApp)
         let shipped = Bundle(url: newApp)?.infoDictionary?["CFBundleShortVersionString"] as? String
         guard let version = shipped.flatMap(AppVersion.init), version == expected else {
-            throw Failure.message("La versión descargada no coincide con la publicada.")
+            throw Failure.message(String(localized: "La versión descargada no coincide con la publicada."))
         }
 
         // Stage next to the current app (same volume) so the swap is atomic.
@@ -201,7 +203,8 @@ final class Updater {
             _ = try fm.replaceItemAt(appURL, withItemAt: staged)
         } catch {
             try? fm.removeItem(at: staged)
-            throw Failure.message("No se pudo reemplazar \(appURL.path): \(error.localizedDescription)")
+            let path = appURL.path, reason = error.localizedDescription
+            throw Failure.message(String(localized: "No se pudo reemplazar \(path): \(reason)"))
         }
     }
 
@@ -215,12 +218,13 @@ final class Updater {
               SecCodeCopyStaticCode(selfCode, [], &selfStatic) == errSecSuccess, let selfStatic,
               SecCodeCopyDesignatedRequirement(selfStatic, [], &requirement) == errSecSuccess, let requirement,
               SecStaticCodeCreateWithPath(app as CFURL, [], &candidate) == errSecSuccess, let candidate else {
-            throw Failure.message("No se pudo leer la firma de las aplicaciones.")
+            throw Failure.message(String(localized: "No se pudo leer la firma de las aplicaciones."))
         }
         let flags = SecCSFlags(rawValue: kSecCSCheckAllArchitectures | kSecCSStrictValidate | kSecCSCheckNestedCode)
         let status = SecStaticCodeCheckValidity(candidate, flags, requirement)
         guard status == errSecSuccess else {
-            throw Failure.message("La versión descargada no está firmada con el certificado de Rambla (\(status)); no se instaló.")
+            let code = Int(status)
+            throw Failure.message(String(localized: "La versión descargada no está firmada con el certificado de Rambla (\(code)); no se instaló."))
         }
     }
 
@@ -237,7 +241,8 @@ final class Updater {
         process.waitUntilExit()
         guard process.terminationStatus == 0 else {
             let name = URL(fileURLWithPath: tool).lastPathComponent
-            throw Failure.message("\(name) falló: \(output.trimmingCharacters(in: .whitespacesAndNewlines))")
+            let detail = output.trimmingCharacters(in: .whitespacesAndNewlines)
+            throw Failure.message(String(localized: "\(name) falló: \(detail)"))
         }
         return output
     }

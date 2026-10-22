@@ -30,7 +30,7 @@ struct AppsView: View {
             }
         }
         .formStyle(.grouped)
-        .alert("Rambla", isPresented: Binding(get: { alertMessage != nil }, set: { if !$0 { alertMessage = nil } })) {
+        .alert(Text(verbatim: "Rambla"), isPresented: Binding(get: { alertMessage != nil }, set: { if !$0 { alertMessage = nil } })) {
             Button("Aceptar") {}
         } message: {
             Text(alertMessage ?? "")
@@ -91,9 +91,9 @@ struct AppsView: View {
 
     private func chooseApp() {
         let panel = NSOpenPanel()
-        panel.title = "Elegir una app"
-        panel.message = "Elegí la app a la que querés agregarle una regla."
-        panel.prompt = "Elegir"
+        panel.title = String(localized: "Elegir una app")
+        panel.message = String(localized: "Elegí la app a la que querés agregarle una regla.")
+        panel.prompt = String(localized: "Elegir")
         panel.allowedContentTypes = [.applicationBundle]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
@@ -101,7 +101,7 @@ struct AppsView: View {
         presentOpenPanel(panel) { url in
             guard let url else { return }
             guard let bundle = Bundle(url: url), let bundleID = bundle.bundleIdentifier else {
-                alertMessage = "No pude leer el identificador de esa app."
+                alertMessage = String(localized: "No pude leer el identificador de esa app.")
                 return
             }
             add(bundleID: bundleID, name: Self.displayName(of: bundle, at: url))
@@ -117,7 +117,7 @@ struct AppsView: View {
 
     private func add(bundleID: String, name: String) {
         if let existing = store.prefs.rule(for: bundleID) {
-            alertMessage = "«\(existing.name)» ya tiene una regla."
+            alertMessage = String(localized: "«\(existing.name)» ya tiene una regla.")
             return
         }
         store.prefs.appRules.append(AppRule(bundleID: bundleID, name: name))

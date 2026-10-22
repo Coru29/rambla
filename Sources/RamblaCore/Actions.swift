@@ -6,10 +6,10 @@ public enum ActionGroup: String, CaseIterable, Sendable {
 
     public var title: String {
         switch self {
-        case .navigate: return "Navegar"
-        case .size: return "Tamaño"
-        case .stacks: return "Pilas y pestañas"
-        case .other: return "Otros"
+        case .navigate: return String(localized: "Navegar")
+        case .size: return String(localized: "Tamaño")
+        case .stacks: return String(localized: "Pilas y pestañas")
+        case .other: return String(localized: "Otros")
         }
     }
 }
@@ -56,47 +56,41 @@ public enum Action: String, CaseIterable, Codable, Sendable, CodingKeyRepresenta
     case closeWindow = "close-window"
     case togglePause = "toggle-pause"
 
-    /// Spanish label shown in the Shortcuts page and in exported Raycast scripts.
+    /// Label shown in the Shortcuts page and in exported Raycast scripts (Spanish, translated through Localizable.strings).
     public var title: String {
         switch self {
-        case .focusLeft: return "Enfocar columna izquierda"
-        case .focusRight: return "Enfocar columna derecha"
-        case .focusUp: return "Enfocar ventana de arriba"
-        case .focusDown: return "Enfocar ventana de abajo"
-        case .focusFirst: return "Ir a la primera columna"
-        case .focusLast: return "Ir a la última columna"
-        case .focus1: return "Ir a la columna 1"
-        case .focus2: return "Ir a la columna 2"
-        case .focus3: return "Ir a la columna 3"
-        case .focus4: return "Ir a la columna 4"
-        case .focus5: return "Ir a la columna 5"
-        case .focus6: return "Ir a la columna 6"
-        case .focus7: return "Ir a la columna 7"
-        case .focus8: return "Ir a la columna 8"
-        case .focus9: return "Ir a la columna 9"
-        case .moveLeft: return "Mover columna a la izquierda"
-        case .moveRight: return "Mover columna a la derecha"
-        case .moveUp: return "Mover ventana hacia arriba"
-        case .moveDown: return "Mover ventana hacia abajo"
-        case .sendNextDisplay: return "Mandar a la siguiente pantalla"
-        case .cycleWidth: return "Rotar ancho"
-        case .fullWidth: return "Ancho completo"
-        case .center: return "Centrar columna"
-        case .wider: return "Más ancha"
-        case .narrower: return "Más angosta"
-        case .taller: return "Más alta"
-        case .shorter: return "Más baja"
-        case .equalizeHeights: return "Igualar alturas"
-        case .pinLeft: return "Fijar a la izquierda"
-        case .pinRight: return "Fijar a la derecha"
-        case .stackLeft: return "Apilar en la columna izquierda"
-        case .stackRight: return "Apilar en la columna derecha"
-        case .popLeft: return "Sacar de la pila hacia la izquierda"
-        case .popRight: return "Sacar de la pila hacia la derecha"
-        case .toggleTabbed: return "Alternar pila / pestañas"
-        case .toggleFloat: return "Flotar / volver a la tira"
-        case .closeWindow: return "Cerrar ventana"
-        case .togglePause: return "Pausar / reanudar Rambla"
+        case .focusLeft: return String(localized: "Enfocar columna izquierda")
+        case .focusRight: return String(localized: "Enfocar columna derecha")
+        case .focusUp: return String(localized: "Enfocar ventana de arriba")
+        case .focusDown: return String(localized: "Enfocar ventana de abajo")
+        case .focusFirst: return String(localized: "Ir a la primera columna")
+        case .focusLast: return String(localized: "Ir a la última columna")
+        case .focus1, .focus2, .focus3, .focus4, .focus5, .focus6, .focus7, .focus8, .focus9:
+            let number = Int(rawValue.split(separator: "-").last ?? "") ?? 0
+            return String(localized: "Ir a la columna \(number)")
+        case .moveLeft: return String(localized: "Mover columna a la izquierda")
+        case .moveRight: return String(localized: "Mover columna a la derecha")
+        case .moveUp: return String(localized: "Mover ventana hacia arriba")
+        case .moveDown: return String(localized: "Mover ventana hacia abajo")
+        case .sendNextDisplay: return String(localized: "Mandar a la siguiente pantalla")
+        case .cycleWidth: return String(localized: "Rotar ancho")
+        case .fullWidth: return String(localized: "Ancho completo")
+        case .center: return String(localized: "Centrar columna")
+        case .wider: return String(localized: "Más ancha")
+        case .narrower: return String(localized: "Más angosta")
+        case .taller: return String(localized: "Más alta")
+        case .shorter: return String(localized: "Más baja")
+        case .equalizeHeights: return String(localized: "Igualar alturas")
+        case .pinLeft: return String(localized: "Fijar a la izquierda")
+        case .pinRight: return String(localized: "Fijar a la derecha")
+        case .stackLeft: return String(localized: "Apilar en la columna izquierda")
+        case .stackRight: return String(localized: "Apilar en la columna derecha")
+        case .popLeft: return String(localized: "Sacar de la pila hacia la izquierda")
+        case .popRight: return String(localized: "Sacar de la pila hacia la derecha")
+        case .toggleTabbed: return String(localized: "Alternar pila / pestañas")
+        case .toggleFloat: return String(localized: "Flotar / volver a la tira")
+        case .closeWindow: return String(localized: "Cerrar ventana")
+        case .togglePause: return String(localized: "Pausar / reanudar Rambla")
         }
     }
 

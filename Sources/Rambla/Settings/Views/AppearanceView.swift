@@ -41,9 +41,8 @@ struct AppearanceView: View {
     private var dimSection: some View {
         Section {
             Toggle("Atenuar ventanas inactivas", isOn: $store.prefs.dimInactive.enabled)
-            SliderRow("Intensidad", value: $store.prefs.dimInactive.amount, in: 0.05...0.6, step: 0.05) {
-                "\(Int(($0 * 100).rounded())) %"
-            }
+            SliderRow("Intensidad", value: $store.prefs.dimInactive.amount, in: 0.05...0.6, step: 0.05,
+                      display: SettingsFormat.percent)
             .disabled(!store.prefs.dimInactive.enabled)
         } footer: {
             Text("Oscurece todo menos la ventana enfocada.")

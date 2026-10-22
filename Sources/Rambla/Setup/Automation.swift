@@ -20,7 +20,8 @@ enum Automation {
             try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
         } catch {
             Log.error("Raycast export: cannot create \(folder.path): \(error.localizedDescription)")
-            return "No se pudo crear la carpeta «\(folder.path)»: \(error.localizedDescription)"
+            let path = folder.path, reason = error.localizedDescription
+            return String(localized: "No se pudo crear la carpeta «\(path)»: \(reason)")
         }
         for action in Action.allCases {
             let file = folder.appendingPathComponent(AutomationScripts.raycastFileName(for: action))
@@ -29,7 +30,8 @@ enum Automation {
                 try fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: file.path)
             } catch {
                 Log.error("Raycast export: cannot write \(file.path): \(error.localizedDescription)")
-                return "No se pudo escribir «\(file.lastPathComponent)» en «\(folder.path)»: \(error.localizedDescription)"
+                let name = file.lastPathComponent, path = folder.path, reason = error.localizedDescription
+                return String(localized: "No se pudo escribir «\(name)» en «\(path)»: \(reason)")
             }
         }
         Log.info("Exported \(Action.allCases.count) Raycast scripts to \(folder.path)")
@@ -64,7 +66,8 @@ enum Automation {
         do {
             try script.write(to: staged, atomically: false, encoding: .utf8)
         } catch {
-            return "No se pudo preparar el comando: \(error.localizedDescription)"
+            let reason = error.localizedDescription
+            return String(localized: "No se pudo preparar el comando: \(reason)")
         }
         let command = administratorInstallCommand(staged: staged.path, destination: path)
         let outcome = runProcess("/usr/bin/osascript", ["-e", administratorScript(running: command)])
@@ -73,15 +76,16 @@ enum Automation {
             return nil
         }
         // osascript reports a dismissed password dialog as "6:22: execution error: User canceled. (-128)".
-        if outcome.errorText.contains("(-128)") { return "Se canceló la instalación del comando." }
+        if outcome.errorText.contains("(-128)") { return String(localized: "Se canceló la instalación del comando.") }
         Log.error("Installing the rambla command failed: \(outcome.errorText)")
-        return "No se pudo instalar el comando en \(path): \(reason(fromOsascript: outcome.errorText))"
+        let why = reason(fromOsascript: outcome.errorText)
+        return String(localized: "No se pudo instalar el comando en \(path): \(why)")
     }
 
     /// The part of an osascript error that means something to the user: without the "0:51: execution error: " prefix.
     static func reason(fromOsascript errorText: String) -> String {
         let reason = errorText.replacingOccurrences(of: #"^\d+:\d+: execution error: "#, with: "", options: .regularExpression)
-        return reason.isEmpty ? "error desconocido" : reason
+        return reason.isEmpty ? String(localized: "error desconocido") : reason
     }
 
     /// Shell command run as root: make sure the folder exists (`mkdir -p` leaves an existing folder's permissions

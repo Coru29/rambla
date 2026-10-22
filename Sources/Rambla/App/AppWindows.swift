@@ -45,25 +45,25 @@ enum AppWindows {
         let mainMenu = NSMenu()
 
         let appMenu = submenu(titled: "Rambla", in: mainMenu)
-        appMenu.addItem(withTitle: "Ocultar Rambla", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        appMenu.addItem(withTitle: String(localized: "Ocultar Rambla"), action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Salir de Rambla", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(withTitle: String(localized: "Salir de Rambla"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 
-        let fileMenu = submenu(titled: "Archivo", in: mainMenu)
-        fileMenu.addItem(withTitle: "Cerrar", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        let fileMenu = submenu(titled: String(localized: "Archivo"), in: mainMenu)
+        fileMenu.addItem(withTitle: String(localized: "Cerrar"), action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
 
-        let editMenu = submenu(titled: "Edición", in: mainMenu)
-        editMenu.addItem(withTitle: "Deshacer", action: Selector(("undo:")), keyEquivalent: "z")
-        let redo = editMenu.addItem(withTitle: "Rehacer", action: Selector(("redo:")), keyEquivalent: "z")
+        let editMenu = submenu(titled: String(localized: "Edición"), in: mainMenu)
+        editMenu.addItem(withTitle: String(localized: "Deshacer"), action: Selector(("undo:")), keyEquivalent: "z")
+        let redo = editMenu.addItem(withTitle: String(localized: "Rehacer"), action: Selector(("redo:")), keyEquivalent: "z")
         redo.keyEquivalentModifierMask = [.command, .shift]
         editMenu.addItem(.separator())
-        editMenu.addItem(withTitle: "Cortar", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
-        editMenu.addItem(withTitle: "Copiar", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
-        editMenu.addItem(withTitle: "Pegar", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
-        editMenu.addItem(withTitle: "Seleccionar todo", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editMenu.addItem(withTitle: String(localized: "Cortar"), action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: String(localized: "Copiar"), action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: String(localized: "Pegar"), action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: String(localized: "Seleccionar todo"), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
 
-        let windowMenu = submenu(titled: "Ventana", in: mainMenu)
-        windowMenu.addItem(withTitle: "Minimizar", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+        let windowMenu = submenu(titled: String(localized: "Ventana"), in: mainMenu)
+        windowMenu.addItem(withTitle: String(localized: "Minimizar"), action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
         NSApp.windowsMenu = windowMenu
 
         NSApp.mainMenu = mainMenu

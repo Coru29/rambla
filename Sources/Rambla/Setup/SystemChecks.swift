@@ -95,10 +95,10 @@ enum SystemChecks {
             Log.error("Could not turn off the macOS \(fingers)-finger horizontal swipe")
             NSApp.activate()
             let alert = NSAlert()
-            alert.messageText = "No se pudo cambiar el gesto de macOS"
-            alert.informativeText = "Cambialo en Ajustes del Sistema → Trackpad → Más gestos: elegí «Desactivado» en «Cambiar entre apps en pantalla completa»."
-            alert.addButton(withTitle: "Abrir Ajustes")
-            alert.addButton(withTitle: "Cerrar")
+            alert.messageText = String(localized: "No se pudo cambiar el gesto de macOS")
+            alert.informativeText = String(localized: "Cambialo en Ajustes del Sistema → Trackpad → Más gestos: elegí «Desactivado» en «Cambiar entre apps en pantalla completa».")
+            alert.addButton(withTitle: String(localized: "Abrir Ajustes"))
+            alert.addButton(withTitle: String(localized: "Cerrar"))
             if alert.runModal() == .alertFirstButtonReturn { NSWorkspace.shared.open(MacChecks.trackpadURL) }
         }
     }

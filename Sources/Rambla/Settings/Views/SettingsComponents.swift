@@ -6,13 +6,13 @@ import SwiftUI
 /// The slider itself is continuous and the value is snapped to `step` as it changes, because a `step:` makes
 /// macOS draw one tick mark per step (forty of them for a gap).
 struct SliderRow: View {
-    let title: String
+    let title: LocalizedStringKey
     @Binding var value: Double
     let range: ClosedRange<Double>
     let step: Double
     let display: (Double) -> String
 
-    init(_ title: String, value: Binding<Double>, in range: ClosedRange<Double>, step: Double,
+    init(_ title: LocalizedStringKey, value: Binding<Double>, in range: ClosedRange<Double>, step: Double,
          display: @escaping (Double) -> String) {
         self.title = title
         _value = value
@@ -26,7 +26,7 @@ struct SliderRow: View {
             HStack(spacing: 8) {
                 Slider(value: snapped, in: range)
                     .frame(width: 200)
-                    .accessibilityLabel(title)
+                    .accessibilityLabel(Text(title))
                     .accessibilityValue(display(value))
                 Text(display(value))
                     .monospacedDigit()
@@ -52,17 +52,12 @@ struct SliderRow: View {
     }
 }
 
-/// Number formats shared by the settings pages (Spanish: decimal comma, a space before the percent sign).
+/// Number formats shared by the settings pages. They follow the user's region, not the app's language:
+/// "33,3 %" in Uruguay, "33.3%" in the United States.
 enum SettingsFormat {
-    /// 0.5 -> "50 %", 1/3 -> "33,3 %".
+    /// 0.5 -> "50 %", 1/3 -> "33,3 %": every percentage in the settings looks like this.
     static func percent(_ fraction: Double) -> String {
-        let value = (fraction * 100).formatted(.number.precision(.fractionLength(0...1)))
-        return "\(value) %"
-    }
-
-    /// 0.5 -> "50 %" and 2/3 -> "66 %": whole percent, rounded down (a tiny epsilon keeps 0.29 from showing as 28).
-    static func wholePercent(_ fraction: Double) -> String {
-        "\(Int((fraction * 100 + 1e-6).rounded(.down))) %"
+        fraction.formatted(.percent.precision(.fractionLength(0...1)))
     }
 
     /// 8 -> "8 pt".
@@ -140,9 +135,9 @@ struct CheckRow: View {
 
     private var statusName: String {
         switch result.status {
-        case .ok: return "Correcto"
-        case .warning: return "Atención"
-        case .info: return "Información"
+        case .ok: return String(localized: "Correcto")
+        case .warning: return String(localized: "Atención")
+        case .info: return String(localized: "Información")
         }
     }
 }

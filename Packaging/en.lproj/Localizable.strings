@@ -1,0 +1,384 @@
+/* English translation of Rambla. The keys are the Spanish text in the code (Spanish is the source
+   language). scripts/check-localization.sh fails when a text in the code has no line here. */
+
+/* Rambla/App/AppDelegate.swift */
+"Iniciando…" = "Starting…";
+"Falta el permiso de Accesibilidad" = "Accessibility permission missing";
+"Abrir Ajustes de Accesibilidad…" = "Open Accessibility Settings…";
+"Bienvenida…" = "Welcome…";
+"En pausa" = "Paused";
+"Activo" = "Active";
+"Reanudar Rambla" = "Resume Rambla";
+"Pausar Rambla" = "Pause Rambla";
+"Actualizando a Rambla %@…" = "Updating to Rambla %@…";
+"Actualizar a Rambla %@…" = "Update to Rambla %@…";
+"Reacomodar ventanas" = "Rearrange Windows";
+"Traer todas las ventanas a la pantalla" = "Bring All Windows on Screen";
+"Flotar / volver la ventana actual" = "Float / Unfloat Current Window";
+"Configuración…" = "Settings…";
+"Manual de uso" = "User Manual";
+"Buscar actualizaciones…" = "Check for Updates…";
+
+/* Rambla/App/AppWindows.swift */
+"Ocultar Rambla" = "Hide Rambla";
+"Salir de Rambla" = "Quit Rambla";
+"Archivo" = "File";
+"Cerrar" = "Close";
+"Edición" = "Edit";
+"Deshacer" = "Undo";
+"Rehacer" = "Redo";
+"Cortar" = "Cut";
+"Copiar" = "Copy";
+"Pegar" = "Paste";
+"Seleccionar todo" = "Select All";
+"Ventana" = "Window";
+"Minimizar" = "Minimize";
+
+/* Rambla/App/CLI.swift */
+"Rambla no está abierto." = "Rambla is not running.";
+"Rambla no respondió." = "Rambla did not respond.";
+"Uso: rambla <acción>\nEjemplos: rambla focus-left · rambla cycle-width · rambla focus-3 · rambla toggle-pause\nrambla list muestra todas las acciones.\nTambién por URL: open -g \"rambla://focus-left\"" = "Usage: rambla <action>\nExamples: rambla focus-left · rambla cycle-width · rambla focus-3 · rambla toggle-pause\nrambla list shows every action.\nAlso by URL: open -g \"rambla://focus-left\"";
+
+/* Rambla/App/Updater.swift */
+"Tenés la última versión" = "You have the latest version";
+"Rambla %@ es la versión más nueva." = "Rambla %@ is the newest version.";
+"No se pudo buscar actualizaciones" = "Could not check for updates";
+"No se encontró una versión publicada." = "No published release was found.";
+"Rambla %@ está disponible" = "Rambla %@ is available";
+"Tenés la %@. Rambla se descarga, se reemplaza y se vuelve a abrir; el permiso de Accesibilidad se mantiene." = "You have %@. Rambla downloads itself, replaces itself and reopens; the Accessibility permission is kept.";
+"Novedades:" = "What’s new:";
+"Actualizar y reiniciar" = "Update and Relaunch";
+"Ver en GitHub" = "View on GitHub";
+"Más tarde" = "Later";
+"No se pudo actualizar automáticamente" = "Could not update automatically";
+"Podés bajar la versión nueva desde GitHub." = "You can download the new version from GitHub.";
+"Abrir GitHub" = "Open GitHub";
+"La descarga falló." = "The download failed.";
+"El DMG no contiene Rambla.app." = "The DMG does not contain Rambla.app.";
+"La versión descargada no coincide con la publicada." = "The downloaded version does not match the published one.";
+"No se pudo reemplazar %@: %@" = "Could not replace %@: %@";
+"No se pudo leer la firma de las aplicaciones." = "Could not read the apps’ signatures.";
+"La versión descargada no está firmada con el certificado de Rambla (%lld); no se instaló." = "The downloaded version is not signed with Rambla’s certificate (%lld), so it was not installed.";
+"%@ falló: %@" = "%@ failed: %@";
+
+/* Rambla/Input/KeyNames.swift */
+"Espacio" = "Space";
+
+/* Rambla/Onboarding/WelcomePages.swift */
+"Bienvenido a Rambla" = "Welcome to Rambla";
+"Cada ventana es una columna en una tira horizontal que se desliza hasta la que enfocás, y Rambla se lleva bien con Rectangle." = "Each window is a column on a horizontal strip that slides to the one you focus, and Rambla gets along with Rectangle.";
+"Permiso de Accesibilidad" = "Accessibility permission";
+"Rambla lo necesita para mover y acomodar las ventanas de otras apps. No graba ni envía nada de lo que hacés." = "Rambla needs it to move and arrange other apps’ windows. It does not record or send anything you do.";
+"Permiso activado" = "Permission granted";
+"Falta el permiso" = "Permission missing";
+"Abrir Ajustes de Accesibilidad" = "Open Accessibility Settings";
+"Listo, Rambla ya puede acomodar tus ventanas." = "Done, Rambla can now arrange your windows.";
+"Activá Rambla en la lista de Ajustes y volvé acá: esta ventana se actualiza sola." = "Turn on Rambla in the list in System Settings and come back: this window updates by itself.";
+"Deslizá con 3 o 4 dedos hacia los costados y la tira te sigue. macOS usa ese mismo gesto para cambiar de escritorio, así que conviene que no choquen." = "Swipe sideways with 3 or 4 fingers and the strip follows you. macOS uses that same gesture to switch desktops, so it is best if they do not clash.";
+"Deslizar con el trackpad" = "Swipe with the trackpad";
+"Cantidad de dedos" = "Number of fingers";
+"Abrir Ajustes del Trackpad" = "Open Trackpad Settings";
+"Atajos básicos" = "Basic shortcuts";
+"Moverte entre columnas" = "Move between columns";
+"Cambiar el ancho de la columna" = "Change the column’s width";
+"Alternar entre pila y pestañas" = "Switch between stack and tabs";
+"Sacar la ventana de la tira o devolverla" = "Take the window off the strip or put it back";
+"Fijar la columna a la izquierda" = "Pin the column to the left";
+"Rambla usa ⌃⌘ y Rectangle usa ⌃⌥, así que no se pisan." = "Rambla uses ⌃⌘ and Rectangle uses ⌃⌥, so they never collide.";
+"Una ventana que mueve Rectangle queda flotando: con %@ la devolvés a la tira." = "A window that Rectangle moves stays floating: %@ puts it back on the strip.";
+"Una ventana que mueve Rectangle queda flotando: la devolvés a la tira desde el menú de Rambla." = "A window that Rectangle moves stays floating: put it back on the strip from Rambla’s menu.";
+"Podés cambiar todos los atajos en Configuración." = "You can change every shortcut in Settings.";
+"Todo listo" = "All set";
+"Rambla vive en la barra de menú. Desde ahí la pausás, abrís la configuración o volvés a esta guía." = "Rambla lives in the menu bar. From there you can pause it, open its settings or come back to this guide.";
+"No se pudo cambiar esta opción." = "This option could not be changed.";
+"Abrir el manual" = "Open the Manual";
+
+/* Rambla/Onboarding/WelcomeView.swift */
+"Atrás" = "Back";
+"Empezar" = "Get Started";
+"Lo hago después" = "I’ll Do It Later";
+"Siguiente" = "Next";
+"Paso %lld de %lld" = "Step %lld of %lld";
+
+/* Rambla/Onboarding/WelcomeWindowController.swift */
+"Bienvenida a Rambla" = "Welcome to Rambla";
+
+/* Rambla/Settings/SettingsWindowController.swift */
+"Configuración de Rambla" = "Rambla Settings";
+
+/* Rambla/Settings/ShortcutRecorder.swift */
+"Sin atajo" = "No shortcut";
+"Atajo" = "Shortcut";
+"⎋ cancela · ⌫ borra el atajo" = "⎋ cancels · ⌫ clears the shortcut";
+"Hacé clic y escribí el atajo nuevo" = "Click and type the new shortcut";
+"Borrar este atajo" = "Clear this shortcut";
+"Borrar %@" = "Clear %@";
+"Escribí el atajo…" = "Type the shortcut…";
+"Grabando" = "Recording";
+"Incluí ⌃, ⌥ o ⌘" = "Include ⌃, ⌥ or ⌘";
+
+/* Rambla/Settings/Views/AboutView.swift */
+"Gestor de ventanas con scroll horizontal. Gratis y open source." = "A scrolling window manager. Free and open source.";
+"Mostrar registro" = "Show Log";
+"Versión de desarrollo" = "Development version";
+"Versión %@ (%@)" = "Version %@ (%@)";
+"Versión %@" = "Version %@";
+
+/* Rambla/Settings/Views/AppearanceView.swift */
+"Barra indicadora" = "Strip indicator";
+"Un panel con un ícono por columna, abajo en la pantalla. Aparece al navegar o deslizar y se desvanece solo." = "A panel with one icon per column at the bottom of the screen. It shows up when you navigate or swipe and fades away by itself.";
+"Borde de foco" = "Focus border";
+"Color del borde" = "Border color";
+"Grosor del borde" = "Border width";
+"Dibuja un borde redondeado alrededor de la ventana enfocada." = "Draws a rounded border around the focused window.";
+"Atenuar ventanas inactivas" = "Dim inactive windows";
+"Intensidad" = "Intensity";
+"Oscurece todo menos la ventana enfocada." = "Darkens everything except the focused window.";
+"El mouse sigue al foco" = "Mouse follows focus";
+"El foco sigue al mouse" = "Focus follows mouse";
+"Con el primero, el puntero va al centro de la ventana que enfocás con un atajo. Con el segundo, enfocás una ventana dejando el puntero quieto sobre ella (sin desplazar la tira)." = "With the first, the pointer moves to the center of the window you focus with a shortcut. With the second, resting the pointer on a window focuses it (without scrolling the strip).";
+
+/* Rambla/Settings/Views/AppsView.swift */
+"Las apps sin regla van a la tira (Mosaico): cada ventana nueva entra como una columna a la derecha de la enfocada." = "Apps without a rule go on the strip (Tile): each new window comes in as a column to the right of the focused one.";
+"Todavía no hay reglas." = "No rules yet.";
+"Aceptar" = "OK";
+"Apps abiertas" = "Open apps";
+"Elegir una app…" = "Choose an App…";
+"Agregar app" = "Add App";
+"Elegir una app" = "Choose an App";
+"Elegí la app a la que querés agregarle una regla." = "Choose the app you want to add a rule for.";
+"Elegir" = "Choose";
+"No pude leer el identificador de esa app." = "Could not read that app’s identifier.";
+"«%@» ya tiene una regla." = "“%@” already has a rule.";
+"Quitar la regla de %@" = "Remove the rule for %@";
+"Comportamiento" = "Behavior";
+"Mosaico" = "Tile";
+"Flotante" = "Float";
+"Ancho inicial" = "Initial width";
+"Predeterminado" = "Default";
+"Posición al abrir" = "Position when opened";
+"Junto a la enfocada" = "Next to the focused one";
+"Al principio" = "At the start";
+"Al final" = "At the end";
+
+/* Rambla/Settings/Views/AutomationView.swift */
+"Por URL" = "By URL";
+"Sirven en la app Atajos de macOS, en Raycast, Alfred o Hammerspoon, y desde la Terminal con el comando open. Cada acción tiene su id, que aparece en `rambla list`." = "They work in the macOS Shortcuts app, Raycast, Alfred or Hammerspoon, and from Terminal with the open command. Each action has its id, listed by `rambla list`.";
+"Instalar comando `rambla`" = "Install `rambla` Command";
+"En la Terminal" = "In Terminal";
+"`rambla list` muestra todas las acciones. Instalarlo crea `/usr/local/bin/rambla`; si hace falta, macOS pide la contraseña." = "`rambla list` shows every action. Installing it creates `/usr/local/bin/rambla`; macOS asks for your password if needed.";
+"Exportar scripts de Raycast…" = "Export Raycast Scripts…";
+"Crea un script por acción. Después, en Raycast, agregá la carpeta desde Extensions → Script Commands → Add Directories." = "Creates one script per action. Then, in Raycast, add the folder from Extensions → Script Commands → Add Directories.";
+"Listo: ya podés usar «rambla» en la Terminal." = "Done: you can now use “rambla” in Terminal.";
+"Exportar scripts de Raycast" = "Export Raycast Scripts";
+"Elegí la carpeta donde guardar los scripts." = "Choose the folder to save the scripts in.";
+"Exportar acá" = "Export Here";
+"Trabajando…" = "Working…";
+"Scripts guardados en %@" = "Scripts saved in %@";
+"Mostrar en el Finder" = "Show in Finder";
+"Copiar %@" = "Copy %@";
+
+/* Rambla/Settings/Views/DisplaysView.swift */
+"No encontré pantallas." = "No displays found.";
+"Pantallas conectadas" = "Connected displays";
+"Rambla no mueve las ventanas de las pantallas que desactives: quedan como las dejes." = "Rambla does not move windows on the displays you turn off: they stay as you leave them.";
+
+/* Rambla/Settings/Views/GeneralView.swift */
+"Arrancar con la Mac" = "Open at login";
+"macOS pide que lo apruebes en Ítems de inicio." = "macOS asks you to allow it in Login Items.";
+"Abrir Ítems de inicio" = "Open Login Items";
+"En pausa, Rambla trae las ventanas de vuelta a la pantalla y libera sus atajos." = "When paused, Rambla brings the windows back on screen and releases its shortcuts.";
+"Animaciones" = "Animations";
+"Velocidad" = "Speed";
+"Ventanas" = "Windows";
+"Centrar la columna enfocada" = "Center the focused column";
+"Nunca" = "Never";
+"Solo si no entra" = "Only if it does not fit";
+"Siempre" = "Always";
+"Ancho de ventanas nuevas" = "Width of new windows";
+"Mantener altura original" = "Keep original height";
+"Espaciado" = "Spacing";
+"Separación entre ventanas" = "Gap between windows";
+"Margen exterior" = "Outer margin";
+"Agregar preset" = "Add Preset";
+"Restablecer" = "Reset";
+"Presets de ancho" = "Width presets";
+"«Rotar ancho» pasa al siguiente. Van de 5 % a 100 % y se mantienen ordenados." = "“Cycle width” moves to the next one. They go from 5% to 100% and stay sorted.";
+"Paso de ajuste" = "Adjustment step";
+"Cuánto cambian «Más ancha» y «Más angosta» el ancho de la columna." = "How much “Wider” and “Narrower” change the column’s width.";
+"Si otra app (como Rectangle) mueve una ventana, sacarla de la tira" = "When another app (like Rectangle) moves a window, take it out of the strip";
+"La ventana queda flotando donde la dejaron. Con «Flotar / volver a la tira» regresa." = "The window floats where it was put. “Float / back to the strip” brings it back.";
+"Propio de la ventana" = "The window’s own";
+"Preset %lld" = "Preset %lld";
+"Ancho del preset %lld" = "Width of preset %lld";
+"Quitar este preset" = "Remove this preset";
+"Quitar el preset %lld" = "Remove preset %lld";
+
+/* Rambla/Settings/Views/MacView.swift */
+"Todavía no hay nada para revisar." = "Nothing to check yet.";
+"Estado de macOS" = "macOS status";
+"Rambla no cambia estos ajustes por su cuenta: te avisa cuáles conviene tocar y, cuando puede, lo hace con un botón." = "Rambla does not change these settings on its own: it tells you which ones to change and, when it can, does it with a button.";
+"Volver a revisar" = "Check Again";
+
+/* Rambla/Settings/Views/SettingsComponents.swift */
+"Abrir Ajustes" = "Open Settings";
+"Correcto" = "OK";
+"Atención" = "Warning";
+"Información" = "Information";
+
+/* Rambla/Settings/Views/SettingsRoot.swift */
+"General" = "General";
+"Atajos" = "Shortcuts";
+"Trackpad y mouse" = "Trackpad & Mouse";
+"Apariencia" = "Appearance";
+"Apps" = "Apps";
+"Pantallas" = "Displays";
+"Mac" = "Mac";
+"Automatización" = "Automation";
+"Acerca de" = "About";
+
+/* Rambla/Settings/Views/ShortcutsView.swift */
+"¿Restaurar los atajos predeterminados?" = "Restore the default shortcuts?";
+"Restaurar" = "Restore";
+"Cancelar" = "Cancel";
+"Se pierden todos los atajos que cambiaste." = "Every shortcut you changed will be lost.";
+"Hacé clic en un atajo y escribí el nuevo. ⎋ cancela y ⌫ lo borra." = "Click a shortcut and type the new one. ⎋ cancels and ⌫ clears it.";
+"Restaurar predeterminados" = "Restore Defaults";
+"%@, atajo 1" = "%@, shortcut 1";
+"Otro atajo" = "Another shortcut";
+"%@, atajo 2" = "%@, shortcut 2";
+"Ya lo usa «%@»" = "Already used by “%@”";
+"Lo usa Rectangle (%@)" = "Used by Rectangle (%@)";
+"macOS no lo dejó registrar" = "macOS did not allow it";
+"Mitad izquierda" = "Left Half";
+"Mitad derecha" = "Right Half";
+"Mitad superior" = "Top Half";
+"Mitad inferior" = "Bottom Half";
+"Esquina superior izquierda" = "Top Left";
+"Esquina superior derecha" = "Top Right";
+"Esquina inferior izquierda" = "Bottom Left";
+"Esquina inferior derecha" = "Bottom Right";
+"Maximizar" = "Maximize";
+"Casi maximizar" = "Almost Maximize";
+"Maximizar alto" = "Maximize Height";
+"Pantalla anterior" = "Previous Display";
+"Pantalla siguiente" = "Next Display";
+"Agrandar" = "Larger";
+"Achicar" = "Smaller";
+"Centrar" = "Center";
+"Primer tercio" = "First Third";
+"Tercio central" = "Center Third";
+"Último tercio" = "Last Third";
+"Primeros dos tercios" = "First Two Thirds";
+"Dos tercios centrales" = "Center Two Thirds";
+"Últimos dos tercios" = "Last Two Thirds";
+"Mover a la izquierda" = "Move Left";
+"Mover a la derecha" = "Move Right";
+"Mover hacia arriba" = "Move Up";
+"Mover hacia abajo" = "Move Down";
+
+/* Rambla/Settings/Views/TrackpadView.swift */
+"Conflictos con macOS" = "Conflicts with macOS";
+"macOS también recibe el gesto y no se puede bloquear: si usa los mismos dedos para cambiar de escritorio, pasan las dos cosas." = "macOS receives the gesture too and it cannot be blocked: if macOS uses the same fingers to switch desktops, both things happen.";
+"Deslizar la tira con el trackpad" = "Swipe the strip with the trackpad";
+"Dedos" = "Fingers";
+"3 dedos" = "3 fingers";
+"4 dedos" = "4 fingers";
+"Sensibilidad" = "Sensitivity";
+"Dirección natural" = "Natural direction";
+"Trackpad" = "Trackpad";
+"Un swipe horizontal con esa cantidad de dedos desplaza la tira. Al soltar, se asienta en una columna: un swipe corto y rápido pasa a la siguiente. Con la dirección natural, la tira sigue a los dedos; sin ella, va al revés." = "A horizontal swipe with that many fingers scrolls the strip. When you let go it settles on a column: a short, quick swipe moves to the next one. With the natural direction the strip follows your fingers; without it, it goes the other way.";
+"Mover la tira con la ruedita del mouse" = "Move the strip with the mouse wheel";
+"Manteniendo apretado" = "While holding";
+"Mouse" = "Mouse";
+"Con esas teclas apretadas, cada paso de la ruedita enfoca la columna de al lado. Con un Magic Mouse, o con dos dedos en el trackpad, la tira se desliza y se asienta al soltar. Sin las teclas, la ruedita funciona como siempre." = "With those keys held, each notch of the wheel focuses the next column. With a Magic Mouse, or two fingers on the trackpad, the strip slides and settles when you let go. Without the keys, the wheel works as usual.";
+
+/* Rambla/Setup/Automation.swift */
+"No se pudo crear la carpeta «%@»: %@" = "Could not create the folder “%@”: %@";
+"No se pudo escribir «%@» en «%@»: %@" = "Could not write “%@” to “%@”: %@";
+"No se pudo preparar el comando: %@" = "Could not prepare the command: %@";
+"Se canceló la instalación del comando." = "The command installation was cancelled.";
+"No se pudo instalar el comando en %@: %@" = "Could not install the command in %@: %@";
+"error desconocido" = "unknown error";
+
+/* Rambla/Setup/SystemChecks.swift */
+"No se pudo cambiar el gesto de macOS" = "Could not change the macOS gesture";
+"Cambialo en Ajustes del Sistema → Trackpad → Más gestos: elegí «Desactivado» en «Cambiar entre apps en pantalla completa»." = "Change it in System Settings → Trackpad → More Gestures: set “Swipe between full-screen applications” to Off.";
+
+/* RamblaCore/Actions.swift */
+"Navegar" = "Navigate";
+"Tamaño" = "Size";
+"Pilas y pestañas" = "Stacks and tabs";
+"Otros" = "Other";
+"Enfocar columna izquierda" = "Focus left column";
+"Enfocar columna derecha" = "Focus right column";
+"Enfocar ventana de arriba" = "Focus window above";
+"Enfocar ventana de abajo" = "Focus window below";
+"Ir a la primera columna" = "Go to first column";
+"Ir a la última columna" = "Go to last column";
+"Ir a la columna %lld" = "Go to column %lld";
+"Mover columna a la izquierda" = "Move column left";
+"Mover columna a la derecha" = "Move column right";
+"Mover ventana hacia arriba" = "Move window up";
+"Mover ventana hacia abajo" = "Move window down";
+"Mandar a la siguiente pantalla" = "Send to next display";
+"Rotar ancho" = "Cycle width";
+"Ancho completo" = "Full width";
+"Centrar columna" = "Center column";
+"Más ancha" = "Wider";
+"Más angosta" = "Narrower";
+"Más alta" = "Taller";
+"Más baja" = "Shorter";
+"Igualar alturas" = "Equalize heights";
+"Fijar a la izquierda" = "Pin to the left";
+"Fijar a la derecha" = "Pin to the right";
+"Apilar en la columna izquierda" = "Stack into left column";
+"Apilar en la columna derecha" = "Stack into right column";
+"Sacar de la pila hacia la izquierda" = "Pop out of stack to the left";
+"Sacar de la pila hacia la derecha" = "Pop out of stack to the right";
+"Alternar pila / pestañas" = "Toggle stack / tabs";
+"Flotar / volver a la tira" = "Float / back to the strip";
+"Cerrar ventana" = "Close window";
+"Pausar / reanudar Rambla" = "Pause / resume Rambla";
+
+/* RamblaCore/MacSettings.swift */
+"Apagarlo en macOS" = "Turn Off in macOS";
+"Accesibilidad" = "Accessibility";
+"Permiso concedido." = "Permission granted.";
+"Falta el permiso. Sin él Rambla no puede mover ni enfocar ventanas." = "The permission is missing. Without it Rambla cannot move or focus windows.";
+"Spaces separados" = "Separate Spaces";
+"Las pantallas comparten los mismos Spaces. Conviene activar «Las pantallas tienen Spaces independientes» (hay que cerrar sesión para que se aplique)." = "Your displays share the same Spaces. Turn on “Displays have separate Spaces” (it takes effect after logging out).";
+"Cada pantalla tiene sus propios Spaces." = "Each display has its own Spaces.";
+"Reorganizar Spaces" = "Rearrange Spaces";
+"Recomendado: apagado. macOS reordena los Spaces según el uso reciente y cuesta saber qué tira hay en cada uno (Escritorio y Dock → Mission Control)." = "Recommended: off. macOS reorders Spaces by recent use, which makes it hard to know which strip is on each one (Desktop & Dock → Mission Control).";
+"Los Spaces conservan su orden." = "Spaces keep their order.";
+"Stage Manager" = "Stage Manager";
+"Stage Manager (Organizador visual) está activado y acomoda las ventanas por su cuenta, lo que choca con Rambla. Conviene apagarlo." = "Stage Manager is on and arranges windows on its own, which clashes with Rambla. Better turn it off.";
+"Apagado." = "Off.";
+"arrastrar a los bordes" = "dragging to the edges";
+"arrastrar a la barra de menús" = "dragging to the menu bar";
+"arrastrar con la tecla Opción" = "dragging with the Option key";
+"Mosaico por arrastre de macOS" = "macOS drag tiling";
+"macOS acomoda las ventanas al arrastrarlas (%@) y compite con Rambla. Conviene apagarlo en Escritorio y Dock." = "macOS tiles windows when you drag them (%@) and competes with Rambla. Better turn it off in Desktop & Dock.";
+"Gesto del trackpad" = "Trackpad gesture";
+"El gesto de Rambla está desactivado: no hay conflicto." = "Rambla’s gesture is off: no conflict.";
+"macOS también cambia de escritorio con 4 dedos: su opción «3 dedos» de «Cambiar entre apps en pantalla completa» activa también el de 4, y Ajustes no deja apagar solo ese." = "macOS also switches desktops with four fingers: its three-finger option for “Swipe between full-screen applications” turns on the four-finger swipe too, and System Settings cannot turn off just that one.";
+"«%@» lo apaga y macOS sigue cambiando de escritorio con 3 dedos." = "“%@” turns it off, and macOS keeps switching desktops with three fingers.";
+"Elegí «Desactivado» en Trackpad → Más gestos, o pasá Rambla a 3 dedos y macOS a «4 dedos»." = "Choose Off in Trackpad → More Gestures, or set Rambla to three fingers and macOS to four.";
+"macOS cambia de escritorio con 4 dedos, el mismo gesto que usa Rambla." = "macOS switches desktops with four fingers, the same gesture Rambla uses.";
+"«%@» lo apaga; para cambiar de escritorio quedan ⌃← y ⌃→." = "“%@” turns it off; you can still switch desktops with ⌃← and ⌃→.";
+"Elegí «Desactivado» en Trackpad → Más gestos → «Cambiar entre apps en pantalla completa»." = "Choose Off for Trackpad → More Gestures → “Swipe between full-screen applications”.";
+"macOS también cambia de escritorio con 3 dedos («Cambiar entre apps en pantalla completa»)." = "macOS also switches desktops with three fingers (“Swipe between full-screen applications”).";
+"Elegí «4 dedos» o «Desactivado» en Trackpad → Más gestos." = "Choose four fingers or Off in Trackpad → More Gestures.";
+"«%@» apaga ese gesto y macOS sigue cambiando de escritorio con 4 dedos." = "“%@” turns off that gesture, and macOS keeps switching desktops with four fingers.";
+"«%@» apaga ese gesto; para cambiar de escritorio quedan ⌃← y ⌃→." = "“%@” turns off that gesture; you can still switch desktops with ⌃← and ⌃→.";
+"macOS pasa de página con 3 dedos y lo haría a la vez que Rambla mueve la tira." = "macOS swipes between pages with three fingers, and would do it while Rambla moves the strip.";
+"«%@» apaga ese gesto." = "“%@” turns off that gesture.";
+"Elegí «Ir a la izquierda o la derecha con 2 dedos» en Trackpad → Más gestos → «Cambiar de página»." = "Choose “Scroll Left or Right with Two Fingers” for Trackpad → More Gestures → “Swipe between pages”.";
+"macOS no usa el deslizamiento horizontal de %lld dedos." = "macOS does not use the %lld-finger horizontal swipe.";
+"Arrastre con tres dedos" = "Three-finger drag";
+"El arrastre con tres dedos choca con el deslizamiento de 3 dedos de Rambla. Conviene usar 4 dedos en Rambla o apagarlo en Accesibilidad → Control del puntero → Opciones del trackpad." = "Three-finger drag clashes with Rambla’s three-finger swipe. Use four fingers in Rambla, or turn it off in Accessibility → Pointer Control → Trackpad Options.";
+"Activado, pero no choca con el gesto de Rambla." = "On, but it does not clash with Rambla’s gesture.";
+"Rectangle detectado — convivencia activa. Atajos en conflicto: 0." = "Rectangle detected, working side by side. Conflicting shortcuts: 0.";
+"%@ y %lld más" = "%@ and %lld more";
+"Rectangle detectado — convivencia activa. Atajos en conflicto: %lld (%@). Se cambian en la sección Atajos." = "Rectangle detected, working side by side. Conflicting shortcuts: %lld (%@). Change them in Shortcuts.";

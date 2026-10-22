@@ -15,7 +15,7 @@ struct AboutView: View {
                 .interpolation(.high)
                 .frame(width: 96, height: 96)
                 .accessibilityHidden(true)
-            Text("Rambla")
+            Text(verbatim: "Rambla")
                 .font(.system(size: 28, weight: .semibold))
             Text(versionText)
                 .foregroundStyle(.secondary)
@@ -23,7 +23,7 @@ struct AboutView: View {
             Text("Gestor de ventanas con scroll horizontal. Gratis y open source.")
                 .multilineTextAlignment(.center)
                 .padding(.top, 4)
-            Link("github.com/Coru29/rambla", destination: Self.repository)
+            Link(destination: Self.repository) { Text(verbatim: "github.com/Coru29/rambla") }
             Button("Mostrar registro", action: showLog)
                 .padding(.top, 8)
             Spacer(minLength: 0)
@@ -36,12 +36,12 @@ struct AboutView: View {
     private var versionText: String {
         let info = Bundle.main.infoDictionary
         guard let version = info?["CFBundleShortVersionString"] as? String, !version.isEmpty else {
-            return "Versión de desarrollo"
+            return String(localized: "Versión de desarrollo")
         }
         if let build = info?["CFBundleVersion"] as? String, !build.isEmpty, build != version {
-            return "Versión \(version) (\(build))"
+            return String(localized: "Versión \(version) (\(build))")
         }
-        return "Versión \(version)"
+        return String(localized: "Versión \(version)")
     }
 
     private func showLog() {

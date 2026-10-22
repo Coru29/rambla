@@ -1,4 +1,5 @@
 import AppKit
+import RamblaCore
 
 /// Command-line mode of the app binary: `Rambla <action>` forwards the action to the running app.
 enum CLI {
@@ -10,13 +11,21 @@ enum CLI {
     /// Returns an exit code when the arguments are a CLI invocation, or nil to launch the app.
     static func run(_ args: [String]) -> Int32? {
         guard let first = args.first else { return nil }
-        if first == "list" || first == "help" || first == "--help" || first == "-h" {
+        if first == "list" {
+            // Every action id the app, `rambla://` URLs and Raycast understand, with its name.
+            let width = Action.allCases.map(\.rawValue.count).max() ?? 0
+            for action in Action.allCases {
+                print(action.rawValue.padding(toLength: width + 2, withPad: " ", startingAt: 0) + action.title)
+            }
+            return 0
+        }
+        if first == "help" || first == "--help" || first == "-h" {
             print(usage)
             return 0
         }
         guard !first.hasPrefix("-") else { return nil }
         guard !NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).isEmpty else {
-            FileHandle.standardError.write(Data("Rambla no está abierto.\n".utf8))
+            FileHandle.standardError.write(Data((String(localized: "Rambla no está abierto.") + "\n").utf8))
             return 1
         }
         if replyCommands.contains(first) {
@@ -46,15 +55,16 @@ enum CLI {
             }
             usleep(30_000)
         }
-        FileHandle.standardError.write(Data("Rambla no respondió.\n".utf8))
+        FileHandle.standardError.write(Data((String(localized: "Rambla no respondió.") + "\n").utf8))
         return 1
     }
 
     static var usage: String {
-        """
+        String(localized: """
         Uso: rambla <acción>
         Ejemplos: rambla focus-left · rambla cycle-width · rambla focus-3 · rambla toggle-pause
+        rambla list muestra todas las acciones.
         También por URL: open -g "rambla://focus-left"
-        """
+        """)
     }
 }
