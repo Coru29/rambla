@@ -189,6 +189,25 @@ import CoreGraphics
         #expect(settled.column == 2)       // columns 2 and 3 tie in [378.75, 1126.25]: the lower index wins
     }
 
+    @Test func aColumnWiderThanTheSpaceBesideAPinFitsInsteadOfParking() {
+        // A new 900 pt window next to a 25 % right pin (the scroll area is 747.5 wide) used to cross the area's edge,
+        // so it was parked off screen while it had focus.
+        var strip = rightPinStrip()
+        strip.columns[0].width = .points(900)
+        let m = Layout.metrics(input(strip))
+        #expect(m.area.width == 747.5)
+        #expect(m.widths[0] == 747.5)
+        let placement = Layout.compute(input(strip)).placements[1]
+        guard case .visible(let frame) = placement else {
+            Issue.record("the focused wide column should be visible, got \(String(describing: placement))")
+            return
+        }
+        #expect(frame.width == 747.5 && frame.minX == 0)
+        // A window that cannot be narrower than the area still gets its minimum.
+        let minimum = Layout.metrics(input(strip, minSizes: [1: CGSize(width: 800, height: 100)]))
+        #expect(minimum.widths[0] == 800)
+    }
+
     // MARK: - Settle and drop
 
     @Test func settleSnaps() {

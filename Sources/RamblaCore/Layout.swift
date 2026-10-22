@@ -92,7 +92,8 @@ public enum Layout {
     // MARK: - Metrics
 
     /// Strip-space x and width of every column, plus the scroll area. Widths resolve against the area, so
-    /// pinned columns (which shrink it) are sized first; a column is never narrower than its visible windows' minimum.
+    /// pinned columns (which shrink it) are sized first; a column is never wider than the area, unless its visible
+    /// windows' minimum needs it to be.
     public static func metrics(_ input: LayoutInput) -> StripMetrics {
         buildMetrics(input, slots: resolveSlots(input))
     }
@@ -301,7 +302,10 @@ extension Layout {
                 .filter { !input.hidden.contains($0) }
                 .compactMap { input.minSizes[$0]?.width }
                 .max() ?? 0
-            let width = max(column.width.resolve(available: Double(slots.area.width), gap: gap), Double(minWidth))
+            // Never wider than the scroll area, so a wide window beside a pin is not parked while focused; only a
+            // window that cannot be narrower makes its column wider.
+            let wanted = min(column.width.resolve(available: Double(slots.area.width), gap: gap), Double(slots.area.width))
+            let width = max(wanted, Double(minWidth))
             widths.append(width)
             total = cursor + width
             cursor += width + gap
