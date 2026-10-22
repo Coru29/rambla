@@ -208,15 +208,40 @@ import CoreGraphics
         #expect(equidistant.scroll == 0 && equidistant.column == 0)
     }
 
-    @Test func settlePicksTheMostVisibleColumn() {
-        // Widths [242.5, 747.5] fit in the area together, so the target is 0 and the wider column wins.
+    @Test func settleKeepsTheFocusedColumnAmongTheOnesSharingAStop() {
+        // Widths [242.5, 747.5] fit in the area together: both columns' stops are 0, so a swipe changes nothing
+        // and the focus stays where it was.
         let strip = Strip(columns: [Column(windows: [1], width: .fraction(0.25)),
                                     Column(windows: [2], width: .fraction(0.75))], focused: 0)
         let m = Layout.metrics(input(strip))
         #expect(m.total == 1000)
-        let r = Layout.settle(m, scroll: 0)
-        #expect(r.scroll == 0)
-        #expect(r.column == 1)
+        #expect(Layout.settle(m, scroll: 0, velocity: 0, focused: 1) == (0, 1))
+        #expect(Layout.settle(m, scroll: 0, velocity: 0, focused: 0) == (0, 0))
+        #expect(Layout.settle(m, scroll: 0).column == 0)                 // nothing focused: the first one
+    }
+
+    @Test func aSwipeToTheEndFocusesTheLastColumnEvenWhenAWiderOneShowsMore() {
+        // A 900 pt column before a 300 pt last one: xs 0, 610, 1520, total 1820, so the strip ends at 820. There
+        // the wide column still shows 690 pt and the last one 300 pt, but the swipe went to the end: focusing the
+        // wide column would scroll the strip back and the last column could never be reached.
+        let strip = Strip(columns: [Column(windows: [1], width: .points(600)),
+                                    Column(windows: [2], width: .points(900)),
+                                    Column(windows: [3], width: .points(300))], focused: 1)
+        let m = Layout.metrics(input(strip))
+        #expect(m.xs == [0, 610, 1520] && m.total == 1820)
+        let end = Layout.settle(m, scroll: 700, velocity: 2000, focused: 1)
+        #expect(end.scroll == 820)
+        #expect(end.column == 2)
+        let back = Layout.settle(m, scroll: 700, velocity: -2000, focused: 2)
+        #expect(back.scroll == 610 && back.column == 1)
+    }
+
+    @Test func settleFocusesTheColumnItLandsOn() {
+        // Three 50 % columns at 0, 505, 1010 (the strip ends at 505). From the middle column, a swipe back to 0
+        // lands on the first column even though the middle one is still fully on screen there.
+        let m = Layout.metrics(input(threeColumns()))
+        #expect(Layout.settle(m, scroll: 100, velocity: -1000, focused: 1) == (0, 0))
+        #expect(Layout.settle(m, scroll: 400, velocity: 1000, focused: 0) == (505, 1))
     }
 
     @Test func settleWithoutColumns() {

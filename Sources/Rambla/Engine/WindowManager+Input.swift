@@ -42,7 +42,7 @@ extension WindowManager {
         gestureKey = nil
         guard var strip = strips[key], let display = display(for: key) else { return }
         let metrics = Layout.metrics(layoutInput(for: key, strip: strip, display: display))
-        let settled = Layout.settle(metrics, scroll: strip.scroll, velocity: velocity)
+        let settled = Layout.settle(metrics, scroll: strip.scroll, velocity: velocity, focused: strip.focused)
         let width = max(Double(metrics.area.width), 1)
         Log.info(String(format: "Slide released at %.2f widths/s: %.2f → %.2f widths", velocity / width,
                         strip.scroll / width, settled.scroll / width))

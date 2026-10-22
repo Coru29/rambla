@@ -121,8 +121,8 @@ public enum Layout {
         }
     }
 
-    /// Snaps `scroll` to the left edge of the nearest laid-out column (clamped to the strip) and reports
-    /// which column then shows the most. Ties go to the lower index. Column is nil without laid-out columns.
+    /// Snaps `scroll` to the left edge of the nearest laid-out column (clamped to the strip) and reports the column
+    /// it lands on (see below). Ties go to the lower index. Column is nil without laid-out columns.
     public static func settle(_ m: StripMetrics, scroll: Double) -> (scroll: Double, column: Int?) {
         settle(m, scroll: scroll, velocity: 0)
     }
@@ -136,7 +136,13 @@ public enum Layout {
     /// toward later columns). The strip glides on for `flickGlide` before snapping, so a fast flick can pass
     /// several columns, and a flick always lands at least on the next column in its direction: a short quick
     /// swipe changes column, like swiping between desktops.
-    public static func settle(_ m: StripMetrics, scroll: Double, velocity: Double) -> (scroll: Double, column: Int?) {
+    ///
+    /// The column it returns is the one the strip lands on: `focused` when the target is its stop too (a strip that
+    /// fits on screen, or the columns that share the end of the strip), otherwise the first column whose stop the
+    /// target is. Not the most visible one: at the end of a strip a wide column before a narrow last one shows
+    /// more, and focusing it would scroll the strip back, so the last column could never be reached.
+    public static func settle(_ m: StripMetrics, scroll: Double, velocity: Double,
+                              focused: Int? = nil) -> (scroll: Double, column: Int?) {
         let laidOut = m.xs.indices.filter { m.isLaidOut($0) }
         guard !laidOut.isEmpty else { return (0, nil) }
         let w = Double(m.area.width)
@@ -155,13 +161,11 @@ public enum Layout {
             }
         }
 
-        var best: Int?
-        var bestVisible = -1.0
-        for i in laidOut {
-            let visible = max(0, min(m.xs[i] + m.widths[i], target + w) - max(m.xs[i], target))
-            if visible > bestVisible { best = i; bestVisible = visible }
+        if let focused, let index = laidOut.firstIndex(of: focused), abs(stops[index] - target) < epsilon {
+            return (target, focused)
         }
-        return (target, best)
+        let landed = laidOut.indices.first { abs(stops[$0] - target) < epsilon }.map { laidOut[$0] }
+        return (target, landed)
     }
 
     /// Where a dragged column lands when released at `stripX` (strip space): the index it ends up at once
