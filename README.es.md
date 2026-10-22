@@ -36,7 +36,7 @@ Cada ventana es una columna de una tira horizontal que sigue más allá de los b
 - **Convive con [Rectangle](https://rectangleapp.com)**: los atajos usan ⌃⌘, así que no chocan con los ⌃⌥ del set normal de Rectangle (con su set Spectacle chocan un par, y Rambla te avisa). Si Rectangle (u otra app) mueve una ventana, esa ventana sale de la tira y queda donde la pusieron. La página Mac de la configuración avisa si algún atajo choca con tu Rectangle.
 - **Automatización**: enlaces `rambla://`, comando de terminal `rambla` y exportación de scripts para Raycast.
 - **Español e inglés**: la interfaz sigue el idioma de tu Mac.
-- **Liviana**: Swift nativo (AppKit, con la configuración en SwiftUI), sin Electron y sin polling. En reposo usa cerca de 0 % de CPU y ~12 MB de memoria.
+- **Liviana**: Swift nativo (AppKit, con la configuración en SwiftUI), sin Electron y funciona por eventos. En reposo usa cerca de 0 % de CPU y ~12 MB de memoria.
 
 ## Privacidad
 
@@ -116,7 +116,7 @@ scripts/install.sh     # copia a /Applications y la abre
 scripts/e2e.sh         # pruebas en vivo con una app de prueba descartable (requiere el permiso de Accesibilidad)
 ```
 
-La primera compilación crea una identidad de firma autofirmada local en `.signing/`, que nunca se sube al repo. Gracias a eso, macOS conserva el permiso de Accesibilidad entre compilaciones.
+La primera compilación crea una identidad de firma autofirmada local en `.signing/`, que nunca se sube al repo. Gracias a eso, macOS conserva el permiso de Accesibilidad entre compilaciones. Esa identidad es tuya y no la del proyecto: si instalás tu compilación sobre un release, macOS vuelve a pedir el permiso de Accesibilidad y esa copia deja de aceptar las actualizaciones oficiales.
 
 **Versiones y releases**: los commits siguen [Conventional Commits](https://www.conventionalcommits.org) y la versión sale de ellos (`feat` sube la menor, `fix` el parche y `!` la mayor). `scripts/release.sh` arma el DMG firmado, crea el tag y publica el release; las copias instaladas se actualizan solas en menos de un día. Más detalles en [CONTRIBUTING.md](CONTRIBUTING.md).
 

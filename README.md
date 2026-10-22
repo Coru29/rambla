@@ -38,7 +38,7 @@ Every window is a column on one horizontal strip that keeps going past the edges
 - **Plays well with [Rectangle](https://rectangleapp.com)**: default shortcuts use ⌃⌘, so they don't clash with Rectangle's default ⌃⌥ set (with its Spectacle set a couple do, and Rambla tells you), and if Rectangle (or any other app) moves a window, that window leaves the strip and stays where it was put. The Mac page of the settings lists any shortcut that collides with your Rectangle setup.
 - **Automation**: `rambla://` URLs, a `rambla` command-line tool and Raycast script export.
 - **English and Spanish**: the interface follows your Mac's language.
-- **Light**: native Swift (AppKit + SwiftUI settings), no Electron, no polling — about 0 % CPU and ~12 MB of memory when idle.
+- **Light**: native Swift (AppKit + SwiftUI settings), no Electron, event-driven — about 0 % CPU and ~12 MB of memory when idle.
 
 ## Privacy
 
