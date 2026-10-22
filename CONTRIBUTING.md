@@ -32,6 +32,8 @@ type(optional scope): summary in imperative mood
 
 Examples: `fix: keep focus when switching desktops`, `feat(trackpad): three-finger swipe`, `docs: translate the manual`.
 
+**Pull requests are squash-merged**: the whole PR lands as one commit whose message is the PR title, so the **PR title** must follow this format (CI checks it). The commits inside your branch can be anything.
+
 Run this once after cloning to have git reject messages that don't follow the format:
 
 ```sh

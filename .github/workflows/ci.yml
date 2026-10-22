@@ -23,11 +23,12 @@ jobs:
       - name: Release build
         run: swift build -c release --product Rambla
 
-      - name: Commit messages follow Conventional Commits
+      # Pull requests are squash-merged with their title as the commit message, and versions are computed
+      # from those messages: the title must be a Conventional Commit (individual commits can be anything).
+      - name: Pull request title follows Conventional Commits
         if: github.event_name == 'pull_request'
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
         run: |
-          git fetch --no-tags origin "${{ github.base_ref }}"
-          for sha in $(git rev-list --no-merges "origin/${{ github.base_ref }}..HEAD"); do
-            git log -1 --format=%B "$sha" > /tmp/msg
-            scripts/hooks/commit-msg /tmp/msg || { echo "::error::$sha is not a Conventional Commit"; exit 1; }
-          done
+          printf '%s\n' "$TITLE" > /tmp/title
+          scripts/hooks/commit-msg /tmp/title || { echo "::error::Usá un título tipo 'fix: …' o 'feat(scope): …' (Conventional Commits)."; exit 1; }
