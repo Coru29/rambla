@@ -65,9 +65,9 @@ struct WelcomeAccessibilityPage: View {
                     }
                     Spacer(minLength: 8)
                     if model.isTrusted {
-                        Button("Abrir Ajustes de Accesibilidad", action: openAccessibilitySettings)
+                        Button("Abrir la configuración de Accesibilidad", action: openAccessibilitySettings)
                     } else {
-                        Button("Abrir Ajustes de Accesibilidad", action: openAccessibilitySettings)
+                        Button("Abrir la configuración de Accesibilidad", action: openAccessibilitySettings)
                             .buttonStyle(.borderedProminent)
                     }
                 }

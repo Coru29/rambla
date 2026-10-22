@@ -49,8 +49,8 @@ macOS 14 Sonoma o posterior, en Apple silicon, y el permiso de Accesibilidad.
 ## Instalación
 
 1. Bajá **[Rambla.dmg](https://github.com/Coru29/rambla/releases/latest/download/Rambla.dmg)** de [Releases](https://github.com/Coru29/rambla/releases) (o compilalo, más abajo) y arrastrá **Rambla** a Aplicaciones.
-2. Abrila y dale permiso en **Ajustes del Sistema → Privacidad y seguridad → Accesibilidad**.
-3. Rambla no está notarizada por Apple, así que la primera vez macOS no la abre. Andá a **Ajustes del Sistema → Privacidad y seguridad** y tocá **«Abrir de todos modos»** (en macOS 14 alcanza con click derecho en la app → **Abrir**), o corré `xattr -dr com.apple.quarantine /Applications/Rambla.app`.
+2. Abrila y dale permiso en **Configuración del Sistema → Privacidad y seguridad → Accesibilidad**.
+3. Rambla no está notarizada por Apple, así que la primera vez macOS no la abre. Andá a **Configuración del Sistema → Privacidad y seguridad** y tocá **«Abrir de todos modos»** (en macOS 14 alcanza con click derecho en la app → **Abrir**), o corré `xattr -dr com.apple.quarantine /Applications/Rambla.app`.
 
 ### Actualizaciones
 
@@ -82,7 +82,7 @@ Todos se pueden cambiar en **Configuración → Atajos**.
 
 ## Trackpad
 
-macOS también recibe cada deslizamiento y Rambla no lo puede frenar. Y en **Ajustes del Sistema → Trackpad → Más gestos → Cambiar entre apps en pantalla completa**, la opción «3 dedos» deja activo también el de 4. Con el gesto de cuatro dedos (el que viene por defecto), tocá **«Apagarlo en macOS»** en **Configuración → Trackpad y mouse**: Rambla apaga solo el gesto de 4 dedos de macOS y el de 3 sigue cambiando de escritorio. La otra opción es elegir tres dedos en Rambla y poner el de macOS en «4 dedos». Rambla te avisa si chocan.
+macOS también recibe cada deslizamiento y Rambla no lo puede frenar. Y en **Configuración del Sistema → Trackpad → Más gestos → Cambiar entre apps en pantalla completa**, la opción «3 dedos» deja activo también el de 4. Con el gesto de cuatro dedos (el que viene por defecto), tocá **«Apagarlo en macOS»** en **Configuración → Trackpad y mouse**: Rambla apaga solo el gesto de 4 dedos de macOS y el de 3 sigue cambiando de escritorio. La otra opción es elegir tres dedos en Rambla y poner el de macOS en «4 dedos». Rambla te avisa si chocan.
 
 ## Ajustes de macOS recomendados
 
@@ -90,7 +90,7 @@ Rambla los revisa en **Configuración → Mac**:
 
 - **Las pantallas tienen Spaces separados**: activado (viene así).
 - **Reorganizar Spaces automáticamente según el uso más reciente**: desactivado.
-- **Stage Manager** y **arrastrar ventanas a los bordes para organizarlas**: desactivados.
+- El **Organizador visual** y **arrastrar ventanas a los bordes para disponerlas en mosaico**: desactivados.
 - Con dos pantallas, lo mejor es poner la segunda **arriba o abajo** de la principal. Lado a lado también funciona, pero las ventanas solo pueden salir hasta la mitad hacia la otra pantalla antes de estacionarse.
 
 ## Automatización

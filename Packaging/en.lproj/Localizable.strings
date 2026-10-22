@@ -4,7 +4,7 @@
 /* Rambla/App/AppDelegate.swift */
 "Iniciando…" = "Starting…";
 "Falta el permiso de Accesibilidad" = "Accessibility permission missing";
-"Abrir Ajustes de Accesibilidad…" = "Open Accessibility Settings…";
+"Abrir la configuración de Accesibilidad…" = "Open Accessibility Settings…";
 "Bienvenida…" = "Welcome…";
 "En pausa" = "Paused";
 "Activo" = "Active";
@@ -71,7 +71,7 @@
 "Rambla lo necesita para mover y acomodar las ventanas de otras apps. No graba ni envía nada de lo que hacés." = "Rambla needs it to move and arrange other apps’ windows. It does not record or send anything you do.";
 "Permiso activado" = "Permission granted";
 "Falta el permiso" = "Permission missing";
-"Abrir Ajustes de Accesibilidad" = "Open Accessibility Settings";
+"Abrir la configuración de Accesibilidad" = "Open Accessibility Settings";
 "Listo, Rambla ya puede acomodar tus ventanas." = "Done, Rambla can now arrange your windows.";
 "Activá Rambla en la lista de Ajustes y volvé acá: esta ventana se actualiza sola." = "Turn on Rambla in the list in System Settings and come back: this window updates by itself.";
 "Deslizá con 3 o 4 dedos hacia los costados y la tira te sigue. macOS usa ese mismo gesto para cambiar de escritorio, así que conviene que no choquen." = "Swipe sideways with 3 or 4 fingers and the strip follows you. macOS uses that same gesture to switch desktops, so it is best if they do not clash.";
@@ -312,7 +312,7 @@
 
 /* Rambla/Setup/SystemChecks.swift */
 "No se pudo cambiar el gesto de macOS" = "Could not change the macOS gesture";
-"Cambialo en Ajustes del Sistema → Trackpad → Más gestos: elegí «Desactivado» en «Cambiar entre apps en pantalla completa»." = "Change it in System Settings → Trackpad → More Gestures: set “Swipe between full-screen applications” to Off.";
+"Cambialo en Configuración del Sistema → Trackpad → Más gestos: elegí «Desactivado» en «Cambiar entre apps en pantalla completa»." = "Change it in System Settings → Trackpad → More Gestures: set “Swipe between full-screen applications” to Off.";
 
 /* RamblaCore/Actions.swift */
 "Navegar" = "Navigate";
@@ -361,8 +361,8 @@
 "Reorganizar Spaces" = "Rearrange Spaces";
 "Recomendado: apagado. macOS reordena los Spaces según el uso reciente y cuesta saber qué tira hay en cada uno (Escritorio y Dock → Mission Control)." = "Recommended: off. macOS reorders Spaces by recent use, which makes it hard to know which strip is on each one (Desktop & Dock → Mission Control).";
 "Los Spaces conservan su orden." = "Spaces keep their order.";
-"Stage Manager" = "Stage Manager";
-"Stage Manager (Organizador visual) está activado y acomoda las ventanas por su cuenta, lo que choca con Rambla. Conviene apagarlo." = "Stage Manager is on and arranges windows on its own, which clashes with Rambla. Better turn it off.";
+"Organizador visual" = "Stage Manager";
+"El Organizador visual está activado y acomoda las ventanas por su cuenta, lo que choca con Rambla. Conviene apagarlo." = "Stage Manager is on and arranges windows on its own, which clashes with Rambla. Better turn it off.";
 "Apagado." = "Off.";
 "arrastrar a los bordes" = "dragging to the edges";
 "arrastrar a la barra de menús" = "dragging to the menu bar";
@@ -393,8 +393,8 @@
 "Rectangle detectado — convivencia activa. Atajos en conflicto: %lld (%@). Se cambian en la sección Atajos." = "Rectangle detected, working side by side. Conflicting shortcuts: %lld (%@). Change them in Shortcuts.";
 
 /* Swipe up and down (Mission Control) */
-"Cambialo en Ajustes del Sistema → Trackpad → Más gestos: elegí otra cantidad de dedos o «Desactivado» para Mission Control." = "Change it in System Settings → Trackpad → More Gestures: choose another number of fingers or Off for Mission Control.";
-"Desactivá Mission Control y Exposé de apps en Trackpad → Más gestos, o apagá el gesto vertical de Rambla." = "Turn off Mission Control and App Exposé in Trackpad → More Gestures, or turn off Rambla’s vertical gesture.";
+"Cambialo en Configuración del Sistema → Trackpad → Más gestos: elegí otra cantidad de dedos o «Desactivado» para Mission Control." = "Change it in System Settings → Trackpad → More Gestures: choose another number of fingers or Off for Mission Control.";
+"Desactivá Mission Control y Exposé en Trackpad → Más gestos, o apagá el gesto vertical de Rambla." = "Turn off Mission Control and App Exposé in Trackpad → More Gestures, or turn off Rambla’s vertical gesture.";
 "El gesto vertical de Rambla está desactivado: no hay conflicto." = "Rambla’s vertical gesture is off: no conflict.";
 "Elegí «3 dedos» o «Desactivado» para Mission Control en Trackpad → Más gestos." = "Choose three fingers or Off for Mission Control in Trackpad → More Gestures.";
 "Elegí «4 dedos» o «Desactivado» para Mission Control en Trackpad → Más gestos." = "Choose four fingers or Off for Mission Control in Trackpad → More Gestures.";

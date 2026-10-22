@@ -104,8 +104,8 @@ enum SystemChecks {
         let alert = NSAlert()
         alert.messageText = String(localized: "No se pudo cambiar el gesto de macOS")
         alert.informativeText = vertical
-            ? String(localized: "Cambialo en Ajustes del Sistema → Trackpad → Más gestos: elegí otra cantidad de dedos o «Desactivado» para Mission Control.")
-            : String(localized: "Cambialo en Ajustes del Sistema → Trackpad → Más gestos: elegí «Desactivado» en «Cambiar entre apps en pantalla completa».")
+            ? String(localized: "Cambialo en Configuración del Sistema → Trackpad → Más gestos: elegí otra cantidad de dedos o «Desactivado» para Mission Control.")
+            : String(localized: "Cambialo en Configuración del Sistema → Trackpad → Más gestos: elegí «Desactivado» en «Cambiar entre apps en pantalla completa».")
         alert.addButton(withTitle: String(localized: "Abrir Ajustes"))
         alert.addButton(withTitle: String(localized: "Cerrar"))
         if alert.runModal() == .alertFirstButtonReturn { NSWorkspace.shared.open(MacChecks.trackpadURL) }

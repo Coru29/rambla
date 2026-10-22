@@ -66,7 +66,7 @@ final class WelcomeWindowController: NSObject, NSWindowDelegate {
 /// The guide's window. Keys it answers when no control in it wants them: ⏎ goes to the next step, ⎋ and ⌘W close.
 ///
 /// ⏎ is handled here, not as a default button: the default button is drawn in the accent color, and on the
-/// permission step that color belongs to "Abrir Ajustes de Accesibilidad".
+/// permission step that color belongs to "Abrir la configuración de Accesibilidad".
 final class WelcomeWindow: NSWindow {
     /// What ⏎ does.
     var onReturn: (() -> Void)?

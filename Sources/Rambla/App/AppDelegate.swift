@@ -74,7 +74,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func waitForTrust() {
         menuBar.setStatus(String(localized: "Falta el permiso de Accesibilidad"), active: false)
-        let open = NSMenuItem(title: String(localized: "Abrir Ajustes de Accesibilidad…"), action: #selector(openAccessibilitySettings), keyEquivalent: "")
+        let open = NSMenuItem(title: String(localized: "Abrir la configuración de Accesibilidad…"), action: #selector(openAccessibilitySettings), keyEquivalent: "")
         open.target = self
         menuBar.setItems([open, item(String(localized: "Bienvenida…"), #selector(openWelcome))])
         // macOS posts this when any app's Accessibility permission changes; the timer is a fallback

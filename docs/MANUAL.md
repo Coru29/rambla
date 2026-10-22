@@ -46,10 +46,10 @@ En macOS, cada ventana nueva se encima con las demás o te obliga a achicarlas. 
 
 1. Abrí el `.dmg` y arrastrá **Rambla** a la carpeta **Aplicaciones**.
 2. Abrí Rambla desde Aplicaciones. Va a aparecer un ícono en la barra de menú: tres ventanas sobre la rambla. La primera vez se abre también una guía corta (**Bienvenida**) que te acompaña con el permiso, el trackpad y los atajos básicos; la volvés a abrir desde el menú cuando quieras.
-3. macOS te pide el permiso de **Accesibilidad**, que es lo que permite mover ventanas de otras apps. Andá a **Ajustes del Sistema → Privacidad y seguridad → Accesibilidad** y activá **Rambla**. Si no aparece el aviso, el menú de Rambla tiene "Abrir Ajustes de Accesibilidad…".
+3. macOS te pide el permiso de **Accesibilidad**, que es lo que permite mover ventanas de otras apps. Andá a **Configuración del Sistema → Privacidad y seguridad → Accesibilidad** y activá **Rambla**. Si no aparece el aviso, el menú de Rambla tiene "Abrir configuración de Accesibilidad…".
 4. Listo: Rambla detecta el permiso sola y ordena tus ventanas.
 
-> Rambla no está notarizada por Apple, así que la primera vez macOS no la abre. Andá a **Ajustes del Sistema → Privacidad y seguridad** y tocá **«Abrir de todos modos»**. En macOS 14 alcanza con click derecho en la app → **Abrir**.
+> Rambla no está notarizada por Apple, así que la primera vez macOS no la abre. Andá a **Configuración del Sistema → Privacidad y seguridad** y tocá **«Abrir de todos modos»**. En macOS 14 alcanza con click derecho en la app → **Abrir**.
 
 Rambla no necesita Grabación de pantalla, ni Monitoreo de entrada, ni desactivar SIP.
 
@@ -152,8 +152,8 @@ Una columna puede tener varias ventanas.
 
 > macOS también usa ese gesto para cambiar de escritorio y Rambla no lo puede bloquear. Ojo con una trampa de Ajustes: en **«Cambiar entre apps en pantalla completa»**, la opción **«3 dedos»** deja activo también el gesto de 4 dedos, aunque no lo muestre. Elegí una de estas opciones:
 >
-> - **Cuatro dedos para Rambla (recomendado):** en Configuración → Trackpad y mouse, tocá **«Apagarlo en macOS»**. Rambla apaga solo el gesto de 4 dedos de macOS, y el de 3 dedos sigue cambiando de escritorio. A mano, lo más parecido es elegir **«Desactivado»** en Ajustes del Sistema → Trackpad → Más gestos → «Cambiar entre apps en pantalla completa», y cambiar de escritorio con ⌃← / ⌃→.
-> - **Tres dedos para Rambla:** en Ajustes del Sistema → Trackpad → Más gestos, poné «Cambiar entre apps en pantalla completa» en **«4 dedos»** y «Cambiar de página» en **2 dedos**. Después elegí tres dedos en Configuración → Trackpad y mouse. Esta opción no sirve si usás «arrastrar con tres dedos».
+> - **Cuatro dedos para Rambla (recomendado):** en Configuración → Trackpad y mouse, tocá **«Apagarlo en macOS»**. Rambla apaga solo el gesto de 4 dedos de macOS, y el de 3 dedos sigue cambiando de escritorio. A mano, lo más parecido es elegir **«Desactivado»** en Configuración del Sistema → Trackpad → Más gestos → «Cambiar entre apps en pantalla completa», y cambiar de escritorio con ⌃← / ⌃→.
+> - **Tres dedos para Rambla:** en Configuración del Sistema → Trackpad → Más gestos, poné «Cambiar entre apps en pantalla completa» en **«4 dedos»** y «Cambiar de página» en **2 dedos**. Después elegí tres dedos en Configuración → Trackpad y mouse. Esta opción no sirve si usás «arrastrar con tres dedos».
 >
 > Configuración → Trackpad y mouse (y la página Mac) te avisa si el gesto de Rambla choca con el de macOS.
 
@@ -178,7 +178,7 @@ Con un solo botón (el del medio, por ejemplo), un clic sin mover sigue funciona
 - Si pasás una ventana a otro escritorio desde Mission Control, Rambla la mueve a la tira de ese escritorio.
 - **⌃⌘N** manda la ventana enfocada a la siguiente pantalla.
 - Podés desactivar Rambla en una pantalla en Configuración → Pantallas. Ahí no ordena nada.
-- **Recomendado**: dejá activado "Las pantallas tienen Spaces separados" (viene así en macOS). Con dos monitores, lo ideal es poner el segundo **arriba o abajo** del principal en Ajustes del Sistema → Pantallas → Organizar. Lado a lado también funciona, pero las ventanas solo pueden asomarse hasta la mitad hacia el otro monitor antes de estacionarse.
+- **Recomendado**: dejá activado "Las pantallas tienen Spaces separados" (viene así en macOS). Con dos monitores, lo ideal es poner el segundo **arriba o abajo** del principal en Configuración del Sistema → Pantallas → Organizar. Lado a lado también funciona, pero las ventanas solo pueden asomarse hasta la mitad hacia el otro monitor antes de estacionarse.
 - Las ventanas en **pantalla completa** (botón verde) salen de la tira mientras están así y vuelven a su lugar cuando salís.
 - Las ventanas **minimizadas** o de apps **ocultas** (⌘H) dejan su lugar sin ocupar espacio y reaparecen en el mismo sitio.
 - Si **desconectás una pantalla** (por ejemplo, al sacar la notebook del dock) y pasan más de 15 segundos, sus ventanas se suman a la tira de la pantalla donde las deja macOS. **Cuando la volvés a conectar, vuelven a su lugar**, en el mismo orden y con sus anchos; las ventanas que abriste mientras tanto quedan donde estaban. Mientras no vuelve, Rambla recuerda su orden hasta un mes, aunque reinicies.
@@ -201,7 +201,7 @@ Abrila desde el ícono de la barra de menú → **Configuración…**. Mientras 
 | **Apariencia** | Barra indicadora, borde de foco, atenuar inactivas, mouse ↔ foco |
 | **Apps** | Reglas por app: que flote siempre (ideal para calculadoras, reproductores o chats chiquitos), ancho inicial y dónde se abren sus ventanas (al lado de la enfocada, al principio o al final) |
 | **Pantallas** | Activar o desactivar Rambla en cada monitor |
-| **Mac** | Revisa los ajustes de macOS que afectan a Rambla (permiso, Spaces, Stage Manager, gestos, Rectangle) y te lleva al panel de Ajustes que corresponda |
+| **Mac** | Revisa los ajustes de macOS que afectan a Rambla (permiso, Spaces, Organizador visual, gestos, Rectangle) y te lleva al panel de Configuración que corresponda |
 | **Automatización** | Instalar el comando `rambla` y exportar scripts de Raycast |
 | **Acerca de** | Versión, enlace al proyecto y registro |
 
@@ -257,7 +257,7 @@ Los enlaces también sirven en Atajos de Apple, Alfred, Keyboard Maestro, Better
 
 **Un atajo no hace nada.** Puede que otra app ya lo use. Revisá Configuración → Atajos, que marca los que macOS no dejó registrar, y cambialo por otro.
 
-**Rambla pide el permiso de Accesibilidad otra vez.** En Ajustes del Sistema → Privacidad y seguridad → Accesibilidad, quitá Rambla con "−" y agregala de nuevo desde Aplicaciones.
+**Rambla pide el permiso de Accesibilidad otra vez.** En Configuración del Sistema → Privacidad y seguridad → Accesibilidad, quitá Rambla con "−" y agregala de nuevo desde Aplicaciones.
 
 **Algo se ve raro.** Probá **Reacomodar ventanas**. Si sigue, **Mostrar registro** te muestra qué pasó; esa información sirve para reportar el problema en [GitHub](https://github.com/Coru29/rambla/issues).
 
@@ -265,7 +265,7 @@ Los enlaces también sirven en Atajos de Apple, Alfred, Keyboard Maestro, Better
 
 1. Menú de Rambla → **Salir de Rambla**. Todas las ventanas vuelven a la pantalla.
 2. Borrá **Rambla** de Aplicaciones.
-3. En Ajustes del Sistema → Privacidad y seguridad → Accesibilidad, quitá Rambla con "−".
+3. En Configuración del Sistema → Privacidad y seguridad → Accesibilidad, quitá Rambla con "−".
 4. Para no dejar rastros, borrá también:
 
    ```sh

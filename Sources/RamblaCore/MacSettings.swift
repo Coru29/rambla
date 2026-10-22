@@ -187,10 +187,10 @@ public enum MacChecks {
     private static func stageManager(_ s: MacSettings) -> MacCheck {
         let on = s.stageManager == true
         return MacCheck(
-            id: "stage-manager", title: String(localized: "Stage Manager"),
+            id: "stage-manager", title: String(localized: "Organizador visual"),
             status: on ? .warning : .ok,
             detail: on
-                ? String(localized: "Stage Manager (Organizador visual) está activado y acomoda las ventanas por su cuenta, lo que choca con Rambla. Conviene apagarlo.")
+                ? String(localized: "El Organizador visual está activado y acomoda las ventanas por su cuenta, lo que choca con Rambla. Conviene apagarlo.")
                 : String(localized: "Apagado."))
     }
 
@@ -286,7 +286,7 @@ public enum MacChecks {
             problem = String(localized: "macOS también abre Mission Control con 4 dedos hacia arriba: su opción «3 dedos» de Mission Control activa también el de 4.")
             remedy = canFix
                 ? String(localized: "«\(button)» lo apaga y Mission Control sigue con 3 dedos.")
-                : String(localized: "Desactivá Mission Control y Exposé de apps en Trackpad → Más gestos, o apagá el gesto vertical de Rambla.")
+                : String(localized: "Desactivá Mission Control y Exposé en Trackpad → Más gestos, o apagá el gesto vertical de Rambla.")
         case 4 where four:
             problem = String(localized: "macOS abre Mission Control con 4 dedos hacia arriba, el mismo gesto que usa Rambla.")
             remedy = canFix
