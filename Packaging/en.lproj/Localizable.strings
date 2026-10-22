@@ -397,3 +397,7 @@
 "macOS también abre Mission Control con 4 dedos hacia arriba: su opción «3 dedos» de Mission Control activa también el de 4." = "macOS also opens Mission Control with a four-finger swipe up: its three-finger option for Mission Control turns on the four-finger swipe too.";
 "«%@» lo apaga y Mission Control sigue con 3 dedos." = "“%@” turns it off, and Mission Control keeps working with three fingers.";
 "«%@» lo apaga; Mission Control queda en ⌃↑." = "“%@” turns it off; Mission Control stays on ⌃↑.";
+
+/* Settings/Views/GeneralView.swift (updates) */
+"Buscar actualizaciones automáticamente" = "Check for updates automatically";
+"Rambla consulta GitHub al arrancar y una vez por día. Es su única conexión a internet y no envía nada tuyo. Desde el menú podés buscar a mano cuando quieras." = "Rambla checks GitHub when it starts and once a day. It is its only connection to the internet and it sends nothing of yours. You can always check by hand from the menu.";

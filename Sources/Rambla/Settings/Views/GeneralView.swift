@@ -19,6 +19,7 @@ struct GeneralView: View {
             presetsSection
             adjustSection
             externalSection
+            updatesSection
         }
         .formStyle(.grouped)
         .toggleStyle(.switch)
@@ -123,6 +124,14 @@ struct GeneralView: View {
                    isOn: $store.prefs.floatOnExternalMove)
         } footer: {
             Text("La ventana queda flotando donde la dejaron. Con «Flotar / volver a la tira» regresa.")
+        }
+    }
+
+    private var updatesSection: some View {
+        Section {
+            Toggle("Buscar actualizaciones automáticamente", isOn: $store.prefs.checkForUpdates)
+        } footer: {
+            Text("Rambla consulta GitHub al arrancar y una vez por día. Es su única conexión a internet y no envía nada tuyo. Desde el menú podés buscar a mano cuando quieras.")
         }
     }
 
