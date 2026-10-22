@@ -1,0 +1,52 @@
+name: Reportar un problema / Report a bug
+description: Algo no funciona como esperabas. / Something does not work as expected.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: Qué pasó / What happened
+      description: Contá qué hiciste, qué esperabas y qué pasó. / What you did, what you expected and what happened.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Cómo reproducirlo / Steps to reproduce
+      placeholder: |
+        1. Abrí Safari y Terminal
+        2. Apreté ⌃⌘→
+        3. ...
+  - type: input
+    id: rambla
+    attributes:
+      label: Versión de Rambla / Rambla version
+      description: Menú de Rambla → Configuración → Acerca de.
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: Versión de macOS / macOS version
+      placeholder: macOS 26.1
+    validations:
+      required: true
+  - type: input
+    id: setup
+    attributes:
+      label: Pantallas y apps involucradas / Displays and apps involved
+      placeholder: MacBook + monitor externo arriba; VS Code, Slack
+  - type: checkboxes
+    id: others
+    attributes:
+      label: Otros gestores de ventanas abiertos / Other window managers running
+      options:
+        - label: Rectangle
+        - label: Magnet, Moom, BetterSnapTool u otro / or another one
+        - label: Stage Manager
+  - type: textarea
+    id: log
+    attributes:
+      label: Registro / Log
+      description: Menú de Rambla → Mostrar registro. Pegá las últimas líneas. / Rambla menu → Mostrar registro, paste the last lines.
+      render: text

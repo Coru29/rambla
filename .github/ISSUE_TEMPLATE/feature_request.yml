@@ -1,0 +1,15 @@
+name: Proponer una mejora / Suggest a feature
+description: Una idea para que Rambla sea más útil. / An idea to make Rambla more useful.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: Qué necesitás / What you need
+      description: Contá el momento en que te haría falta. / Describe the moment you would need it.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Cómo te lo imaginás / How you picture it

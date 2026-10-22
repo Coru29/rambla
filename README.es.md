@@ -11,6 +11,12 @@
 
 <p align="center"><a href="https://rambla-mac.vercel.app"><b>rambla-mac.vercel.app</b></a> · <a href="docs/MANUAL.md"><b>Manual de uso</b></a> · <a href="README.md">Read in English</a></p>
 
+<p align="center">
+  <a href="https://github.com/Coru29/rambla/actions/workflows/ci.yml"><img src="https://github.com/Coru29/rambla/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
+  <img src="https://img.shields.io/badge/macOS-14%2B-lightgrey" alt="macOS 14+">
+</p>
+
 ---
 
 Cada ventana es una columna de una tira horizontal que sigue más allá de los bordes de la pantalla. Abrir una ventana agrega una columna al lado de la que estás usando **sin achicar las demás**, y la tira se desliza para mostrarte lo que enfocás. Es la idea de [niri](https://github.com/YaLTeR/niri) y PaperWM, hecha como una app nativa y liviana de Mac, inspirada en [ChainYourMac](https://chainyourmac.com), que es paga.
@@ -30,6 +36,10 @@ Cada ventana es una columna de una tira horizontal que sigue más allá de los b
 - **Convive con [Rectangle](https://rectangleapp.com)**: los atajos usan ⌃⌘, así que nunca chocan con los ⌃⌥ de Rectangle. Si Rectangle (u otra app) mueve una ventana, esa ventana sale de la tira y queda donde la pusieron. La página Mac de la configuración avisa si algún atajo choca con tu Rectangle.
 - **Automatización**: enlaces `rambla://`, comando de terminal `rambla` y exportación de scripts para Raycast.
 - **Liviana**: Swift nativo (AppKit, con la configuración en SwiftUI), sin Electron y sin polling. En reposo usa cerca de 0 % de CPU y ~12 MB de memoria.
+
+## Privacidad
+
+Rambla no recolecta datos y no tiene telemetría. No lee el contenido de las ventanas ni graba la pantalla. Su única conexión es una consulta diaria a GitHub para ver si hay una versión nueva, que podés apagar en Configuración → General. Más detalles en [SECURITY.md](SECURITY.md).
 
 ## Requisitos
 

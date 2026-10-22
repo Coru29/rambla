@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Manual de uso / User manual
+    url: https://github.com/Coru29/rambla/blob/main/docs/MANUAL.md
+    about: Atajos, configuración y problemas comunes. / Shortcuts, settings and common problems.
+  - name: Reportar una vulnerabilidad / Report a vulnerability
+    url: https://github.com/Coru29/rambla/security/advisories/new
+    about: En privado, no en un issue público. / Privately, not in a public issue.

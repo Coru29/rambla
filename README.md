@@ -11,6 +11,12 @@
 
 <p align="center"><a href="https://rambla-mac.vercel.app"><b>rambla-mac.vercel.app</b></a> · <a href="README.es.md">Leer en español</a> · <a href="docs/MANUAL.en.md">User manual</a></p>
 
+<p align="center">
+  <a href="https://github.com/Coru29/rambla/actions/workflows/ci.yml"><img src="https://github.com/Coru29/rambla/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
+  <img src="https://img.shields.io/badge/macOS-14%2B-lightgrey" alt="macOS 14+">
+</p>
+
 ---
 
 Every window is a column on one horizontal strip that keeps going past the edges of your screen. Opening a window adds a column next to the one you are using **instead of shrinking everything else**, and the strip slides to show whatever you focus. It is the [niri](https://github.com/YaLTeR/niri) / PaperWM idea, built as a light native Mac app and inspired by the paid [ChainYourMac](https://chainyourmac.com).
@@ -32,6 +38,10 @@ Every window is a column on one horizontal strip that keeps going past the edges
 - **Plays well with [Rectangle](https://rectangleapp.com)**: default shortcuts use ⌃⌘, so they never clash with Rectangle's ⌃⌥, and if Rectangle (or any other app) moves a window, that window leaves the strip and stays where it was put. The Mac page of the settings lists any shortcut that collides with your Rectangle setup.
 - **Automation**: `rambla://` URLs, a `rambla` command-line tool and Raycast script export.
 - **Light**: native Swift (AppKit + SwiftUI settings), no Electron, no polling — about 0 % CPU and ~12 MB of memory when idle.
+
+## Privacy
+
+Rambla collects no data and has no telemetry. It does not read window contents or record the screen. Its only network request is a daily check of GitHub for a new release, which you can turn off in Configuración → General. See [SECURITY.md](SECURITY.md).
 
 ## Requirements
 
