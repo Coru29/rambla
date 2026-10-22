@@ -49,6 +49,8 @@ extension WindowManager {
     }
 
     func saveNow() {
+        // No window known at all (Accessibility lists none while the screen is locked) is no layout: keep the file's.
+        guard !windows.isEmpty else { return }
         var refs: [RamblaCore.WindowRef] = []
         var saved: [SavedStrip] = []
         for (key, strip) in strips where !strip.columns.isEmpty {
@@ -69,7 +71,9 @@ extension WindowManager {
     /// The first time a strip is seen this session, rebuild it from the saved layout (matching windows by
     /// id, then by app + title); windows the save does not know are added afterwards in x order.
     func restoreFromSavedState(keys: [StripKey], candidates: [WindowRecord]) {
-        guard let state = restoreState else { return }
+        // Without a window to place (Rambla started while the screen was locked), wait for one instead of using up
+        // the restore of the strips seen now.
+        guard let state = restoreState, !candidates.isEmpty else { return }
         let live = candidates.map { RamblaCore.WindowRef(id: $0.id, bundleID: $0.bundleID ?? "", title: $0.title) }
         let matches = StateMatcher.match(saved: state.refs, live: live)
         for key in keys where !restoredKeys.contains(key) {

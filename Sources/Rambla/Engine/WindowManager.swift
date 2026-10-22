@@ -199,6 +199,11 @@ final class WindowManager {
         observe(ws, NSWorkspace.didWakeNotification) { [weak self] _ in self?.screensWoke() }
         observe(ws, NSWorkspace.screensDidSleepNotification) { [weak self] _ in self?.screensAsleep = true }
         observe(ws, NSWorkspace.screensDidWakeNotification) { [weak self] _ in self?.screensWoke() }
+        observe(DistributedNotificationCenter.default(), Self.screenUnlocked) { [weak self] _ in
+            // Accessibility lists no window while the screen is locked: if Rambla started then, it knows none yet.
+            Log.info("Screen unlocked: reading the windows again")
+            self?.readWindowsAgain()
+        }
         observe(NotificationCenter.default, NSApplication.didChangeScreenParametersNotification) { [weak self] _ in
             self?.grace(2.5)
             self?.scheduleReconcile(after: 0.4)
@@ -211,6 +216,14 @@ final class WindowManager {
         displayGoneSince.removeAll()
         grace(2.5)
         scheduleReconcile(after: 0.8)
+    }
+
+    private static let screenUnlocked = Notification.Name("com.apple.screenIsUnlocked")
+
+    /// Every app lists its windows again; one reconcile takes all the answers.
+    private func readWindowsAgain() {
+        workers.values.forEach { $0.rescan() }
+        scheduleReconcile(after: 0.3)
     }
 
     private func observe(_ center: NotificationCenter, _ name: Notification.Name, _ block: @escaping @MainActor (Notification) -> Void) {
