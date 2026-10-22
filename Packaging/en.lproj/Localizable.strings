@@ -37,6 +37,8 @@
 /* Rambla/App/CLI.swift */
 "Rambla no está abierto." = "Rambla is not running.";
 "Rambla no respondió." = "Rambla did not respond.";
+"No se pudo pasar la orden a Rambla." = "Could not pass the command to Rambla.";
+"«%@» no es una acción de Rambla: rambla list muestra todas." = "“%@” is not a Rambla action: rambla list shows them all.";
 "Uso: rambla <acción>\nEjemplos: rambla focus-left · rambla cycle-width · rambla focus-3 · rambla toggle-pause\nrambla list muestra todas las acciones.\nTambién por URL: open -g \"rambla://focus-left\"" = "Usage: rambla <action>\nExamples: rambla focus-left · rambla cycle-width · rambla focus-3 · rambla toggle-pause\nrambla list shows every action.\nAlso by URL: open -g \"rambla://focus-left\"";
 
 /* Rambla/App/Updater.swift */

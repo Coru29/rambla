@@ -24,6 +24,10 @@ enum CLI {
             return 0
         }
         guard !first.hasPrefix("-") else { return nil }
+        guard CommandPolicy.allows(first, from: .commandLine) else {
+            FileHandle.standardError.write(Data((String(localized: "«\(first)» no es una acción de Rambla: rambla list muestra todas.") + "\n").utf8))
+            return 1
+        }
         guard !NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).isEmpty else {
             FileHandle.standardError.write(Data((String(localized: "Rambla no está abierto.") + "\n").utf8))
             return 1
@@ -31,8 +35,14 @@ enum CLI {
         if replyCommands.contains(first) {
             return request(first)
         }
-        post(args.joined(separator: " "))
+        // Without the inbox only what a link may do goes through (`post`): closing a window does not.
+        guard post(args.joined(separator: " ")) || CommandPolicy.allows(first, from: .url) else { return failed() }
         return 0
+    }
+
+    private static func failed() -> Int32 {
+        FileHandle.standardError.write(Data((String(localized: "No se pudo pasar la orden a Rambla.") + "\n").utf8))
+        return 1
     }
 
     /// Where the `rambla` command leaves its commands for the running app: a folder only the user's own programs can
@@ -43,7 +53,10 @@ enum CLI {
             .appendingPathComponent("Library/Application Support/Rambla/Commands", isDirectory: true)
     }
 
-    private static func post(_ command: String) {
+    /// Leaves `command` in the inbox and wakes the app; returns false when the inbox could not be written, and then
+    /// the command still goes, trusted like a link.
+    @discardableResult
+    private static func post(_ command: String) -> Bool {
         let file = inbox.appendingPathComponent(String(format: "%.6f-%d.command", Date().timeIntervalSince1970, getpid()))
         let left: Bool
         do {
@@ -53,9 +66,9 @@ enum CLI {
         } catch {
             left = false
         }
-        // Without the folder the command still goes, trusted like a link.
         DistributedNotificationCenter.default().postNotificationName(
             commandNotification, object: left ? nil : command, userInfo: nil, deliverImmediately: true)
+        return left
     }
 
     /// The commands the `rambla` command left since the last call, oldest first. One older than a few seconds, left
@@ -76,7 +89,7 @@ enum CLI {
     private static func request(_ command: String) -> Int32 {
         let path = NSTemporaryDirectory() + "rambla-reply-\(getpid()).json"
         try? FileManager.default.removeItem(atPath: path)
-        post("\(command) \(path)")
+        guard post("\(command) \(path)") else { return failed() }
         let deadline = Date().addingTimeInterval(3)
         while Date() < deadline {
             if let data = FileManager.default.contents(atPath: path), !data.isEmpty {
