@@ -4,8 +4,18 @@ import Foundation
 
 @Test func cliScriptHandsEveryArgumentToTheAppBinary() {
     #expect(AutomationScripts.cliInstallPath == "/usr/local/bin/rambla")
-    #expect(AutomationScripts.appExecutable == "/Applications/Rambla.app/Contents/MacOS/Rambla")
-    #expect(AutomationScripts.cliScript == "#!/bin/sh\nexec \"/Applications/Rambla.app/Contents/MacOS/Rambla\" \"$@\"\n")
+    #expect(AutomationScripts.defaultAppExecutable == "/Applications/Rambla.app/Contents/MacOS/Rambla")
+    #expect(AutomationScripts.cliScript(executable: AutomationScripts.defaultAppExecutable)
+        == "#!/bin/sh\nexec '/Applications/Rambla.app/Contents/MacOS/Rambla' \"$@\"\n")
+}
+
+@Test func theScriptsUseTheAppWhereverItIs() {
+    // An app kept in ~/Applications, or in a folder whose name has a space or a quote.
+    let odd = "/Users/me/My Apps/Ram'bla.app/Contents/MacOS/Rambla"
+    let quoted = #"'/Users/me/My Apps/Ram'\''bla.app/Contents/MacOS/Rambla'"#
+    #expect(AutomationScripts.cliScript(executable: odd) == "#!/bin/sh\nexec \(quoted) \"$@\"\n")
+    #expect(AutomationScripts.raycastScript(for: .closeWindow, executable: odd).hasSuffix("\n\(quoted) close-window\n"))
+    #expect(AutomationScripts.raycastScript(for: .focusLeft, executable: odd).hasSuffix("\nopen -g \"rambla://focus-left\"\n"))
 }
 
 @Test func raycastScriptMatchesTheRaycastTemplate() {
@@ -46,7 +56,7 @@ import Foundation
         if script.hasSuffix("open -g \"rambla://\(action.rawValue)\"\n") {
             #expect(CommandPolicy.allows(action.rawValue, from: .url), "a link cannot run \(action.rawValue)")
         } else {
-            #expect(script.hasSuffix("\n\"\(AutomationScripts.appExecutable)\" \(action.rawValue)\n"), "\(action.rawValue)")
+            #expect(script.hasSuffix("\n'\(AutomationScripts.defaultAppExecutable)' \(action.rawValue)\n"), "\(action.rawValue)")
             #expect(CommandPolicy.allows(action.rawValue, from: .commandLine), "\(action.rawValue)")
         }
         // The id must round-trip through the URL scheme the app handles.
@@ -57,5 +67,5 @@ import Foundation
 
 @Test func closeWindowRunsThroughTheAppBinaryBecauseLinksCannotCloseWindows() {
     #expect(AutomationScripts.raycastScript(for: .closeWindow)
-        .hasSuffix("\n\"/Applications/Rambla.app/Contents/MacOS/Rambla\" close-window\n"))
+        .hasSuffix("\n'/Applications/Rambla.app/Contents/MacOS/Rambla' close-window\n"))
 }

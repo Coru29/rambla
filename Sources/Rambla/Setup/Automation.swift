@@ -4,6 +4,15 @@ import RamblaCore
 /// The `rambla` terminal command and the Raycast scripts ("Configuración → Automatización").
 /// The file contents live in `AutomationScripts` (RamblaCore); this file puts them on disk.
 enum Automation {
+    /// The running app's binary, for the scripts to call, wherever the app is installed. Not when macOS runs it from
+    /// a temporary copy (App Translocation, a quarantined app opened where it was downloaded): that copy goes away.
+    static var appExecutable: String {
+        guard let path = Bundle.main.executablePath, !path.contains("/AppTranslocation/") else {
+            return AutomationScripts.defaultAppExecutable
+        }
+        return path
+    }
+
     /// Installs `/usr/local/bin/rambla`. Returns an error message, or nil on success.
     ///
     /// If the folder is not writable for the user, asks for the administrator password with `osascript`. That call
@@ -26,7 +35,7 @@ enum Automation {
         for action in Action.allCases {
             let file = folder.appendingPathComponent(AutomationScripts.raycastFileName(for: action))
             do {
-                try Data(AutomationScripts.raycastScript(for: action).utf8).write(to: file, options: .atomic)
+                try Data(AutomationScripts.raycastScript(for: action, executable: appExecutable).utf8).write(to: file, options: .atomic)
                 try fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: file.path)
             } catch {
                 Log.error("Raycast export: cannot write \(file.path): \(error.localizedDescription)")
@@ -42,7 +51,7 @@ enum Automation {
 
     /// `installCLI()` with the destination as a parameter.
     static func installCLI(at path: String) -> String? {
-        let script = AutomationScripts.cliScript
+        let script = AutomationScripts.cliScript(executable: appExecutable)
         let fileManager = FileManager.default
         // The write is atomic (temporary file, then rename), so an existing file or symlink at `path` is replaced
         // instead of written through, which matters if `rambla` was symlinked to the app binary by hand.
