@@ -441,6 +441,7 @@ final class WindowManager {
 
         // Windows of a visible strip that are not on screen are either hidden on this Space
         // (minimized, app hidden, inactive native tab, full screen) or were moved to another Space.
+        let hiddenBefore = hidden
         let notVisible = keys.flatMap { strips[$0]!.allWindows.filter { !visible.contains($0) } }
         let spacesOf = Private.spaces(for: notVisible)
         var hiddenNow: [StripKey: Set<WindowID>] = [:]
@@ -483,6 +484,13 @@ final class WindowManager {
             .filter { $0.kind == .tile && visible.contains($0.id) && !managed.contains($0.id) && !floating.contains($0.id) }
             .sorted { $0.frame.minX < $1.frame.minX }
         var revealKeys: Set<StripKey> = []
+        // The focused window was hidden (full screen, minimized, its app hidden) and is back: the strip may have scrolled
+        // meanwhile, so bring it into view instead of laying it out wherever its column is now.
+        if let focused = focusedWindow, let key = key(containing: focused), keys.contains(key),
+           hiddenBefore[key]?.contains(focused) == true, hidden[key]?.contains(focused) != true {
+            strips[key]!.focus(window: focused)
+            revealKeys.insert(key)
+        }
         for record in orphans {
             // A window on a disabled display stays untouched: look it up among all displays.
             guard let display = Displays.best(for: record.frame, in: displays),
