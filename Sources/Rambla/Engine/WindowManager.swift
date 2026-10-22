@@ -6,6 +6,17 @@ struct StripKey: Hashable, Codable {
     let spaceID: UInt64
 }
 
+/// macOS is about to change the displays, or just did (one plugged or unplugged, a lid opened or closed).
+private let displaysReconfigured: CGDisplayReconfigurationCallBack = { _, _, userInfo in
+    guard let userInfo else { return }
+    let manager = Unmanaged<WindowManager>.fromOpaque(userInfo).takeUnretainedValue()
+    if Thread.isMainThread {
+        MainActor.assumeIsolated { manager.displaysReconfiguring() }
+    } else {
+        DispatchQueue.main.async { MainActor.assumeIsolated { manager.displaysReconfiguring() } }
+    }
+}
+
 /// Owns the model (one strip per display and Space), turns events into model changes and applies layouts.
 /// Everything here runs on the main thread; AX calls go through one AppWorker per app.
 @MainActor
@@ -50,6 +61,8 @@ final class WindowManager {
     var focusedWindow: WindowID?
     /// Last frame Rambla asked for, per window (the final target, not animation frames).
     private(set) var requested: [WindowID: CGRect] = [:]
+    /// Where the WindowServer showed each on-screen window at the last reconcile (`whereShown`).
+    private var onScreenFrames: [WindowID: CGRect] = [:]
     private var hiddenSince: [WindowID: CFAbsoluteTime] = [:]
     /// Displays that have strips but are not connected, and since when (a resolution change, a dock or a wake can drop
     /// a display for a while). In uptime, which does not count time asleep, and waking starts the count again.
@@ -157,6 +170,7 @@ final class WindowManager {
         isRunning = false
         for (center, token) in observers { center.removeObserver(token) }
         observers.removeAll()
+        CGDisplayRemoveReconfigurationCallback(displaysReconfigured, Unmanaged.passUnretained(self).toOpaque())
         workers.values.forEach { $0.stop() }
         workers.removeAll()
         dragTracker.setEnabled(false)
@@ -194,6 +208,7 @@ final class WindowManager {
     // MARK: - System observation
 
     private func observeSystem() {
+        CGDisplayRegisterReconfigurationCallback(displaysReconfigured, Unmanaged.passUnretained(self).toOpaque())
         let ws = NSWorkspace.shared.notificationCenter
         observe(ws, NSWorkspace.didLaunchApplicationNotification) { [weak self] note in
             guard let self, let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
@@ -288,6 +303,14 @@ final class WindowManager {
             MainActor.assumeIsolated { block(note) }
         }
         observers.append((center, token))
+    }
+
+    /// macOS moves windows while it changes the displays, sometimes before the screen-parameters notification: those
+    /// moves are not another app's, so they must not float the windows.
+    fileprivate func displaysReconfiguring() {
+        guard isRunning else { return }
+        grace(2.5)
+        scheduleReconcile(after: 0.4)
     }
 
     private func grace(_ seconds: CFAbsoluteTime) {
@@ -499,12 +522,27 @@ final class WindowManager {
     }
 
     private static func windowIDs(onScreenOnly: Bool) -> Set<WindowID> {
+        Set(windowFrames(onScreenOnly: onScreenOnly).keys)
+    }
+
+    /// The normal windows the WindowServer has (`onScreenOnly`: the ones on screen now), with where they are.
+    private static func windowFrames(onScreenOnly: Bool) -> [WindowID: CGRect] {
         let options: CGWindowListOption = onScreenOnly ? [.optionOnScreenOnly, .excludeDesktopElements] : [.optionAll]
-        guard let list = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else { return [] }
-        return Set(list.compactMap { info in
-            guard (info[kCGWindowLayer as String] as? Int) == 0 else { return nil }
-            return (info[kCGWindowNumber as String] as? NSNumber)?.uint32Value
-        })
+        guard let list = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else { return [:] }
+        var frames: [WindowID: CGRect] = [:]
+        for info in list where (info[kCGWindowLayer as String] as? Int) == 0 {
+            guard let id = (info[kCGWindowNumber as String] as? NSNumber)?.uint32Value else { continue }
+            let bounds = (info[kCGWindowBounds as String] as? NSDictionary).flatMap { CGRect(dictionaryRepresentation: $0) }
+            frames[id] = bounds ?? .zero
+        }
+        return frames
+    }
+
+    /// Where a window is: where the WindowServer shows it when it is on screen, else where Rambla last knew it. Rambla's
+    /// own record keeps the frame it asked for, which is out of date once macOS moved the window by itself (a display
+    /// that went away).
+    func whereShown(_ record: WindowRecord) -> CGRect {
+        onScreenFrames[record.id].flatMap { $0 == .zero ? nil : $0 } ?? record.frame
     }
 
     var enabledDisplays: [DisplayInfo] {
@@ -543,7 +581,8 @@ final class WindowManager {
         let connectedBefore = Set(displays.map(\.uuid))
         displays = Displays.current()
         let existing = Self.windowIDs(onScreenOnly: false)
-        let visible = Self.windowIDs(onScreenOnly: true)
+        onScreenFrames = Self.windowFrames(onScreenOnly: true)
+        let visible = Set(onScreenFrames.keys)
         let now = CFAbsoluteTimeGetCurrent()
 
         for id in Array(windows.keys) where !existing.contains(id) {
@@ -616,7 +655,7 @@ final class WindowManager {
         for record in orphans {
             // A window on a disabled display stays untouched: look it up among all displays.
             // A strip waiting to be rebuilt takes its windows then, in their places.
-            guard let display = Displays.best(for: record.frame, in: displays), let key = currentKey(of: display),
+            guard let display = Displays.best(for: whereShown(record), in: displays), let key = currentKey(of: display),
                   keys.contains(key), restoredKeys.contains(key) || !waitingForWindowLists else { continue }
             insert(record, into: key)
             // A window that joins at the end can have the focus (it came back from somewhere): show it.
@@ -669,6 +708,7 @@ final class WindowManager {
                 continue
             }
             for key in Array(strips.keys) where key.displayUUID == uuid { archiveStrip(key, unplugged: true) }
+            rescanAll()
             displayGoneSince[uuid] = nil
             Log.info("Display \(uuid.prefix(8)) disconnected: its windows join the strips of the displays they are on until it comes back")
         }
@@ -679,21 +719,26 @@ final class WindowManager {
     /// to the archive (a display coming back takes it back under the desktop's new key) and its windows join the strips
     /// of the desktops they are on now.
     private func archiveStripsOfGoneSpaces() {
+        var archived = false
         for display in displays {
             guard let current = display.currentSpace, display.spaceIDs.contains(current) else { continue }
             for key in Array(strips.keys) where key.displayUUID == display.uuid && !display.spaceIDs.contains(key.spaceID) {
                 archiveStrip(key, unplugged: returningDisplays[display.uuid] != nil)
+                archived = true
                 Log.info("Desktop \(key.spaceID) is no longer on display \(display.uuid.prefix(8)): its strip goes to the archive")
             }
         }
+        if archived { rescanAll() }
     }
 
-    /// Takes a strip out of the live state, into the archive when it holds windows of a known desktop.
+    /// Takes a strip out of the live state, into the archive when it holds windows of a known desktop. Rambla no longer
+    /// places its windows, so the frames it asked for them are forgotten: the next listing reads where macOS put them.
     private func archiveStrip(_ key: StripKey, unplugged: Bool) {
         if let spaceKey = spaceKeys[key], let strip = strips[key], !strip.columns.isEmpty {
             archive.store(SavedStrip(displayUUID: key.displayUUID, spaceKey: spaceKey, strip: strip, session: StateStore.session,
                                      refs: strip.allWindows.compactMap(ref), unplugged: unplugged), at: Date())
         }
+        for id in strips[key]?.allWindows ?? [] { requested[id] = nil }
         strips[key] = nil
         results[key] = nil
         hidden[key] = nil

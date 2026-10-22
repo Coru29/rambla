@@ -121,7 +121,7 @@ extension WindowManager {
                 let placed = Set(strips.filter { $0.key != key }.values.flatMap(\.allWindows))
                 pool = candidates.filter { !placed.contains($0.id) } + (strips[key]?.allWindows ?? []).compactMap { windows[$0] }
                 guard pool.contains(where: {
-                    $0.kind == .tile && Displays.best(for: $0.frame, in: displays)?.uuid == key.displayUUID
+                    $0.kind == .tile && Displays.best(for: whereShown($0), in: displays)?.uuid == key.displayUUID
                 }) else { continue }
             }
             // Taking windows back from other strips goes by id, or after a Mac restart by a title only one window has.
