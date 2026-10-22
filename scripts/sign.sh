@@ -8,7 +8,19 @@ APP="$1"
 IDENTITY="Rambla Local Signing"
 DIR="$PWD/.signing"
 KC="$DIR/rambla-signing.keychain-db"
-PASS="scroll"
+# The signing keychain's password never lives in the repo. It comes from RAMBLA_SIGNING_PASSWORD or from this item of
+# the login keychain; the first build on a Mac without either creates a random one and stores it there.
+PASS_ITEM="io.github.coru29.Rambla.signing"
+PASS="${RAMBLA_SIGNING_PASSWORD:-$(security find-generic-password -s "$PASS_ITEM" -w 2>/dev/null || true)}"
+if [ -z "$PASS" ]; then
+  if [ -f "$KC" ]; then
+    echo "error: $KC exists, but its password is neither in RAMBLA_SIGNING_PASSWORD nor in the login keychain." >&2
+    echo "  Store it with: security add-generic-password -a rambla -s $PASS_ITEM -w" >&2
+    exit 1
+  fi
+  PASS=$(openssl rand -base64 24)
+  security add-generic-password -U -a rambla -s "$PASS_ITEM" -l "Rambla signing keychain" -w "$PASS"
+fi
 
 create_identity() {
   mkdir -p "$DIR"

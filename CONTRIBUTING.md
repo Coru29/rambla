@@ -49,7 +49,7 @@ scripts/release.sh             # tests, bumps VERSION, signed DMG, tag vX.Y.Z, G
 
 The release notes are generated from the `feat`, `fix` and `perf` commits since the last tag. Installed copies find the new release within a day and update themselves after verifying the signature.
 
-Every release must be signed with the project's certificate in `.signing/` (created by the first build and never committed): installed copies only accept updates signed with the same certificate. Keep a private backup of that folder.
+Every release must be signed with the project's certificate in `.signing/` (created by the first build and never committed): installed copies only accept updates signed with the same certificate. The folder's password is not in the repo either: `scripts/sign.sh` reads it from `RAMBLA_SIGNING_PASSWORD` or from the login keychain item `io.github.coru29.Rambla.signing` (the first build stores a random one there). Keep a private, offline backup of both the folder and its password.
 
 ## Translations
 
