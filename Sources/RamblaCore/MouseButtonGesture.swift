@@ -2,7 +2,8 @@ import Foundation
 
 /// Gestures made by moving the mouse with a chosen combination of its buttons held (a "chord": the middle button, or
 /// the side buttons 4 and 5 pressed together, say). Sideways slides the strip under the pointer and lets it settle on
-/// release, like the trackpad swipe; a clear move up or down is one command per press. Buttons are numbered the way
+/// release, like the trackpad swipe. A clear move up is one command per press, at once; a move down is decided when the
+/// buttons are released (the previous width), unless it goes on long enough to open the overview. Buttons are numbered the way
 /// mouse apps number them: 3 is the middle button (pressing the wheel), 4 and 5 the side ones. The left and right
 /// buttons never take part.
 ///
@@ -39,6 +40,8 @@ public struct MouseButtonGesture: Sendable {
         case slideEnded(velocity: Double)
         /// A move up (true) or down: one per press of the chord.
         case vertical(up: Bool)
+        /// A long move down: the overview.
+        case overview
     }
 
     public struct Output: Equatable, Sendable {
@@ -63,6 +66,8 @@ public struct MouseButtonGesture: Sendable {
     public static let slideStart = 8.0
     /// Upward or downward movement (points) that counts as a move up or down.
     public static let verticalStart = 40.0
+    /// Downward movement (points) that opens the overview instead of giving back the previous width.
+    public static let overviewStart = 160.0
 
     private enum Phase: Sendable {
         case idle
@@ -71,6 +76,8 @@ public struct MouseButtonGesture: Sendable {
         /// The whole chord is down: the pointer moved this much since, and the next moves decide what it is.
         case armed(dx: Double, dy: Double)
         case sliding
+        /// Moved down far enough to give back the previous width when released, or to open the overview if it goes on.
+        case goingDown(dx: Double, dy: Double)
         /// This press already did its part (or came apart): the rest of it is swallowed until its buttons are released.
         case spent
     }
@@ -184,6 +191,11 @@ public struct MouseButtonGesture: Sendable {
             velocity.reset()
             phase = held.isEmpty ? .idle : .spent
             return Output(passes: false, commands: [.slideEnded(velocity: speed)])
+        case .goingDown(_, let y):
+            // Still down when released: the previous width. Back near the start: nothing.
+            held.remove(at: index)
+            phase = held.isEmpty ? .idle : .spent
+            return Output(passes: false, commands: y >= Self.verticalStart ? [.vertical(up: false)] : [])
         case .spent, .idle:
             held.remove(at: index)
             if held.isEmpty { phase = .idle }
@@ -212,11 +224,16 @@ public struct MouseButtonGesture: Sendable {
                 return Output(passes: false, commands: [.slideBegan, .slide(x)])
             }
             if abs(y) >= Self.verticalStart, abs(y) > 2 * abs(x) {
-                phase = .spent
-                return Output(passes: false, commands: [.vertical(up: y < 0)])
+                if y < 0 {
+                    phase = .spent
+                    return Output(passes: false, commands: [.vertical(up: true)])
+                }
+                return goDown(x, y)
             }
             phase = .armed(dx: x, dy: y)
             return Output(passes: false)
+        case .goingDown(let x, let y):
+            return goDown(x + dx, y + dy)
         case .sliding:
             position += dx
             velocity.add(position, at: time)
@@ -227,6 +244,16 @@ public struct MouseButtonGesture: Sendable {
     }
 
     // MARK: - Helpers
+
+    /// The pointer is `y` points below where the chord came together: the overview once it is far enough.
+    private mutating func goDown(_ x: Double, _ y: Double) -> Output {
+        guard y >= Self.overviewStart else {
+            phase = .goingDown(dx: x, dy: y)
+            return Output(passes: false)
+        }
+        phase = .spent
+        return Output(passes: false, commands: [.overview])
+    }
 
     private var isWaiting: Bool {
         if case .waiting = phase { return true }

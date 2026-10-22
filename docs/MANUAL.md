@@ -90,8 +90,11 @@ Si algo no te gusta, todo se puede cambiar en **Configuración** (menú de Rambl
 | ⌃⌘⇧← / ⌃⌘⇧→ (o ⌃⌘⇧H / ⌃⌘⇧L) | Mueve la columna enfocada a la izquierda / derecha |
 | ⌃⌘⇧↑ / ⌃⌘⇧↓ (o ⌃⌘⇧K / ⌃⌘⇧J) | Mueve la ventana hacia arriba / abajo dentro de su pila |
 | ⌃⌘N | Manda la ventana a la tira de la siguiente pantalla |
+| ⌃⌘O | Abre la vista general de la tira |
 
 También podés enfocar como siempre: con un click, ⌘Tab, el Dock o Mission Control. La tira se desliza igual.
+
+**Vista general.** Con **⌃⌘O** (o bajando bastante con los botones del mouse, ver el capítulo 10) ves toda la tira de la pantalla en chico: cada ventana con su app y su título, las pilas, las pestañas y las columnas fijadas. Una barra arriba marca la parte que está en pantalla ahora. Hacé click en una ventana para ir a ella, o elegila con las flechas y tocá ↩; con 1 … 9 vas directo a esa columna. Esc, un click afuera o ⌃⌘O de nuevo la cierran.
 
 **Centrado.** Por defecto, la tira se mueve lo justo para que la columna enfocada se vea entera. En Configuración → General podés elegir que la centre **siempre** o **solo si la tira no entra en la pantalla**. Con **⌃⌘C** centrás la columna enfocada en cualquier momento.
 
@@ -164,7 +167,8 @@ Una columna puede tener varias ventanas.
 **Gestos con los botones del mouse.** En Configuración → Trackpad y mouse → Botones del mouse, activá **«Gestos con botones del mouse»** y elegí los botones: hacé clic en el campo **Botones**, apretá juntos los que quieras (por ejemplo, los dos laterales, 4 y 5) y soltalos. Después, con esos botones apretados, mové el mouse:
 
 - **Hacia los costados**, la tira sigue al puntero y al soltar se asienta en una columna. Un movimiento corto y rápido pasa a la siguiente.
-- **Hacia arriba**, la columna enfocada toma el ancho completo; **hacia abajo**, vuelve al ancho que tenía.
+- **Hacia arriba**, la columna enfocada toma el ancho completo.
+- **Hacia abajo** y soltando, vuelve al ancho que tenía. Si seguís bajando un buen trecho, se abre la **vista general**.
 
 Con un solo botón (el del medio, por ejemplo), un clic sin mover sigue funcionando como siempre. Con varios, cada botón por separado también sigue haciendo lo suyo: Rambla espera un instante a ver si llega el otro y, si no llega, le pasa el clic a la app. La sensibilidad y la dirección se cambian en la misma sección.
 

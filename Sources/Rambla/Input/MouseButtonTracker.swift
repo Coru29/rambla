@@ -24,6 +24,7 @@ final class MouseButtonTracker: @unchecked Sendable {
         /// Release speed in pointer points per second.
         let slideEnded: @MainActor (Double) -> Void
         let vertical: @MainActor (_ up: Bool) -> Void
+        let overview: @MainActor () -> Void
     }
 
     /// The settings' recorder: told the buttons down so far, then the whole combination once they are all released.
@@ -143,6 +144,7 @@ final class MouseButtonTracker: @unchecked Sendable {
                     case .slide(let dx): handlers.slide(dx)
                     case .slideEnded(let velocity): handlers.slideEnded(velocity)
                     case .vertical(let up): handlers.vertical(up)
+                    case .overview: handlers.overview()
                     }
                 }
             }

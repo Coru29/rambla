@@ -94,7 +94,7 @@ struct TrackpadView: View {
         } header: {
             Text("Botones del mouse")
         } footer: {
-            Text("Mantené apretados esos botones y mové el mouse: hacia los costados desliza la tira, hacia arriba la columna enfocada toma el ancho completo y hacia abajo vuelve al ancho que tenía. Con un solo botón, un clic sin mover sigue funcionando como siempre. Con varios, cada uno por separado sigue haciendo lo suyo: así conviven con Mac Mouse Fix y otras apps que usan los mismos botones.")
+            Text("Mantené apretados esos botones y mové el mouse: hacia los costados desliza la tira, hacia arriba la columna enfocada toma el ancho completo y hacia abajo, al soltar, vuelve al ancho que tenía; bajando bastante se abre la vista general. Con un solo botón, un clic sin mover sigue funcionando como siempre. Con varios, cada uno por separado sigue haciendo lo suyo: así conviven con Mac Mouse Fix y otras apps que usan los mismos botones.")
         }
     }
 

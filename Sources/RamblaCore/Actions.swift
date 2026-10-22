@@ -37,6 +37,7 @@ public enum Action: String, CaseIterable, Codable, Sendable, CodingKeyRepresenta
     case moveUp = "move-up"
     case moveDown = "move-down"
     case sendNextDisplay = "send-next-display"
+    case overview
     case cycleWidth = "cycle-width"
     case fullWidth = "full-width"
     case center
@@ -73,6 +74,7 @@ public enum Action: String, CaseIterable, Codable, Sendable, CodingKeyRepresenta
         case .moveUp: return String(localized: "Mover ventana hacia arriba")
         case .moveDown: return String(localized: "Mover ventana hacia abajo")
         case .sendNextDisplay: return String(localized: "Mandar a la siguiente pantalla")
+        case .overview: return String(localized: "Vista general")
         case .cycleWidth: return String(localized: "Rotar ancho")
         case .fullWidth: return String(localized: "Ancho completo")
         case .center: return String(localized: "Centrar columna")
@@ -98,7 +100,7 @@ public enum Action: String, CaseIterable, Codable, Sendable, CodingKeyRepresenta
         switch self {
         case .focusLeft, .focusRight, .focusUp, .focusDown, .focusFirst, .focusLast,
              .focus1, .focus2, .focus3, .focus4, .focus5, .focus6, .focus7, .focus8, .focus9,
-             .moveLeft, .moveRight, .moveUp, .moveDown, .sendNextDisplay:
+             .moveLeft, .moveRight, .moveUp, .moveDown, .sendNextDisplay, .overview:
             return .navigate
         case .cycleWidth, .fullWidth, .center, .wider, .narrower, .taller, .shorter,
              .equalizeHeights, .pinLeft, .pinRight:

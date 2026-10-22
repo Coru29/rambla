@@ -30,6 +30,7 @@ Every window is a column on one horizontal strip that keeps going past the edges
 - **Column widths**: presets (25/33/50/66/75 %), full width, wider/narrower, center, and **pin a column** to the left or right edge.
 - **Stacks and tabs**: put several windows in one column, stacked vertically or as tabs with a clickable tab bar.
 - **Trackpad**: a three- or four-finger swipe slides the strip; a short quick swipe reaches the next column. Swipe up for full width, down to go back.
+- **Overview** (⌃⌘O, or a long move down with the mouse buttons): the whole strip at a glance, with every window's app and title; click one, or pick it with the arrows, to jump there.
 - **Strip indicator**: a frosted bar with one icon per column while you navigate; click a tile to jump, drag it to reorder.
 - **Mouse**: hold ⌃⌘ and turn the wheel to go through the columns, or hold the mouse buttons you choose (the middle one, the side buttons 4 + 5 together…) and move the mouse: sideways slides the strip, up for full width, down to go back. Drag a window onto another column to reorder; resize it to set the column width. Gets along with Mac Mouse Fix.
 - **Focus border** and **dim inactive windows** (optional), focus follows mouse / mouse follows focus (optional).
@@ -70,6 +71,7 @@ All of them can be changed in **Settings → Shortcuts**.
 | ⌃⌘1 … ⌃⌘9 | Jump to column N |
 | ⌃⌘⇧ + arrows (or H J K L) | Move the column / the window inside its stack |
 | ⌃⌘N | Send the window to the next display |
+| ⌃⌘O | Overview of the strip |
 | ⌃⌘R | Cycle preset widths |
 | ⌃⌘M | Full width (again to restore) |
 | ⌃⌘C | Center the column |

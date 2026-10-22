@@ -28,6 +28,7 @@ Cada ventana es una columna de una tira horizontal que sigue más allá de los b
 - **Anchos de columna**: prefijados (25/33/50/66/75 %), ancho completo, más ancha o más angosta, centrar y **fijar una columna** al borde izquierdo o derecho.
 - **Pilas y pestañas**: varias ventanas en una columna, apiladas o en pestañas con una barra en la que se puede hacer click.
 - **Trackpad**: deslizar con tres o cuatro dedos mueve la tira; un deslizamiento corto y rápido pasa a la columna siguiente. Hacia arriba, ancho completo; hacia abajo, vuelve.
+- **Vista general** (⌃⌘O, o bajando bastante con los botones del mouse): toda la tira de un vistazo, con la app y el título de cada ventana; un click, o elegirla con las flechas, te lleva a ella.
 - **Barra indicadora**: aparece al navegar con un ícono por columna; click para saltar, arrastrar para reordenar.
 - **Mouse**: con ⌃⌘ apretado, la ruedita recorre las columnas. También podés mantener apretados los botones que elijas (el del medio, los laterales 4 + 5 juntos…) y mover el mouse: a los costados desliza la tira, hacia arriba da el ancho completo y hacia abajo vuelve. Arrastrá una ventana sobre otra columna para reordenar, o cambiale el tamaño para fijar el ancho de su columna. Convive con Mac Mouse Fix.
 - Opcionales: **borde en la ventana enfocada**, **atenuar las inactivas**, el foco sigue al mouse y el mouse sigue al foco.
@@ -68,6 +69,7 @@ Todos se pueden cambiar en **Configuración → Atajos**.
 | ⌃⌘1 … ⌃⌘9 | Ir a la columna N |
 | ⌃⌘⇧ + flechas (o H J K L) | Mover la columna o la ventana dentro de su pila |
 | ⌃⌘N | Mandar la ventana a la siguiente pantalla |
+| ⌃⌘O | Vista general de la tira |
 | ⌃⌘R | Rotar entre los anchos prefijados |
 | ⌃⌘M | Ancho completo (repetir para volver) |
 | ⌃⌘C | Centrar la columna |

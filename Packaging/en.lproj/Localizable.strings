@@ -295,7 +295,7 @@
 "Gestos con botones del mouse" = "Mouse button gestures";
 "Botones" = "Buttons";
 "Botones del mouse" = "Mouse buttons";
-"Mantené apretados esos botones y mové el mouse: hacia los costados desliza la tira, hacia arriba la columna enfocada toma el ancho completo y hacia abajo vuelve al ancho que tenía. Con un solo botón, un clic sin mover sigue funcionando como siempre. Con varios, cada uno por separado sigue haciendo lo suyo: así conviven con Mac Mouse Fix y otras apps que usan los mismos botones." = "Hold those buttons and move the mouse: sideways slides the strip, up gives the focused column the full width and down gives back the width it had. With a single button, a click without moving still works as usual. With several, each one on its own keeps doing its job, so they get along with Mac Mouse Fix and other apps that use the same buttons.";
+"Mantené apretados esos botones y mové el mouse: hacia los costados desliza la tira, hacia arriba la columna enfocada toma el ancho completo y hacia abajo, al soltar, vuelve al ancho que tenía; bajando bastante se abre la vista general. Con un solo botón, un clic sin mover sigue funcionando como siempre. Con varios, cada uno por separado sigue haciendo lo suyo: así conviven con Mac Mouse Fix y otras apps que usan los mismos botones." = "Hold those buttons and move the mouse: sideways slides the strip, up gives the focused column the full width, and down gives back the width it had when you let go; going down a good stretch opens the overview. With a single button, a click without moving still works as usual. With several, each one on its own keeps doing its job, so they get along with Mac Mouse Fix and other apps that use the same buttons.";
 "Botón del medio" = "Middle button";
 "Botón %lld" = "Button %lld";
 "Apretá los botones…" = "Press the buttons…";
@@ -331,6 +331,8 @@
 "Mover ventana hacia arriba" = "Move window up";
 "Mover ventana hacia abajo" = "Move window down";
 "Mandar a la siguiente pantalla" = "Send to next display";
+"Vista general" = "Overview";
+"← → elegí una ventana · ↩ la enfoca · esc cierra" = "← → choose a window · ↩ focuses it · esc closes";
 "Rotar ancho" = "Cycle width";
 "Ancho completo" = "Full width";
 "Centrar columna" = "Center column";

@@ -83,6 +83,7 @@ public enum KeyCode {
     public static let j: UInt16 = 0x26
     public static let k: UInt16 = 0x28
     public static let n: UInt16 = 0x2D
+    public static let o: UInt16 = 0x1F
     public static let m: UInt16 = 0x2E
 
     public static let digit1: UInt16 = 0x12
@@ -149,6 +150,7 @@ public enum DefaultShortcuts {
         case .moveUp: return [withShift(KeyCode.up), withShift(KeyCode.k)]
         case .moveDown: return [withShift(KeyCode.down), withShift(KeyCode.j)]
         case .sendNextDisplay: return [plain(KeyCode.n)]
+        case .overview: return [plain(KeyCode.o)]
         case .cycleWidth: return [plain(KeyCode.r)]
         case .fullWidth: return [plain(KeyCode.m)]
         case .center: return [plain(KeyCode.c)]

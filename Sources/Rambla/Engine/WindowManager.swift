@@ -76,6 +76,8 @@ final class WindowManager {
     var onStateChanged: (() -> Void)?
     /// Called when a command or gesture should flash the strip indicator.
     var indicatorHook: ((StripKey, NSEvent.ModifierFlags?) -> Void)?
+    /// Called to show (or hide, when it is on screen) the overview of a strip.
+    var overviewHook: ((StripKey) -> Void)?
     /// Saved layout from the previous run (its floating windows; the strips go to `archive`).
     var restoreState: SavedState?
     /// Strips not in view: those of the previous run not seen yet, and those of unplugged displays. Each is rebuilt

@@ -25,7 +25,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         slideBegan: { [weak self] in self?.engine.gestureBegan() },
         slide: { [weak self] dx in self?.engine.mouseDragged(dx) },
         slideEnded: { [weak self] velocity in self?.engine.mouseDragEnded(velocity: velocity) },
-        vertical: { [weak self] up in self?.engine.verticalSwipe(up: up) }))
+        vertical: { [weak self] up in self?.engine.verticalSwipe(up: up) },
+        overview: { [weak self] in self?.engine.showOverviewUnderPointer() }))
     private lazy var mouseFocus = MouseFocus { [weak self] point in self?.engine.hover(at: point) }
     private var overlays: OverlayCoordinator?
     private lazy var settingsBackend = AppSettingsBackend(mouseButtons: mouseButtons)

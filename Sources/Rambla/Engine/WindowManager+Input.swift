@@ -100,6 +100,12 @@ extension WindowManager {
         onStateChanged?()
     }
 
+    /// A long move down with the mouse buttons held: the overview of the strip under the pointer.
+    func showOverviewUnderPointer() {
+        guard isRunning, !isPaused, gestureKey == nil, let key = stripKeyUnderPointer() else { return }
+        overviewHook?(key)
+    }
+
     func hover(at point: CGPoint) {
         guard isRunning, !isPaused, prefs.focusFollowsMouse, gestureKey == nil else { return }
         for key in currentKeys {

@@ -26,6 +26,7 @@ private let specActions: [(id: String, title: String)] = [
     ("move-up", "Mover ventana hacia arriba"),
     ("move-down", "Mover ventana hacia abajo"),
     ("send-next-display", "Mandar a la siguiente pantalla"),
+    ("overview", "Vista general"),
     ("cycle-width", "Rotar ancho"),
     ("full-width", "Ancho completo"),
     ("center", "Centrar columna"),
@@ -48,7 +49,7 @@ private let specActions: [(id: String, title: String)] = [
 
 @Test func actionIdsMatchSpecInOrder() {
     #expect(Action.allCases.map { $0.rawValue } == specActions.map { $0.id })
-    #expect(Action.allCases.count == 38)
+    #expect(Action.allCases.count == 39)
     #expect(Action.focus1.rawValue == "focus-1")
     #expect(Action.focus9.rawValue == "focus-9")
 }
@@ -64,7 +65,7 @@ private let specActions: [(id: String, title: String)] = [
     let expected: [ActionGroup: [String]] = [
         .navigate: ["focus-left", "focus-right", "focus-up", "focus-down", "focus-first", "focus-last",
                     "focus-1", "focus-2", "focus-3", "focus-4", "focus-5", "focus-6", "focus-7", "focus-8", "focus-9",
-                    "move-left", "move-right", "move-up", "move-down", "send-next-display"],
+                    "move-left", "move-right", "move-up", "move-down", "send-next-display", "overview"],
         .size: ["cycle-width", "full-width", "center", "wider", "narrower", "taller", "shorter",
                 "equalize-heights", "pin-left", "pin-right"],
         .stacks: ["stack-left", "stack-right", "pop-left", "pop-right", "toggle-tabbed", "toggle-float"],
@@ -128,6 +129,7 @@ private let specShortcuts: [(id: String, combos: [(code: UInt16, mods: String)])
     ("move-up", [(0x7E, "⌃⇧⌘"), (0x28, "⌃⇧⌘")]),
     ("move-down", [(0x7D, "⌃⇧⌘"), (0x26, "⌃⇧⌘")]),
     ("send-next-display", [(0x2D, "⌃⌘")]),
+    ("overview", [(0x1F, "⌃⌘")]),
     ("cycle-width", [(0x0F, "⌃⌘")]),
     ("full-width", [(0x2E, "⌃⌘")]),
     ("center", [(0x08, "⌃⌘")]),

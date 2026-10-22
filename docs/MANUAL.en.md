@@ -90,8 +90,11 @@ If you don't like something, everything can be changed in **Settings**: Rambla's
 | ⌃⌘⇧← / ⌃⌘⇧→ (or ⌃⌘⇧H / ⌃⌘⇧L) | Move the focused column left / right |
 | ⌃⌘⇧↑ / ⌃⌘⇧↓ (or ⌃⌘⇧K / ⌃⌘⇧J) | Move the window up / down inside its stack |
 | ⌃⌘N | Send the window to the strip of the next display |
+| ⌃⌘O | Open the overview of the strip |
 
 You can also focus as usual: with a click, ⌘Tab, the Dock or Mission Control. The strip slides all the same.
+
+**Overview.** **⌃⌘O** (or a long move down with the mouse buttons, see chapter 10) shows the whole strip of the display at a glance: every window with its app and title, the stacks, the tabs and the pinned columns. A bar on top marks the part that is on screen now. Click a window to go there, or pick it with the arrows and press ↩; 1 … 9 jump to that column. Esc, a click outside or ⌃⌘O again close it.
 
 **Centering.** By default the strip moves just enough for the focused column to be fully visible. In Settings → General you can make it center the column **always** or **only when the strip does not fit on the screen**. **⌃⌘C** centers the focused column at any time.
 
@@ -164,7 +167,8 @@ A column can hold several windows.
 **Mouse button gestures.** In Settings → Trackpad & Mouse → Mouse buttons, turn on **Mouse button gestures** and choose the buttons: click the **Buttons** field, press the ones you want together (both side buttons, 4 and 5, for example) and let go. Then hold those buttons and move the mouse:
 
 - **Sideways**, the strip follows the pointer and settles on a column when you let go. A short quick move reaches the next one.
-- **Up**, the focused column takes the full width; **down**, it goes back to the width it had.
+- **Up**, the focused column takes the full width.
+- **Down** and letting go, it goes back to the width it had. Keep going down a good stretch and the **overview** opens.
 
 With a single button (the middle one, say), a click without moving still works as usual. With several, each button on its own keeps doing its job too: Rambla waits a moment for the other one and, if it does not come, hands the click to the app. Sensitivity and direction are in the same section.
 

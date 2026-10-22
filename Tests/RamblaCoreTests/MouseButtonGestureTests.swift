@@ -79,8 +79,36 @@ private func isSlideEnd(_ output: Output) -> Bool {
     #expect(gesture.handle(.drag(dx: 0, dy: -50), at: 0.06) == swallowed)         // the rest of that press
     #expect(gesture.handle(.drag(dx: 90, dy: 0), at: 0.08) == swallowed)          // even sideways
     #expect(gesture.handle(.up(3), at: 0.1) == swallowed)
+    // Down waits for the release: a longer move down is the overview.
     _ = gesture.handle(.down(3), at: 1)
-    #expect(gesture.handle(.drag(dx: -3, dy: 45), at: 1.02) == Output(passes: false, commands: [.vertical(up: false)]))
+    #expect(gesture.handle(.drag(dx: -3, dy: 45), at: 1.02) == swallowed)
+    #expect(gesture.handle(.up(3), at: 1.1) == Output(passes: false, commands: [.vertical(up: false)]))
+}
+
+@Test func aLongMoveDownOpensTheOverview() {
+    var gesture = MouseButtonGesture(buttons: [4, 5])
+    _ = gesture.handle(.down(4), at: 0)
+    _ = gesture.handle(.down(5), at: 0.01)
+    #expect(gesture.handle(.drag(dx: 2, dy: 60), at: 0.03) == swallowed)          // the width, if released now
+    #expect(gesture.handle(.drag(dx: -4, dy: 110), at: 0.06) == Output(passes: false, commands: [.overview]))
+    #expect(gesture.handle(.drag(dx: 0, dy: 80), at: 0.08) == swallowed)          // once per press
+    #expect(gesture.handle(.up(4), at: 0.2) == swallowed)
+    #expect(gesture.handle(.up(5), at: 0.21) == swallowed)
+}
+
+@Test func comingBackUpBeforeLettingGoChangesNothing() {
+    var gesture = MouseButtonGesture(buttons: [3])
+    _ = gesture.handle(.down(3), at: 0)
+    _ = gesture.handle(.drag(dx: 0, dy: 60), at: 0.03)
+    #expect(gesture.handle(.drag(dx: 0, dy: -45), at: 0.06) == swallowed)         // back near where it started
+    #expect(gesture.handle(.up(3), at: 0.2) == swallowed)                         // neither the width nor a click
+}
+
+@Test func aMoveDownThatLosesItsReleaseDoesNothing() {
+    var gesture = MouseButtonGesture(buttons: [3])
+    _ = gesture.handle(.down(3), at: 0)
+    _ = gesture.handle(.drag(dx: 0, dy: 60), at: 0.03)
+    #expect(gesture.handle(.released, at: 0.1) == passes)                         // no width change on a guess
 }
 
 @Test func aSlantedDragWaitsForAClearerOne() {
@@ -190,7 +218,8 @@ private func isSlideEnd(_ output: Output) -> Bool {
     _ = gesture.handle(.drag(dx: 0, dy: -50), at: 0.05)                           // up
     #expect(gesture.handle(.up(5), at: 0.1) == swallowed)
     #expect(gesture.handle(.down(5), at: 0.3) == swallowed)                       // 4 is still held: the chord again
-    #expect(gesture.handle(.drag(dx: 0, dy: 50), at: 0.35) == Output(passes: false, commands: [.vertical(up: false)]))
+    #expect(gesture.handle(.drag(dx: 0, dy: 50), at: 0.35) == swallowed)
+    #expect(gesture.handle(.up(5), at: 0.4) == Output(passes: false, commands: [.vertical(up: false)]))
 }
 
 @Test func releasingOneButtonMidSlideAndPressingItAgainSlidesAgain() {
@@ -230,7 +259,7 @@ private func isSlideEnd(_ output: Output) -> Bool {
     #expect(gesture.heldButtons.isEmpty)
     _ = gesture.handle(.down(4), at: 1)
     _ = gesture.handle(.down(5), at: 1.01)
-    _ = gesture.handle(.drag(dx: 0, dy: 45), at: 1.02)                            // spent
+    _ = gesture.handle(.drag(dx: 0, dy: 45), at: 1.02)                            // on its way down
     #expect(gesture.handle(.released, at: 1.03) == passes)
     #expect(gesture.handle(.up(4), at: 1.04) == passes)                           // the apps' now: Rambla forgot it
 }

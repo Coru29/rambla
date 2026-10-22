@@ -47,6 +47,10 @@ extension WindowManager {
             return
         }
         guard !isPaused else { return }
+        if action == .overview {
+            if let key = activeStripKey() { overviewHook?(key) }
+            return
+        }
         if action == .toggleFloat {
             toggleFloatFocused()
             return
@@ -74,6 +78,8 @@ extension WindowManager {
         case .sendNextDisplay:
             sendFocusedToNextDisplay(from: key)
             return
+        case .overview:
+            return   // handled above
         case .cycleWidth: strip.cycleWidth(presets: prefs.presetWidths, available: available, gap: gap)
         case .fullWidth: strip.toggleFullWidth()
         case .center:
