@@ -94,7 +94,7 @@ If you don't like something, everything can be changed in **Settings**: Rambla's
 
 You can also focus as usual: with a click, ⌘Tab, the Dock or Mission Control. The strip slides all the same.
 
-**Overview.** **⌃⌘O** (or a long move down with the mouse buttons, see chapter 10) shows the whole strip of the display at a glance: every window with its app and title, the stacks, the tabs and the pinned columns. A bar on top marks the part that is on screen now. Click a window to go there, or pick it with the arrows and press ↩; 1 … 9 jump to that column. To change the order, drag a window to another place, or choose it and press ⇧← or ⇧→ (⌃⌘⇧← → too): its column moves in the strip (pinned ones stay at their edge). Esc, ⌘W, a click outside or ⌃⌘O again close it. While it is open, Rambla's focus shortcuts (⌃⌘ + arrows, ⌃⌘1 … 9) move the selection instead of the strip.
+**Overview.** **⌃⌘O** (or a long move down on the trackpad or with the mouse buttons, see chapter 10) shows the whole strip of the display at a glance: every window with its app and title, the stacks, the tabs and the pinned columns. A bar on top marks the part that is on screen now. Click a window to go there, or pick it with the arrows and press ↩; 1 … 9 jump to that column. To change the order, drag a window to another place, or choose it and press ⇧← or ⇧→ (⌃⌘⇧← → too): its column moves in the strip (pinned ones stay at their edge). Esc, ⌘W, a click outside or ⌃⌘O again close it. While it is open, Rambla's focus shortcuts (⌃⌘ + arrows, ⌃⌘1 … 9) move the selection instead of the strip.
 
 **Centering.** By default the strip moves just enough for the focused column to be fully visible. In Settings → General you can make it center the column **always** or **only when the strip does not fit on the screen**. **⌃⌘C** centers the focused column at any time.
 
@@ -151,7 +151,7 @@ A column can hold several windows.
 
 **Reorder with the mouse.** Grab a window by its title bar and drop it on another column. It moves to that place, before or after depending on which side of the column you drop it. If you drop it on another display, it moves to that display's strip.
 
-**Swipe with the trackpad.** Swipe left or right with **four fingers** (you can change it to three): the strip follows your fingers and settles on a column when you let go. A short quick swipe is enough to reach the next one. On a Force Touch trackpad you feel a gentle tap each time the strip passes a column, and another when a swipe changes the width; if you would rather not, turn off **Haptic feedback** in Settings → Trackpad & Mouse.
+**Swipe with the trackpad.** Swipe left or right with **four fingers** (you can change it to three): the strip follows your fingers and settles on a column when you let go. A short quick swipe is enough to reach the next one. On a Force Touch trackpad you feel a gentle tap each time the strip is about to pass a column (in a quick swipe, as soon as it starts), and another with the swipes up and down; if you would rather not, turn off **Haptic feedback** in Settings → Trackpad & Mouse.
 
 > macOS uses that gesture to switch desktops too, and Rambla cannot block it. Watch out for a trap in System Settings: for **"Swipe between full-screen applications"**, the **three-finger** option also keeps the four-finger swipe on, without showing it. Pick one of these setups:
 >
@@ -160,7 +160,7 @@ A column can hold several windows.
 >
 > Settings → Trackpad & Mouse (and the Mac page) tells you if Rambla's gesture collides with the system's.
 
-**Full width from the trackpad.** Swipe **up** with the same fingers and the focused column takes the whole width of the screen, without macOS's full screen (like ⌃⌘M). Swipe **down** to go back to the width it had. macOS opens Mission Control with that gesture, and its three-finger option keeps the four-finger one on too: Settings → Trackpad & Mouse warns you and turns it off with **Turn Off in macOS** (Mission Control keeps working with three fingers and ⌃↑). You can turn this gesture off on the same page.
+**Full width from the trackpad.** Swipe **up** with the same fingers and the focused column takes the whole width of the screen, without macOS's full screen (like ⌃⌘M). Swipe **down** and let go to go back to the width it had; keep going down a good stretch and the **overview** opens. macOS opens Mission Control with that gesture, and its three-finger option keeps the four-finger one on too: Settings → Trackpad & Mouse warns you and turns it off with **Turn Off in macOS** (Mission Control keeps working with three fingers and ⌃↑). You can turn this gesture off on the same page.
 
 **Move the strip with the mouse wheel.** Hold **⌃⌘** and turn the wheel: each notch focuses the next column. With a Magic Mouse, or two fingers on a trackpad, holding ⌃⌘ slides the strip like the gesture, and it settles when you let go. Without the keys, the wheel scrolls as usual. You can change the keys in Settings → Trackpad & Mouse.
 

@@ -41,3 +41,44 @@ public enum TrackpadSwipe: Equatable, Sendable {
         return nil
     }
 }
+
+/// Up and down on the trackpad, like with the mouse buttons: up gives the full width at once; down is decided when
+/// the fingers lift (back to the previous width), unless they go down `overviewStart` first, which opens the overview;
+/// back up before lifting, nothing. One command per swipe.
+public struct TrackpadVertical: Equatable, Sendable {
+    public enum Command: Equatable, Sendable { case fullWidth, previousWidth, overview }
+
+    /// How far down (a fraction of the trackpad's height) opens the overview.
+    public static let overviewStart = 0.3
+
+    private var goingDown = false
+    private var done = false
+
+    public init() {}
+
+    /// The swipe went up or down: the rest of it does not slide the strip.
+    public var isVertical: Bool { goingDown || done }
+
+    /// The fingers are `dy` from where they landed (a fraction of the trackpad's height, up positive), and the swipe
+    /// reads as `kind` so far.
+    public mutating func moved(_ kind: TrackpadSwipe?, dy: Double) -> Command? {
+        guard !done else { return nil }
+        if !goingDown {
+            if kind == .up {
+                done = true
+                return .fullWidth
+            }
+            guard kind == .down else { return nil }
+            goingDown = true
+        }
+        guard dy <= -Self.overviewStart else { return nil }
+        done = true
+        return .overview
+    }
+
+    /// The fingers lifted `dy` from where they landed; the next swipe starts over.
+    public mutating func lifted(dy: Double) -> Command? {
+        defer { self = TrackpadVertical() }
+        return goingDown && !done && dy <= -TrackpadSwipe.verticalStart ? .previousWidth : nil
+    }
+}

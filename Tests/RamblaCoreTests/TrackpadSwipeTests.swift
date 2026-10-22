@@ -34,3 +34,49 @@ import Testing
     #expect(TrackpadSwipe.frame(touching: 0, total: 4, fingers: 4) == .end)     // all of them at once
     #expect(TrackpadSwipe.frame(touching: 2, total: 2, fingers: 4) == .end)     // a two-finger scroll
 }
+
+// MARK: - Up and down
+
+@Test func upGivesTheFullWidthAtOnce() {
+    var swipe = TrackpadVertical()
+    let first = swipe.moved(.up, dy: 0.12)
+    let again = swipe.moved(.up, dy: 0.4)
+    let lift = swipe.lifted(dy: 0.4)
+    #expect(first == .fullWidth)
+    #expect(again == nil)                                                            // one command per swipe
+    #expect(lift == nil)
+}
+
+@Test func downIsDecidedWhenTheFingersLift() {
+    var swipe = TrackpadVertical()
+    let down = swipe.moved(.down, dy: -0.12)
+    #expect(down == nil)
+    #expect(swipe.isVertical)                                                        // the rest does not slide
+    #expect(swipe.lifted(dy: -0.15) == .previousWidth)
+    // Back up before lifting: nothing.
+    var back = TrackpadVertical()
+    _ = back.moved(.down, dy: -0.12)
+    let up = back.moved(nil, dy: -0.02)
+    #expect(up == nil)
+    #expect(back.lifted(dy: -0.02) == nil)
+}
+
+@Test func downFarOpensTheOverview() {
+    var swipe = TrackpadVertical()
+    _ = swipe.moved(.down, dy: -0.12)
+    let far = swipe.moved(nil, dy: -0.31)
+    let further = swipe.moved(nil, dy: -0.5)
+    #expect(far == .overview)
+    #expect(further == nil)
+    #expect(swipe.lifted(dy: -0.5) == nil)                                          // not the previous width too
+    // The next swipe starts over.
+    let next = swipe.moved(.up, dy: 0.12)
+    #expect(next == .fullWidth)
+}
+
+@Test func sidewaysIsNotVertical() {
+    var swipe = TrackpadVertical()
+    let sideways = swipe.moved(.horizontal, dy: 0.01)
+    #expect(sideways == nil)
+    #expect(!swipe.isVertical)
+}

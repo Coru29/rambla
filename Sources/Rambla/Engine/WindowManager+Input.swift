@@ -47,7 +47,8 @@ extension WindowManager {
         strip.scroll += points
         strips[key] = strip
         apply(key, animate: false, verify: false)
-        if let metrics = results[key]?.metrics, slideDetent?.crossed(metrics, scroll: strip.scroll) == true {
+        if let metrics = results[key]?.metrics,
+           slideDetent?.moved(by: points, to: strip.scroll, in: metrics, at: ProcessInfo.processInfo.systemUptime) == true {
             Haptics.detent()
         }
         indicatorHook?(key, nil)
@@ -84,7 +85,7 @@ extension WindowManager {
         Log.info("Swipe \(up ? "up: full width" : "down: previous width")")
         strip.setFullWidth(up)
         strips[key] = strip
-        if onTrackpad, prefs.trackpad.haptics { Haptics.widthChanged() }
+        if onTrackpad, prefs.trackpad.haptics { Haptics.gesture() }
         reveal(key)
         indicatorHook?(key, nil)
         onStateChanged?()
@@ -107,10 +108,12 @@ extension WindowManager {
         onStateChanged?()
     }
 
-    /// A long move down with the mouse buttons held: the overview of the strip under the pointer.
-    func showOverviewUnderPointer() {
+    /// A long move down, on the trackpad or with the mouse buttons held: the overview of the strip under the pointer.
+    /// On the trackpad it taps once.
+    func showOverviewUnderPointer(onTrackpad: Bool) {
         guard isRunning, !isPaused, gestureKey == nil, let key = stripKeyUnderPointer() else { return }
         overviewHook?(key)
+        if onTrackpad, prefs.trackpad.haptics { Haptics.gesture() }
     }
 
     func hover(at point: CGPoint) {

@@ -94,7 +94,7 @@ Si algo no te gusta, todo se puede cambiar en **Configuración** (menú de Rambl
 
 También podés enfocar como siempre: con un click, ⌘Tab, el Dock o Mission Control. La tira se desliza igual.
 
-**Vista general.** Con **⌃⌘O** (o bajando bastante con los botones del mouse, ver el capítulo 10) ves toda la tira de la pantalla en chico: cada ventana con su app y su título, las pilas, las pestañas y las columnas fijadas. Una barra arriba marca la parte que está en pantalla ahora. Hacé click en una ventana para ir a ella, o elegila con las flechas y tocá ↩; con 1 … 9 vas directo a esa columna. Para cambiar el orden, arrastrá una ventana a otro lugar, o elegila y tocá ⇧← o ⇧→ (también ⌃⌘⇧← →): su columna se mueve en la tira (las fijadas quedan en su borde). Esc, ⌘W, un click afuera o ⌃⌘O de nuevo la cierran. Mientras está abierta, los atajos de Rambla para moverte (⌃⌘ + flechas, ⌃⌘1 … 9) mueven la selección en vez de la tira.
+**Vista general.** Con **⌃⌘O** (o bajando bastante con el trackpad o con los botones del mouse, ver el capítulo 10) ves toda la tira de la pantalla en chico: cada ventana con su app y su título, las pilas, las pestañas y las columnas fijadas. Una barra arriba marca la parte que está en pantalla ahora. Hacé click en una ventana para ir a ella, o elegila con las flechas y tocá ↩; con 1 … 9 vas directo a esa columna. Para cambiar el orden, arrastrá una ventana a otro lugar, o elegila y tocá ⇧← o ⇧→ (también ⌃⌘⇧← →): su columna se mueve en la tira (las fijadas quedan en su borde). Esc, ⌘W, un click afuera o ⌃⌘O de nuevo la cierran. Mientras está abierta, los atajos de Rambla para moverte (⌃⌘ + flechas, ⌃⌘1 … 9) mueven la selección en vez de la tira.
 
 **Centrado.** Por defecto, la tira se mueve lo justo para que la columna enfocada se vea entera. En Configuración → General podés elegir que la centre **siempre** o **solo si la tira no entra en la pantalla**. Con **⌃⌘C** centrás la columna enfocada en cualquier momento.
 
@@ -151,7 +151,7 @@ Una columna puede tener varias ventanas.
 
 **Reordenar con el mouse.** Agarrá una ventana de la barra de título y soltala encima de otra columna. Se mueve a ese lugar, antes o después según de qué lado de la columna la sueltes. Si la soltás en otra pantalla, pasa a la tira de esa pantalla.
 
-**Deslizar con el trackpad.** Deslizá con **cuatro dedos** a izquierda o derecha (podés cambiarlo a tres): la tira sigue tus dedos y al soltar se asienta en una columna. Un deslizamiento corto y rápido alcanza para pasar a la siguiente. Con un trackpad Force Touch sentís un toque suave cada vez que la tira pasa a otra columna, y otro cuando un gesto cambia el ancho; si no lo querés, apagá **«Respuesta háptica»** en Configuración → Trackpad y mouse.
+**Deslizar con el trackpad.** Deslizá con **cuatro dedos** a izquierda o derecha (podés cambiarlo a tres): la tira sigue tus dedos y al soltar se asienta en una columna. Un deslizamiento corto y rápido alcanza para pasar a la siguiente. Con un trackpad Force Touch sentís un toque suave cada vez que la tira va a pasar a otra columna (en un deslizamiento rápido, apenas arranca), y otro con los gestos hacia arriba o abajo; si no lo querés, apagá **«Respuesta háptica»** en Configuración → Trackpad y mouse.
 
 > macOS también usa ese gesto para cambiar de escritorio y Rambla no lo puede bloquear. Ojo con una trampa de Configuración del Sistema: en **«Cambiar entre apps en pantalla completa»**, la opción **«3 dedos»** deja activo también el gesto de 4 dedos, aunque no lo muestre. Elegí una de estas opciones:
 >
@@ -160,7 +160,7 @@ Una columna puede tener varias ventanas.
 >
 > Configuración → Trackpad y mouse (y la página Mac) te avisa si el gesto de Rambla choca con el de macOS.
 
-**Ancho completo con el trackpad.** Deslizá con los mismos dedos **hacia arriba** y la columna enfocada ocupa todo el ancho de la pantalla, sin la pantalla completa de macOS (como ⌃⌘M). **Hacia abajo** vuelve al ancho que tenía. macOS abre Mission Control con ese gesto, y su opción «3 dedos» también deja activo el de 4: Configuración → Trackpad y mouse te avisa y lo apaga con **«Apagarlo en macOS»** (Mission Control sigue con 3 dedos y con ⌃↑). Si no lo querés, se desactiva en la misma página.
+**Ancho completo con el trackpad.** Deslizá con los mismos dedos **hacia arriba** y la columna enfocada ocupa todo el ancho de la pantalla, sin la pantalla completa de macOS (como ⌃⌘M). **Hacia abajo** y soltando, vuelve al ancho que tenía; si seguís bajando un buen trecho, se abre la **vista general**. macOS abre Mission Control con ese gesto, y su opción «3 dedos» también deja activo el de 4: Configuración → Trackpad y mouse te avisa y lo apaga con **«Apagarlo en macOS»** (Mission Control sigue con 3 dedos y con ⌃↑). Si no lo querés, se desactiva en la misma página.
 
 **Mover la tira con la ruedita del mouse.** Mantené **⌃⌘** y girá la ruedita: cada paso enfoca la columna de al lado. Con un Magic Mouse, o con dos dedos en el trackpad, manteniendo ⌃⌘ la tira se desliza como con el gesto y se asienta al soltar. Sin las teclas, la ruedita funciona como siempre. Las teclas se cambian en Configuración → Trackpad y mouse.
 

@@ -11,13 +11,15 @@ private let tapCallback: CGEventTapCallBack = { _, type, event, userInfo in
 /// N-finger swipes on the trackpad, read from a listen-only event tap of gesture events (it never blocks or alters
 /// input). The tap exists only while the feature is on. Sideways slides the strip: positions are the fingers' mean x
 /// on the trackpad, from 0 (left edge) to 1 (right edge), and the release velocity is in those units per second.
-/// Up and down are one command each per swipe (`TrackpadSwipe` tells them apart).
+/// Up and down give one command per swipe (`TrackpadSwipe` tells them apart, `TrackpadVertical` decides): up the full
+/// width, down when the fingers lift the previous width, and further down the overview.
 @MainActor
 final class GestureTracker {
     private let onBegin: () -> Void
     private let onChange: (_ dx: Double) -> Void
     private let onEnd: (_ velocity: Double) -> Void
     private let onVertical: (_ up: Bool) -> Void
+    private let onOverview: () -> Void
 
     private var tap: CFMachPort?
     private var source: CFRunLoopSource?
@@ -25,10 +27,12 @@ final class GestureTracker {
     private let retry = TapRetry(name: "Trackpad gesture tap")
     private var fingers = 4
     private var vertical = true
-    /// This swipe already went up or down: the rest of it is ignored.
-    private var verticalDone = false
+    /// Up or down: once a swipe is one, the rest of it does not slide the strip.
+    private var verticalSwipe = TrackpadVertical()
     private var start: CGPoint?
     private var last: CGPoint?
+    /// Where the fingers are now (`last` follows only a slide).
+    private var current: CGPoint?
     private var active = false
     private var velocity = VelocityTracker()
     /// When the swipe's fingers last reported (event time), and the one check that ends the swipe there once
@@ -37,11 +41,13 @@ final class GestureTracker {
     private var liftCheck: DispatchWorkItem?
 
     init(onBegin: @escaping () -> Void, onChange: @escaping (_ dx: Double) -> Void,
-         onEnd: @escaping (_ velocity: Double) -> Void, onVertical: @escaping (_ up: Bool) -> Void) {
+         onEnd: @escaping (_ velocity: Double) -> Void, onVertical: @escaping (_ up: Bool) -> Void,
+         onOverview: @escaping () -> Void) {
         self.onBegin = onBegin
         self.onChange = onChange
         self.onEnd = onEnd
         self.onVertical = onVertical
+        self.onOverview = onOverview
     }
 
     func configure(enabled: Bool, fingers: Int, vertical: Bool) {
@@ -88,11 +94,21 @@ final class GestureTracker {
         liftCheck = nil
         lastTouch = nil
         if active { onEnd(velocity.velocity(at: time)) }
+        if let start, let current, let command = verticalSwipe.lifted(dy: current.y - start.y) { perform(command) }
+        verticalSwipe = TrackpadVertical()
         active = false
-        verticalDone = false
         start = nil
         last = nil
+        current = nil
         velocity.reset()
+    }
+
+    private func perform(_ command: TrackpadVertical.Command) {
+        switch command {
+        case .fullWidth: onVertical(true)
+        case .previousWidth: onVertical(false)
+        case .overview: onOverview()
+        }
     }
 
     /// Ends the swipe at its last touch, so it keeps the speed it had, once `liftTimeout` has passed since; until then
@@ -135,7 +151,7 @@ final class GestureTracker {
         let x = touching.reduce(0) { $0 + $1.normalizedPosition.x } / count
         let y = touching.reduce(0) { $0 + $1.normalizedPosition.y } / count
         Log.info(String(format: "touches %d touching %d resting %d [%@] x %.3f y %.3f %@", all.count, touching.count,
-                        resting, phases, x, y, active ? "sliding" : (verticalDone ? "vertical-done" : "-")))
+                        resting, phases, x, y, active ? "sliding" : (verticalSwipe.isVertical ? "vertical" : "-")))
     }
 
     fileprivate func handle(type: CGEventType, event: CGEvent) {
@@ -164,21 +180,16 @@ final class GestureTracker {
         guard let start else {
             self.start = mean
             last = mean
+            current = mean
             return
         }
+        current = mean
         if !active {
-            guard !verticalDone else { return }
-            switch TrackpadSwipe.kind(dx: mean.x - start.x, dy: mean.y - start.y) {
-            case .horizontal:
-                active = true
-                onBegin()
-            case .up where vertical, .down where vertical:
-                verticalDone = true
-                onVertical(mean.y > start.y)
-                return
-            default:
-                return
-            }
+            let kind = TrackpadSwipe.kind(dx: mean.x - start.x, dy: mean.y - start.y)
+            if vertical, let command = verticalSwipe.moved(kind, dy: mean.y - start.y) { perform(command) }
+            guard !verticalSwipe.isVertical, kind == .horizontal else { return }
+            active = true
+            onBegin()
         }
         if let last { onChange(mean.x - last.x) }
         last = mean

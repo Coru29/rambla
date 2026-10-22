@@ -8,8 +8,8 @@ enum Haptics {
         NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
     }
 
-    /// A swipe up or down changed the column's width.
-    static func widthChanged() {
+    /// A swipe up or down did what it does: a width, the overview.
+    static func gesture() {
         NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
     }
 }

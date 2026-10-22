@@ -60,7 +60,7 @@ struct TrackpadView: View {
         } header: {
             Text("Trackpad")
         } footer: {
-            Text("Un swipe horizontal con esa cantidad de dedos desplaza la tira. Al soltar, se asienta en una columna: un swipe corto y rápido pasa a la siguiente. Con la dirección natural, la tira sigue a los dedos; sin ella, va al revés. Con la respuesta háptica, el trackpad da un toque suave cada vez que la tira pasa a otra columna y cuando un gesto cambia el ancho.")
+            Text("Un swipe horizontal con esa cantidad de dedos desplaza la tira. Al soltar, se asienta en una columna: un swipe corto y rápido pasa a la siguiente. Con la dirección natural, la tira sigue a los dedos; sin ella, va al revés. Hacia abajo se decide al soltar, y bajando un buen trecho se abre la vista general. Con la respuesta háptica, el trackpad da un toque suave cada vez que la tira va a pasar a otra columna y con los gestos hacia arriba o abajo.")
         }
     }
 
