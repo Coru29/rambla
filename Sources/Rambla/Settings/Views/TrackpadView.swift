@@ -56,10 +56,11 @@ struct TrackpadView: View {
                 .disabled(!enabled)
             Toggle("Hacia arriba, ancho completo; hacia abajo, el ancho de antes", isOn: $store.prefs.trackpad.verticalSwipe)
                 .disabled(!enabled)
+            Toggle("Respuesta háptica", isOn: $store.prefs.trackpad.haptics)
         } header: {
             Text("Trackpad")
         } footer: {
-            Text("Un swipe horizontal con esa cantidad de dedos desplaza la tira. Al soltar, se asienta en una columna: un swipe corto y rápido pasa a la siguiente. Con la dirección natural, la tira sigue a los dedos; sin ella, va al revés.")
+            Text("Un swipe horizontal con esa cantidad de dedos desplaza la tira. Al soltar, se asienta en una columna: un swipe corto y rápido pasa a la siguiente. Con la dirección natural, la tira sigue a los dedos; sin ella, va al revés. Con la respuesta háptica, el trackpad da un toque suave cada vez que la tira pasa a otra columna y cuando un gesto cambia el ancho.")
         }
     }
 

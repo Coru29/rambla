@@ -128,6 +128,8 @@ final class WindowManager {
     var saveWorkItem: DispatchWorkItem?
     /// Strip being moved by a trackpad swipe.
     var gestureKey: StripKey?
+    /// The detents of a slide done on the trackpad, felt as taps (nil when it is not, or haptics are off).
+    var slideDetent: SlideDetent?
     /// Focus given by hover or swipe: do not scroll when macOS confirms it.
     var revealSuppressedFor: WindowID?
 

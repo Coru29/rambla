@@ -11,9 +11,11 @@ extension WindowManager {
     static let mouseDragGain = 2.0
 
     /// A slide starts on the strip under the pointer (the trackpad and the mouse wheel both act where you look).
-    func gestureBegan() {
+    /// `onTrackpad`: the fingers are on the trackpad, so it can tap each column the strip passes.
+    func gestureBegan(onTrackpad: Bool) {
         guard isRunning, !isPaused else { return }
         gestureKey = stripKeyUnderPointer()
+        slideDetent = onTrackpad && prefs.trackpad.haptics ? SlideDetent() : nil
         if let key = gestureKey { strips[key]?.allWindows.forEach(animator.cancel) }
     }
 
@@ -45,6 +47,9 @@ extension WindowManager {
         strip.scroll += points
         strips[key] = strip
         apply(key, animate: false, verify: false)
+        if let metrics = results[key]?.metrics, slideDetent?.crossed(metrics, scroll: strip.scroll) == true {
+            Haptics.detent()
+        }
         indicatorHook?(key, nil)
     }
 
@@ -53,6 +58,7 @@ extension WindowManager {
     func slideEnded(velocity: Double) {
         guard let key = gestureKey else { return }
         gestureKey = nil
+        slideDetent = nil
         guard var strip = strips[key], let display = display(for: key) else { return }
         let metrics = Layout.metrics(layoutInput(for: key, strip: strip, display: display))
         let settled = Layout.settle(metrics, scroll: strip.scroll, velocity: velocity, focused: strip.focused)
@@ -72,12 +78,13 @@ extension WindowManager {
     }
 
     /// Swipe up (on the trackpad, or dragging with the mouse buttons): the focused column takes the full width of the
-    /// screen (without macOS's full screen); swipe down: back to the width it had.
-    func verticalSwipe(up: Bool) {
+    /// screen (without macOS's full screen); swipe down: back to the width it had. On the trackpad it taps once.
+    func verticalSwipe(up: Bool, onTrackpad: Bool) {
         guard isRunning, !isPaused, gestureKey == nil, let key = activeStripKey(), var strip = strips[key] else { return }
         Log.info("Swipe \(up ? "up: full width" : "down: previous width")")
         strip.setFullWidth(up)
         strips[key] = strip
+        if onTrackpad, prefs.trackpad.haptics { Haptics.widthChanged() }
         reveal(key)
         indicatorHook?(key, nil)
         onStateChanged?()

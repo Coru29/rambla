@@ -151,7 +151,7 @@ A column can hold several windows.
 
 **Reorder with the mouse.** Grab a window by its title bar and drop it on another column. It moves to that place, before or after depending on which side of the column you drop it. If you drop it on another display, it moves to that display's strip.
 
-**Swipe with the trackpad.** Swipe left or right with **four fingers** (you can change it to three): the strip follows your fingers and settles on a column when you let go. A short quick swipe is enough to reach the next one.
+**Swipe with the trackpad.** Swipe left or right with **four fingers** (you can change it to three): the strip follows your fingers and settles on a column when you let go. A short quick swipe is enough to reach the next one. On a Force Touch trackpad you feel a gentle tap each time the strip passes a column, and another when a swipe changes the width; if you would rather not, turn off **Haptic feedback** in Settings → Trackpad & Mouse.
 
 > macOS uses that gesture to switch desktops too, and Rambla cannot block it. Watch out for a trap in System Settings: for **"Swipe between full-screen applications"**, the **three-finger** option also keeps the four-finger swipe on, without showing it. Pick one of these setups:
 >
@@ -201,7 +201,7 @@ Open them from the menu bar icon → **Settings…**. While the window is open, 
 |---|---|
 | **General** | Enable or pause, launch at login, animations and their speed, centering, width of new windows, keep original height, gaps between windows and margin, preset widths, adjustment step, what to do when another app moves a window |
 | **Shortcuts** | Change any shortcut (each action takes two). Click the shortcut and press the new combination: ⎋ cancels and ⌫ clears it. It warns you if it clashes with Rectangle or if macOS doesn't allow it. **Restore Defaults** brings everything back. |
-| **Trackpad & Mouse** | The trackpad gesture (fingers, sensitivity, natural direction, swipe up for full width), conflicts with macOS, the mouse wheel and the mouse buttons |
+| **Trackpad & Mouse** | The trackpad gesture (fingers, sensitivity, natural direction, swipe up for full width, haptic feedback), conflicts with macOS, the mouse wheel and the mouse buttons |
 | **Appearance** | Strip indicator, focus border, dim inactive windows, mouse ↔ focus |
 | **Apps** | Per-app rules: always float (great for calculators, players or small chats), initial width, and where its windows open (next to the focused one, at the start or at the end) |
 | **Displays** | Turn Rambla on or off for each monitor |

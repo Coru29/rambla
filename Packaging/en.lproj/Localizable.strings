@@ -289,7 +289,7 @@
 "Sensibilidad" = "Sensitivity";
 "Dirección natural" = "Natural direction";
 "Trackpad" = "Trackpad";
-"Un swipe horizontal con esa cantidad de dedos desplaza la tira. Al soltar, se asienta en una columna: un swipe corto y rápido pasa a la siguiente. Con la dirección natural, la tira sigue a los dedos; sin ella, va al revés." = "A horizontal swipe with that many fingers scrolls the strip. When you let go it settles on a column: a short, quick swipe moves to the next one. With the natural direction the strip follows your fingers; without it, it goes the other way.";
+"Un swipe horizontal con esa cantidad de dedos desplaza la tira. Al soltar, se asienta en una columna: un swipe corto y rápido pasa a la siguiente. Con la dirección natural, la tira sigue a los dedos; sin ella, va al revés. Con la respuesta háptica, el trackpad da un toque suave cada vez que la tira pasa a otra columna y cuando un gesto cambia el ancho." = "A horizontal swipe with that many fingers scrolls the strip. When you let go it settles on a column: a short, quick swipe moves to the next one. With the natural direction the strip follows your fingers; without it, it goes the other way. With haptic feedback, the trackpad gives a gentle tap each time the strip passes a column, and when a swipe changes the width.";
 "Mover la tira con la ruedita del mouse" = "Move the strip with the mouse wheel";
 "Manteniendo apretado" = "While holding";
 "Mouse" = "Mouse";
@@ -414,3 +414,4 @@
 /* Settings/Views/GeneralView.swift (updates) */
 "Buscar actualizaciones automáticamente" = "Check for updates automatically";
 "Rambla consulta GitHub al arrancar y una vez por día. Es su única conexión a internet y no envía nada tuyo. Desde el menú podés buscar a mano cuando quieras." = "Rambla checks GitHub when it starts and once a day. It is its only connection to the internet and it sends nothing of yours. You can always check by hand from the menu.";
+"Respuesta háptica" = "Haptic feedback";

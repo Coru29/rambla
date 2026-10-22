@@ -97,7 +97,8 @@ private func customizedPreferences() -> Preferences {
     p.dimInactive = DimPrefs(enabled: true, amount: 0.4)
     p.focusFollowsMouse = true
     p.mouseFollowsFocus = true
-    p.trackpad = TrackpadPrefs(enabled: false, fingers: 3, sensitivity: 1.5, natural: false, verticalSwipe: false)
+    p.trackpad = TrackpadPrefs(enabled: false, fingers: 3, sensitivity: 1.5, natural: false, verticalSwipe: false,
+                               haptics: false)
     p.mouse = MousePrefs(enabled: false, modifiers: [.option, .command])
     p.mouseButtons = MouseButtonsPrefs(enabled: true, buttons: [3, 5], sensitivity: 2.5, natural: false)
     p.appRules = [
@@ -265,4 +266,12 @@ private func customizedPreferences() -> Preferences {
     // Nothing usable left: the default chord, rather than one that can never be pressed.
     let unusable = try decodePreferences(#"{"mouseButtons": {"buttons": [1, 2]}}"#)
     #expect(unusable.mouseButtons.buttons == MouseButtonsPrefs().buttons)
+}
+
+@Test func hapticsAreOnUnlessTurnedOff() throws {
+    #expect(TrackpadPrefs().haptics)
+    // Preferences saved before 1.2.0 have no such key: it is on.
+    let old = try decodePreferences(#"{"trackpad": {"enabled": true, "fingers": 3}}"#)
+    #expect(old.trackpad.haptics)
+    #expect(old.trackpad.fingers == 3)
 }

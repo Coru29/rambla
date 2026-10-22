@@ -12,20 +12,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let engine = WindowManager.shared
     private let store = PreferencesStore.shared
     private lazy var gestures = GestureTracker(
-        onBegin: { [weak self] in self?.engine.gestureBegan() },
+        onBegin: { [weak self] in self?.engine.gestureBegan(onTrackpad: true) },
         onChange: { [weak self] dx in self?.engine.gestureChanged(dx) },
         onEnd: { [weak self] velocity in self?.engine.gestureEnded(velocity: velocity) },
-        onVertical: { [weak self] up in self?.engine.verticalSwipe(up: up) })
+        onVertical: { [weak self] up in self?.engine.verticalSwipe(up: up, onTrackpad: true) })
     private lazy var wheel = ScrollWheelTracker(handlers: .init(
         step: { [weak self] columns in self?.engine.wheelStep(columns) },
-        slideBegan: { [weak self] in self?.engine.gestureBegan() },
+        // Two fingers on the trackpad scroll like a wheel; a Magic Mouse has no haptic engine and taps nothing.
+        slideBegan: { [weak self] in self?.engine.gestureBegan(onTrackpad: true) },
         slide: { [weak self] points in self?.engine.slide(by: points) },
         slideEnded: { [weak self] velocity in self?.engine.slideEnded(velocity: velocity) }))
     private lazy var mouseButtons = MouseButtonTracker(handlers: .init(
-        slideBegan: { [weak self] in self?.engine.gestureBegan() },
+        slideBegan: { [weak self] in self?.engine.gestureBegan(onTrackpad: false) },
         slide: { [weak self] dx in self?.engine.mouseDragged(dx) },
         slideEnded: { [weak self] velocity in self?.engine.mouseDragEnded(velocity: velocity) },
-        vertical: { [weak self] up in self?.engine.verticalSwipe(up: up) },
+        vertical: { [weak self] up in self?.engine.verticalSwipe(up: up, onTrackpad: false) },
         overview: { [weak self] in self?.engine.showOverviewUnderPointer() }))
     private lazy var mouseFocus = MouseFocus { [weak self] point in self?.engine.hover(at: point) }
     private var overlays: OverlayCoordinator?

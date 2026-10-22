@@ -56,14 +56,17 @@ public struct TrackpadPrefs: Codable, Equatable, Sendable {
     public var natural: Bool
     /// Swiping up with the same fingers gives the focused column the full width; down gives back its width.
     public var verticalSwipe: Bool
+    /// A tap on the trackpad (Force Touch) each time a slide passes a column, and when a swipe up or down acts.
+    public var haptics: Bool
 
     public init(enabled: Bool = true, fingers: Int = 4, sensitivity: Double = 1.0, natural: Bool = true,
-                verticalSwipe: Bool = true) {
+                verticalSwipe: Bool = true, haptics: Bool = true) {
         self.enabled = enabled
         self.fingers = fingers
         self.sensitivity = sensitivity
         self.natural = natural
         self.verticalSwipe = verticalSwipe
+        self.haptics = haptics
     }
 
     public init(from decoder: Decoder) throws {
@@ -74,6 +77,7 @@ public struct TrackpadPrefs: Codable, Equatable, Sendable {
         sensitivity = try container.decodeIfPresent(Double.self, forKey: .sensitivity) ?? defaults.sensitivity
         natural = try container.decodeIfPresent(Bool.self, forKey: .natural) ?? defaults.natural
         verticalSwipe = try container.decodeIfPresent(Bool.self, forKey: .verticalSwipe) ?? defaults.verticalSwipe
+        haptics = try container.decodeIfPresent(Bool.self, forKey: .haptics) ?? defaults.haptics
     }
 }
 
