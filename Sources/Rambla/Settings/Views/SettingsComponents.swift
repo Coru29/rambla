@@ -111,7 +111,7 @@ struct CheckRow: View {
                     .buttonStyle(.borderedProminent)
                 }
                 if let url = result.settingsURL {
-                    Button("Abrir Ajustes") { NSWorkspace.shared.open(url) }
+                    Button("Abrir Configuración del Sistema") { NSWorkspace.shared.open(url) }
                 }
             }
         }

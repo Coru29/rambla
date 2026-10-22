@@ -73,11 +73,11 @@
 "Falta el permiso" = "Permission missing";
 "Abrir la configuración de Accesibilidad" = "Open Accessibility Settings";
 "Listo, Rambla ya puede acomodar tus ventanas." = "Done, Rambla can now arrange your windows.";
-"Activá Rambla en la lista de Ajustes y volvé acá: esta ventana se actualiza sola." = "Turn on Rambla in the list in System Settings and come back: this window updates by itself.";
+"Activá Rambla en la lista de Configuración del Sistema y volvé acá: esta ventana se actualiza sola." = "Turn on Rambla in the list in System Settings and come back: this window updates by itself.";
 "Deslizá con 3 o 4 dedos hacia los costados y la tira te sigue. macOS usa ese mismo gesto para cambiar de escritorio, así que conviene que no choquen." = "Swipe sideways with 3 or 4 fingers and the strip follows you. macOS uses that same gesture to switch desktops, so it is best if they do not clash.";
 "Deslizar con el trackpad" = "Swipe with the trackpad";
 "Cantidad de dedos" = "Number of fingers";
-"Abrir Ajustes del Trackpad" = "Open Trackpad Settings";
+"Abrir la configuración del Trackpad" = "Open Trackpad Settings";
 "Atajos básicos" = "Basic shortcuts";
 "Moverte entre columnas" = "Move between columns";
 "Cambiar el ancho de la columna" = "Change the column’s width";
@@ -221,7 +221,7 @@
 "Volver a revisar" = "Check Again";
 
 /* Rambla/Settings/Views/SettingsComponents.swift */
-"Abrir Ajustes" = "Open Settings";
+"Abrir Configuración del Sistema" = "Open System Settings";
 "Correcto" = "OK";
 "Atención" = "Warning";
 "Información" = "Information";
@@ -295,7 +295,7 @@
 "Gestos con botones del mouse" = "Mouse button gestures";
 "Botones" = "Buttons";
 "Botones del mouse" = "Mouse buttons";
-"Mantené apretados esos botones y mové el mouse: hacia los costados desliza la tira, hacia arriba la columna enfocada toma el ancho completo y hacia abajo, al soltar, vuelve al ancho que tenía; bajando bastante se abre la vista general. Con un solo botón, un clic sin mover sigue funcionando como siempre. Con varios, cada uno por separado sigue haciendo lo suyo: así conviven con Mac Mouse Fix y otras apps que usan los mismos botones." = "Hold those buttons and move the mouse: sideways slides the strip, up gives the focused column the full width, and down gives back the width it had when you let go; going down a good stretch opens the overview. With a single button, a click without moving still works as usual. With several, each one on its own keeps doing its job, so they get along with Mac Mouse Fix and other apps that use the same buttons.";
+"Mantené apretados esos botones y mové el mouse: hacia los costados desliza la tira, hacia arriba la columna enfocada toma el ancho completo y hacia abajo, al soltar, vuelve al ancho que tenía; bajando bastante se abre la vista general. Con un solo botón, un clic sin mover sigue funcionando como siempre. Con varios, cada uno por separado sigue haciendo lo suyo: así conviven con Mac Mouse Fix y otras apps que usan los mismos botones." = "Hold those buttons and move the mouse: sideways slides the strip, up gives the focused column the full width, and down, once you let go, gives back the width it had; going down a good stretch opens the overview. With a single button, a click without moving still works as usual. With several, each one on its own keeps doing its job, so they get along with Mac Mouse Fix and other apps that use the same buttons.";
 "Botón del medio" = "Middle button";
 "Botón %lld" = "Button %lld";
 "Apretá los botones…" = "Press the buttons…";
@@ -373,7 +373,7 @@
 "macOS acomoda las ventanas al arrastrarlas (%@) y compite con Rambla. Conviene apagarlo en Escritorio y Dock." = "macOS tiles windows when you drag them (%@) and competes with Rambla. Better turn it off in Desktop & Dock.";
 "Gesto del trackpad" = "Trackpad gesture";
 "El gesto de Rambla está desactivado: no hay conflicto." = "Rambla’s gesture is off: no conflict.";
-"macOS también cambia de escritorio con 4 dedos: su opción «3 dedos» de «Cambiar entre apps en pantalla completa» activa también el de 4, y Ajustes no deja apagar solo ese." = "macOS also switches desktops with four fingers: its three-finger option for “Swipe between full-screen applications” turns on the four-finger swipe too, and System Settings cannot turn off just that one.";
+"macOS también cambia de escritorio con 4 dedos: su opción «3 dedos» de «Cambiar entre apps en pantalla completa» activa también el de 4, y Configuración del Sistema no deja apagar solo ese." = "macOS also switches desktops with four fingers: its three-finger option for “Swipe between full-screen applications” turns on the four-finger swipe too, and System Settings cannot turn off just that one.";
 "«%@» lo apaga y macOS sigue cambiando de escritorio con 3 dedos." = "“%@” turns it off, and macOS keeps switching desktops with three fingers.";
 "Elegí «Desactivado» en Trackpad → Más gestos, o pasá Rambla a 3 dedos y macOS a «4 dedos»." = "Choose Off in Trackpad → More Gestures, or set Rambla to three fingers and macOS to four.";
 "macOS cambia de escritorio con 4 dedos, el mismo gesto que usa Rambla." = "macOS switches desktops with four fingers, the same gesture Rambla uses.";

@@ -106,7 +106,7 @@ enum SystemChecks {
         alert.informativeText = vertical
             ? String(localized: "Cambialo en Configuración del Sistema → Trackpad → Más gestos: elegí otra cantidad de dedos o «Desactivado» para Mission Control.")
             : String(localized: "Cambialo en Configuración del Sistema → Trackpad → Más gestos: elegí «Desactivado» en «Cambiar entre apps en pantalla completa».")
-        alert.addButton(withTitle: String(localized: "Abrir Ajustes"))
+        alert.addButton(withTitle: String(localized: "Abrir Configuración del Sistema"))
         alert.addButton(withTitle: String(localized: "Cerrar"))
         if alert.runModal() == .alertFirstButtonReturn { NSWorkspace.shared.open(MacChecks.trackpadURL) }
     }

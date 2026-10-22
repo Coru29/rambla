@@ -117,7 +117,7 @@ Modificador base **⌃⌘** y **⌃⌘⇧** para la variante "mover". Ninguno ch
 
 - Un swipe horizontal de N dedos (3 o 4, default 4) desplaza la tira siguiendo los dedos. Al soltar, la tira se asienta alineando el borde de columna más cercano y enfoca la columna más visible.
 - La dirección es natural (el contenido sigue a los dedos) y la sensibilidad es configurable.
-- macOS también recibe el gesto y no se puede bloquear. Configuración → Mac avisa si el gesto de escritorios de macOS usa la misma cantidad de dedos y ofrece abrir Ajustes del Trackpad.
+- macOS también recibe el gesto y no se puede bloquear. Configuración → Mac avisa si el gesto de escritorios de macOS usa la misma cantidad de dedos y ofrece abrir la configuración del Trackpad.
 
 ### Barra indicadora
 

@@ -233,7 +233,7 @@ public enum MacChecks {
         let problem: String, remedy: String
         switch fingers {
         case 4 where fourSwitches && threeSwitches:
-            problem = String(localized: "macOS también cambia de escritorio con 4 dedos: su opción «3 dedos» de «Cambiar entre apps en pantalla completa» activa también el de 4, y Ajustes no deja apagar solo ese.")
+            problem = String(localized: "macOS también cambia de escritorio con 4 dedos: su opción «3 dedos» de «Cambiar entre apps en pantalla completa» activa también el de 4, y Configuración del Sistema no deja apagar solo ese.")
             remedy = canFix
                 ? String(localized: "«\(button)» lo apaga y macOS sigue cambiando de escritorio con 3 dedos.")
                 : String(localized: "Elegí «Desactivado» en Trackpad → Más gestos, o pasá Rambla a 3 dedos y macOS a «4 dedos».")

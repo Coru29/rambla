@@ -78,7 +78,7 @@ struct WelcomeAccessibilityPage: View {
                 if model.isTrusted {
                     Text("Listo, Rambla ya puede acomodar tus ventanas.")
                 } else {
-                    Text("Activá Rambla en la lista de Ajustes y volvé acá: esta ventana se actualiza sola.")
+                    Text("Activá Rambla en la lista de Configuración del Sistema y volvé acá: esta ventana se actualiza sola.")
                 }
             }
             .foregroundStyle(.secondary)
@@ -125,7 +125,7 @@ struct WelcomeTrackpadPage: View {
                 ForEach(rows) { WelcomeCheckRow(check: $0, onFix: reload) }
             }
             .padding(.horizontal, 2)
-            Button("Abrir Ajustes del Trackpad") {
+            Button("Abrir la configuración del Trackpad") {
                 NSWorkspace.shared.open(MacChecks.trackpadURL)
             }
             Spacer(minLength: 0)

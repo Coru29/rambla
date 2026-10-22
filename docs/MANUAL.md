@@ -46,7 +46,7 @@ En macOS, cada ventana nueva se encima con las demás o te obliga a achicarlas. 
 
 1. Abrí el `.dmg` y arrastrá **Rambla** a la carpeta **Aplicaciones**.
 2. Abrí Rambla desde Aplicaciones. Va a aparecer un ícono en la barra de menú: tres ventanas sobre la rambla. La primera vez se abre también una guía corta (**Bienvenida**) que te acompaña con el permiso, el trackpad y los atajos básicos; la volvés a abrir desde el menú cuando quieras.
-3. macOS te pide el permiso de **Accesibilidad**, que es lo que permite mover ventanas de otras apps. Andá a **Configuración del Sistema → Privacidad y seguridad → Accesibilidad** y activá **Rambla**. Si no aparece el aviso, el menú de Rambla tiene "Abrir configuración de Accesibilidad…".
+3. macOS te pide el permiso de **Accesibilidad**, que es lo que permite mover ventanas de otras apps. Andá a **Configuración del Sistema → Privacidad y seguridad → Accesibilidad** y activá **Rambla**. Si no aparece el aviso, el menú de Rambla tiene "Abrir la configuración de Accesibilidad…".
 4. Listo: Rambla detecta el permiso sola y ordena tus ventanas.
 
 > Rambla no está notarizada por Apple, así que la primera vez macOS no la abre. Andá a **Configuración del Sistema → Privacidad y seguridad** y tocá **«Abrir de todos modos»**. En macOS 14 alcanza con click derecho en la app → **Abrir**.
@@ -153,7 +153,7 @@ Una columna puede tener varias ventanas.
 
 **Deslizar con el trackpad.** Deslizá con **cuatro dedos** a izquierda o derecha (podés cambiarlo a tres): la tira sigue tus dedos y al soltar se asienta en una columna. Un deslizamiento corto y rápido alcanza para pasar a la siguiente.
 
-> macOS también usa ese gesto para cambiar de escritorio y Rambla no lo puede bloquear. Ojo con una trampa de Ajustes: en **«Cambiar entre apps en pantalla completa»**, la opción **«3 dedos»** deja activo también el gesto de 4 dedos, aunque no lo muestre. Elegí una de estas opciones:
+> macOS también usa ese gesto para cambiar de escritorio y Rambla no lo puede bloquear. Ojo con una trampa de Configuración del Sistema: en **«Cambiar entre apps en pantalla completa»**, la opción **«3 dedos»** deja activo también el gesto de 4 dedos, aunque no lo muestre. Elegí una de estas opciones:
 >
 > - **Cuatro dedos para Rambla (recomendado):** en Configuración → Trackpad y mouse, tocá **«Apagarlo en macOS»**. Rambla apaga solo el gesto de 4 dedos de macOS, y el de 3 dedos sigue cambiando de escritorio. A mano, lo más parecido es elegir **«Desactivado»** en Configuración del Sistema → Trackpad → Más gestos → «Cambiar entre apps en pantalla completa», y cambiar de escritorio con ⌃← / ⌃→.
 > - **Tres dedos para Rambla:** en Configuración del Sistema → Trackpad → Más gestos, poné «Cambiar entre apps en pantalla completa» en **«4 dedos»** y «Cambiar de página» en **2 dedos**. Después elegí tres dedos en Configuración → Trackpad y mouse. Esta opción no sirve si usás «arrastrar con tres dedos».
@@ -205,7 +205,7 @@ Abrila desde el ícono de la barra de menú → **Configuración…**. Mientras 
 | **Apariencia** | Barra indicadora, borde de foco, atenuar inactivas, mouse ↔ foco |
 | **Apps** | Reglas por app: que flote siempre (ideal para calculadoras, reproductores o chats chiquitos), ancho inicial y dónde se abren sus ventanas (al lado de la enfocada, al principio o al final) |
 | **Pantallas** | Activar o desactivar Rambla en cada monitor |
-| **Mac** | Revisa los ajustes de macOS que afectan a Rambla (permiso, Spaces, Organizador visual, gestos, Rectangle) y te lleva al panel de Configuración que corresponda |
+| **Mac** | Revisa los ajustes de macOS que afectan a Rambla (permiso, Spaces, Organizador visual, gestos, Rectangle) y te lleva al panel de Configuración del Sistema que corresponda |
 | **Automatización** | Instalar el comando `rambla` y exportar scripts de Raycast |
 | **Acerca de** | Versión, enlace al proyecto y registro |
 
@@ -257,7 +257,7 @@ Los enlaces también sirven en Atajos de Apple, Alfred, Keyboard Maestro, Better
 
 **Una ventana salió sola de la tira.** Otra app la movió (Rectangle, un doble click en la barra de título, el botón verde con ⌥). Es a propósito: Rambla no pelea con otras apps. Devolvela con ⌃⌘T.
 
-**Deslizar con el trackpad cambia de escritorio.** macOS usa el mismo gesto, aunque Ajustes diga «3 dedos»: mirá la [sección 10](#10-mouse-y-trackpad).
+**Deslizar con el trackpad cambia de escritorio.** macOS usa el mismo gesto, aunque Configuración del Sistema diga «3 dedos»: mirá la [sección 10](#10-mouse-y-trackpad).
 
 **Un atajo no hace nada.** Puede que otra app ya lo use. Revisá Configuración → Atajos, que marca los que macOS no dejó registrar, y cambialo por otro.
 
