@@ -14,7 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var gestures = GestureTracker(
         onBegin: { [weak self] in self?.engine.gestureBegan() },
         onChange: { [weak self] dx in self?.engine.gestureChanged(dx) },
-        onEnd: { [weak self] in self?.engine.gestureEnded() })
+        onEnd: { [weak self] velocity in self?.engine.gestureEnded(velocity: velocity) })
     private lazy var mouseFocus = MouseFocus { [weak self] point in self?.engine.hover(at: point) }
     private var overlays: OverlayCoordinator?
     private let settingsBackend = AppSettingsBackend()

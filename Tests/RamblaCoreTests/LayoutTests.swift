@@ -228,6 +228,60 @@ import CoreGraphics
         #expect(collapsed.column == nil)
     }
 
+    // MARK: - Settle after a flick
+
+    /// Five 50 % columns at xs 0, 505, 1010, 1515 and 2020 (total 2515): the strip can scroll to 1515.
+    func fiveColumns() -> Strip {
+        Strip(columns: (1...5).map { Column(windows: [WindowID($0)], width: .fraction(0.5)) }, focused: 0)
+    }
+
+    @Test func settleWithoutVelocityIsThePlainSettle() {
+        let m = Layout.metrics(input(fiveColumns()))
+        for scroll in [-100.0, 0, 200, 252.5, 300, 760, 1300, 5000] {
+            let plain = Layout.settle(m, scroll: scroll)
+            let still = Layout.settle(m, scroll: scroll, velocity: 0)
+            #expect(still.scroll == plain.scroll && still.column == plain.column, "scroll \(scroll)")
+        }
+    }
+
+    @Test func aFlickReachesTheNextColumnAfterAShortMove() {
+        // 400 pt/s is past the flick threshold of 0.3 area widths per second (300 pt/s here).
+        let m = Layout.metrics(input(fiveColumns()))
+        let forward = Layout.settle(m, scroll: 600, velocity: 400)     // the nearest column is still 505
+        #expect(forward.scroll == 1010 && forward.column == 2)
+        let back = Layout.settle(m, scroll: 450, velocity: -400)       // the nearest column is still 505
+        #expect(back.scroll == 0 && back.column == 0)
+    }
+
+    @Test func aSlowReleaseSettlesOnTheNearestColumn() {
+        let m = Layout.metrics(input(fiveColumns()))
+        let slow = Layout.settle(m, scroll: 600, velocity: 200)        // glides 20 pt, to 620
+        #expect(slow.scroll == 505 && slow.column == 1)
+    }
+
+    @Test func theFlickDirectionBeatsTheNearestColumn() {
+        let m = Layout.metrics(input(fiveColumns()))
+        let r = Layout.settle(m, scroll: 900, velocity: -400)          // 1010 is nearer, but the flick goes left
+        #expect(r.scroll == 505 && r.column == 1)
+    }
+
+    @Test func aFastFlickGlidesPastSeveralColumns() {
+        let m = Layout.metrics(input(fiveColumns()))
+        let r = Layout.settle(m, scroll: 600, velocity: 9000)          // glides 900 pt, to 1500
+        #expect(r.scroll == 1515)
+        #expect(r.column == 3)                                         // columns 3 and 4 tie: the lower index wins
+    }
+
+    @Test func aFlickStopsAtTheEndsOfTheStrip() {
+        let m = Layout.metrics(input(fiveColumns()))
+        let end = Layout.settle(m, scroll: 1515, velocity: 4000)
+        #expect(end.scroll == 1515)
+        let start = Layout.settle(m, scroll: 0, velocity: -4000)
+        #expect(start.scroll == 0 && start.column == 0)
+        let none = Layout.settle(Layout.metrics(input(Strip())), scroll: 40, velocity: 4000)
+        #expect(none.scroll == 0 && none.column == nil)
+    }
+
     @Test func dropIndexCases() {
         let m = Layout.metrics(input(threeColumns()))
         #expect(Layout.dropIndex(m, stripX: 1300, dragging: 0) == 2)

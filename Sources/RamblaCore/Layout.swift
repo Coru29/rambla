@@ -124,11 +124,36 @@ public enum Layout {
     /// Snaps `scroll` to the left edge of the nearest laid-out column (clamped to the strip) and reports
     /// which column then shows the most. Ties go to the lower index. Column is nil without laid-out columns.
     public static func settle(_ m: StripMetrics, scroll: Double) -> (scroll: Double, column: Int?) {
+        settle(m, scroll: scroll, velocity: 0)
+    }
+
+    /// How long a released strip keeps gliding at its release speed before it snaps (seconds).
+    static let flickGlide = 0.1
+    /// Release speeds from this many scroll-area widths per second on count as a flick.
+    static let flickSpeed = 0.3
+
+    /// Like `settle(_:scroll:)` for a strip let go while moving at `velocity` (scroll units per second, positive
+    /// toward later columns). The strip glides on for `flickGlide` before snapping, so a fast flick can pass
+    /// several columns, and a flick always lands at least on the next column in its direction: a short quick
+    /// swipe changes column, like swiping between desktops.
+    public static func settle(_ m: StripMetrics, scroll: Double, velocity: Double) -> (scroll: Double, column: Int?) {
         let laidOut = m.xs.indices.filter { m.isLaidOut($0) }
-        guard var nearest = laidOut.first else { return (0, nil) }
+        guard !laidOut.isEmpty else { return (0, nil) }
         let w = Double(m.area.width)
-        for i in laidOut where abs(m.xs[i] - scroll) < abs(m.xs[nearest] - scroll) { nearest = i }
-        let target = min(max(m.xs[nearest], 0), max(0, m.total - w))
+        let maxScroll = max(0, m.total - w)
+        let stops = laidOut.map { min(max(m.xs[$0], 0), maxScroll) }
+
+        let glided = scroll + velocity * flickGlide
+        var target = stops[0]
+        for stop in stops where abs(stop - glided) < abs(target - glided) { target = stop }
+        let epsilon = 0.5
+        if abs(velocity) >= flickSpeed * w {
+            if velocity > 0, target <= scroll + epsilon, let next = stops.first(where: { $0 > scroll + epsilon }) {
+                target = next
+            } else if velocity < 0, target >= scroll - epsilon, let previous = stops.last(where: { $0 < scroll - epsilon }) {
+                target = previous
+            }
+        }
 
         var best: Int?
         var bestVisible = -1.0

@@ -1,4 +1,5 @@
 import AppKit
+import RamblaCore
 
 private let tapCallback: CGEventTapCallBack = { _, type, event, userInfo in
     guard let userInfo else { return Unmanaged.passUnretained(event) }
@@ -8,12 +9,13 @@ private let tapCallback: CGEventTapCallBack = { _, type, event, userInfo in
 }
 
 /// Horizontal N-finger swipes on the trackpad, read from a listen-only event tap of gesture events
-/// (it never blocks or alters input). The tap exists only while the feature is on.
+/// (it never blocks or alters input). The tap exists only while the feature is on. Positions are the fingers'
+/// mean x on the trackpad, from 0 (left edge) to 1 (right edge); the release velocity is in those units per second.
 @MainActor
 final class GestureTracker {
     private let onBegin: () -> Void
     private let onChange: (_ dx: Double) -> Void
-    private let onEnd: () -> Void
+    private let onEnd: (_ velocity: Double) -> Void
 
     private var tap: CFMachPort?
     private var source: CFRunLoopSource?
@@ -21,8 +23,10 @@ final class GestureTracker {
     private var start: CGPoint?
     private var last: CGPoint?
     private var active = false
+    private var velocity = VelocityTracker()
 
-    init(onBegin: @escaping () -> Void, onChange: @escaping (_ dx: Double) -> Void, onEnd: @escaping () -> Void) {
+    init(onBegin: @escaping () -> Void, onChange: @escaping (_ dx: Double) -> Void,
+         onEnd: @escaping (_ velocity: Double) -> Void) {
         self.onBegin = onBegin
         self.onChange = onChange
         self.onEnd = onEnd
@@ -54,14 +58,16 @@ final class GestureTracker {
         if let source { CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes) }
         tap = nil
         source = nil
-        reset()
+        reset(at: ProcessInfo.processInfo.systemUptime)
     }
 
-    private func reset() {
-        if active { onEnd() }
+    /// Ends the swipe (if one was under way) at `time`, the moment the fingers lifted or changed in number.
+    private func reset(at time: TimeInterval) {
+        if active { onEnd(velocity.velocity(at: time)) }
         active = false
         start = nil
         last = nil
+        velocity.reset()
     }
 
     fileprivate func handle(type: CGEventType, event: CGEvent) {
@@ -72,7 +78,7 @@ final class GestureTracker {
         guard let nsEvent = NSEvent(cgEvent: event), nsEvent.type == .gesture else { return }
         let touching = nsEvent.touches(matching: .touching, in: nil)
         guard touching.count == fingers else {
-            reset()
+            reset(at: nsEvent.timestamp)
             return
         }
         let count = Double(touching.count)
@@ -92,5 +98,6 @@ final class GestureTracker {
         }
         if let last { onChange(mean.x - last.x) }
         last = mean
+        velocity.add(mean.x, at: nsEvent.timestamp)
     }
 }

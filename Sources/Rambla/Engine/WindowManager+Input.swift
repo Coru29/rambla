@@ -1,32 +1,51 @@
 import AppKit
 import RamblaCore
 
-/// Trackpad swipes and focus-follows-mouse.
+/// Trackpad swipes, the mouse wheel and focus-follows-mouse.
 extension WindowManager {
+    /// Scroll-area widths the strip travels when the fingers cross the whole trackpad, at sensitivity 1×:
+    /// a comfortable four-finger swipe (about a quarter of the trackpad) moves a bit more than half a screen.
+    static let trackpadGain = 2.5
+
+    /// A slide starts on the strip under the pointer (the trackpad and the mouse wheel both act where you look).
     func gestureBegan() {
         guard isRunning, !isPaused else { return }
-        let mouse = Displays.axPoint(NSEvent.mouseLocation)
-        let display = enabledDisplays.first { $0.frame.contains(mouse) }
-        gestureKey = display.flatMap(currentKey) ?? activeStripKey()
+        gestureKey = stripKeyUnderPointer()
         if let key = gestureKey { strips[key]?.allWindows.forEach(animator.cancel) }
     }
 
+    /// Fingers moved `dx` on the trackpad (a fraction of its width).
     func gestureChanged(_ dx: Double) {
-        guard let key = gestureKey, var strip = strips[key], let width = results[key]?.metrics.area.width else { return }
-        let direction: Double = prefs.trackpad.natural ? 1 : -1
-        strip.scroll -= dx * width * 1.5 * prefs.trackpad.sensitivity * direction
+        guard let width = gestureKey.flatMap({ results[$0]?.metrics.area.width }) else { return }
+        slide(by: -dx * width * trackpadScale)
+    }
+
+    /// The fingers lifted, moving at `velocity` trackpad widths per second.
+    func gestureEnded(velocity: Double) {
+        let width = gestureKey.flatMap { results[$0]?.metrics.area.width } ?? 0
+        slideEnded(velocity: -velocity * width * trackpadScale)
+    }
+
+    /// Moves the strip being slid by `points` toward later columns.
+    func slide(by points: Double) {
+        guard let key = gestureKey, var strip = strips[key] else { return }
+        strip.scroll += points
         strips[key] = strip
         apply(key, animate: false, verify: false)
         indicatorHook?(key, nil)
     }
 
-    /// Settles on the nearest column edge and focuses the most visible column, without another scroll.
-    func gestureEnded() {
+    /// Settles on a column edge (carrying the release `velocity`, in points per second, so a flick reaches the next
+    /// column) and focuses the most visible column, without another scroll.
+    func slideEnded(velocity: Double) {
         guard let key = gestureKey else { return }
         gestureKey = nil
         guard var strip = strips[key], let display = display(for: key) else { return }
         let metrics = Layout.metrics(layoutInput(for: key, strip: strip, display: display))
-        let settled = Layout.settle(metrics, scroll: strip.scroll)
+        let settled = Layout.settle(metrics, scroll: strip.scroll, velocity: velocity)
+        let width = max(Double(metrics.area.width), 1)
+        Log.info(String(format: "Slide released at %.2f widths/s: %.2f → %.2f widths", velocity / width,
+                        strip.scroll / width, settled.scroll / width))
         strip.scroll = settled.scroll
         if let column = settled.column, let window = strip.columns[column].activeWindow {
             strip.focused = column
@@ -36,6 +55,23 @@ extension WindowManager {
         // Next to a pinned column the settled one can still poke under the pin (and be parked):
         // a minimal reveal keeps the focused window on screen.
         reveal(key, animate: true, mode: .never)
+        onStateChanged?()
+    }
+
+    /// One notch of the mouse wheel with the chosen keys held: focus the next column (`direction` > 0) or the
+    /// previous one of the strip under the pointer, like the keyboard shortcuts do.
+    func wheelStep(_ direction: Int) {
+        guard isRunning, !isPaused, gestureKey == nil, let key = stripKeyUnderPointer(), var strip = strips[key] else { return }
+        Log.info("Wheel step \(direction > 0 ? "right" : "left")")
+        let before = strip.focusedWindow
+        strip.focusColumn(direction > 0 ? .right : .left, hidden: hidden[key] ?? [])
+        strips[key] = strip
+        if let target = strip.focusedWindow, target != before || target != focusedWindow {
+            focus(window: target, in: key)
+        } else {
+            reveal(key)
+        }
+        indicatorHook?(key, nil)
         onStateChanged?()
     }
 
@@ -59,5 +95,20 @@ extension WindowManager {
         focusedWindow = id
         worker(for: id)?.focus(id)
         overlayHook?()
+    }
+
+    // MARK: - Helpers
+
+    /// Strip points per trackpad width: the gain, the user's sensitivity and the direction (natural: the strip
+    /// follows the fingers, so fingers moving left scroll toward later columns).
+    private var trackpadScale: Double {
+        Self.trackpadGain * prefs.trackpad.sensitivity * (prefs.trackpad.natural ? 1 : -1)
+    }
+
+    /// The strip of the display under the pointer, or the active one when the pointer is on no managed display.
+    private func stripKeyUnderPointer() -> StripKey? {
+        let mouse = Displays.axPoint(NSEvent.mouseLocation)
+        let display = enabledDisplays.first { $0.frame.contains(mouse) }
+        return display.flatMap(currentKey) ?? activeStripKey()
     }
 }
