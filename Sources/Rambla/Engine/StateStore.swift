@@ -89,8 +89,13 @@ extension WindowManager {
             strips[key] = restored
             Log.info("Restored \(restored.allWindows.count) windows on display \(key.displayUUID.prefix(8))")
         }
-        for (savedID, liveID) in matches where state.floating.contains(savedID) && !floatingRestored.contains(liveID) {
-            floatingRestored.insert(liveID)
+        // Each saved floating window floats one live window, once. Titles only count while apps are still bringing
+        // their windows back after Rambla starts; later, a window with the same title is a new one.
+        let pending = state.refs.filter { pendingFloating.contains($0.id) }
+        guard !pending.isEmpty else { return }
+        let startingUp = CFAbsoluteTimeGetCurrent() - launchTime < Self.restoreByTitleWindow
+        for (savedID, liveID) in StateMatcher.match(saved: pending, live: live, byTitle: startingUp) {
+            pendingFloating.remove(savedID)
             markFloating(liveID)
         }
     }

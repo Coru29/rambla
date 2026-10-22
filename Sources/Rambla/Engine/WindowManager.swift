@@ -68,7 +68,11 @@ final class WindowManager {
     /// Saved layout from the previous run; strips are rebuilt from it the first time each one is seen.
     var restoreState: SavedState?
     var restoredKeys: Set<StripKey> = []
-    var floatingRestored: Set<WindowID> = []
+    /// Saved ids of the floating windows not matched yet; each one floats a single live window.
+    var pendingFloating: Set<WindowID> = []
+    /// When Rambla started: saved windows are matched by title only for `restoreByTitleWindow` seconds after it.
+    var launchTime: CFAbsoluteTime = 0
+    static let restoreByTitleWindow: CFAbsoluteTime = 15
     /// Floating windows that Rambla floated by itself because another app moved them (Rectangle, a snap after a
     /// drag). Unlike the ones the user floats, they are not saved, and "Reacomodar ventanas" puts them back.
     var autoFloated: Set<WindowID> = []
@@ -92,6 +96,8 @@ final class WindowManager {
         displays = Displays.current()
         frontmostPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
         restoreState = StateStore.load()
+        pendingFloating = Set(restoreState?.floating ?? [])
+        launchTime = CFAbsoluteTimeGetCurrent()
         observeSystem()
         NSWorkspace.shared.runningApplications.forEach(register)
         if let only = onlyBundles { Log.info("Test mode: managing only \(only.sorted().joined(separator: ", "))") }

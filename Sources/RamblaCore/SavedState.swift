@@ -62,8 +62,9 @@ public enum StateMatcher {
     /// Maps saved window ids to the live windows they most likely are; saved windows with no match are absent.
     /// Pass 1 pairs windows with the same id and the same app (same login session). Pass 2 pairs what is left by app
     /// and identical non-empty title, in order (after a restart). Each live window is used at most once, and pass 1
-    /// claims its windows first so a title match can never steal a window whose id is known.
-    public static func match(saved: [WindowRef], live: [WindowRef]) -> [WindowID: WindowID] {
+    /// claims its windows first so a title match can never steal a window whose id is known. Without `byTitle` only
+    /// pass 1 runs: past the first moments of a session, a new window sharing a saved title is a different window.
+    public static func match(saved: [WindowRef], live: [WindowRef], byTitle: Bool = true) -> [WindowID: WindowID] {
         var mapping: [WindowID: WindowID] = [:]
         var claimed = Set<Int>()   // indices into `live`
 
@@ -77,7 +78,7 @@ public enum StateMatcher {
             claimed.insert(index)
         }
 
-        for ref in saved where mapping[ref.id] == nil && !ref.title.isEmpty {
+        for ref in saved where byTitle && mapping[ref.id] == nil && !ref.title.isEmpty {
             guard let index = live.indices.first(where: {
                 !claimed.contains($0) && live[$0].bundleID == ref.bundleID && live[$0].title == ref.title
             }) else { continue }

@@ -208,3 +208,14 @@ private func savedColumn(_ windows: [WindowID], _ width: ColumnWidth = .fraction
     let state = SavedState(floating: [7, 8])
     #expect(state.upgraded() == state)
 }
+
+@Test func matcherCanLeaveTitlesOut() {
+    // After the first moments of a session, a new window that happens to share a saved title must not inherit its
+    // place (a floating "zsh" would make every new Terminal window float).
+    let saved = [WindowRef(id: 1, bundleID: "com.apple.Terminal", title: "zsh"),
+                 WindowRef(id: 2, bundleID: "com.apple.Safari", title: "Apple")]
+    let live = [WindowRef(id: 9, bundleID: "com.apple.Terminal", title: "zsh"),
+                WindowRef(id: 2, bundleID: "com.apple.Safari", title: "Apple")]
+    #expect(StateMatcher.match(saved: saved, live: live) == [1: 9, 2: 2])
+    #expect(StateMatcher.match(saved: saved, live: live, byTitle: false) == [2: 2])
+}
