@@ -21,12 +21,14 @@ if printf '%s\n' "$OUT" | grep -q ": error:"; then
 fi
 
 # Fallback: build the test product and load it with the custom runner.
+echo "swift test ran no Swift Testing tests (exit $STATUS); its last lines:" >&2
+printf '%s\n' "$OUT" | tail -n 15 >&2
 swift build --product RamblaPackageTests >/dev/null 2>&1 || { swift build --product RamblaPackageTests; exit 1; }
 BUNDLE=$(find .build -type f -path "*RamblaPackageTests.xctest/Contents/MacOS/RamblaPackageTests" -not -path "*.dSYM*" -print0 2>/dev/null \
   | xargs -0 ls -t 2>/dev/null | head -n 1)
 if [ -z "$BUNDLE" ]; then
   echo "No se encontró el bundle de tests. Contenido de .build:" >&2
-  find .build -maxdepth 5 -name "*PackageTests*" >&2
+  find .build -maxdepth 6 \( -name "*PackageTests*" -o -name "*.xctest" \) >&2
   exit 1
 fi
 RUNNER=.build/test-runner
