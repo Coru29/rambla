@@ -14,12 +14,12 @@ struct MacView: View {
                         .foregroundStyle(.secondary)
                 }
                 ForEach(checks.results) { result in
-                    CheckRow(result: result)
+                    CheckRow(result: result, onFix: refresh)
                 }
             } header: {
                 Text("Estado de macOS")
             } footer: {
-                Text("Rambla no cambia estos ajustes: solo te avisa cuáles conviene tocar.")
+                Text("Rambla no cambia estos ajustes por su cuenta: te avisa cuáles conviene tocar y, cuando puede, lo hace con un botón.")
             }
             Section {
                 HStack {

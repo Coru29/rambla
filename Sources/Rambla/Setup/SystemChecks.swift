@@ -9,6 +9,8 @@ struct CheckResult: Identifiable {
     let status: Status
     let detail: String
     let settingsURL: URL?
+    /// A change Rambla can make itself, offered as a button on the row.
+    let fix: MacCheck.Fix?
 }
 
 /// Reads macOS settings that affect Rambla ("Configuración → Mac").
@@ -38,6 +40,7 @@ enum SystemChecks {
             threeFingerSwipe: trackpadDomains.compactMap { integer("TrackpadThreeFingerHorizSwipeGesture", in: $0) },
             fourFingerSwipe: trackpadDomains.compactMap { integer("TrackpadFourFingerHorizSwipeGesture", in: $0) },
             threeFingerDrag: trackpadDomains.compactMap { flag("TrackpadThreeFingerDrag", in: $0) },
+            canChangeTrackpadGestures: TrackpadGestureSettings.isAvailable,
             rectangle: isRectangleRunning ? .running(conflicts: rectangleConflicts(prefs: prefs)) : .notRunning)
     }
 
@@ -76,6 +79,27 @@ enum SystemChecks {
         case .warning: status = .warning
         case .info: status = .info
         }
-        return CheckResult(id: check.id, title: check.title, status: status, detail: check.detail, settingsURL: check.settingsURL)
+        return CheckResult(id: check.id, title: check.title, status: status, detail: check.detail,
+                           settingsURL: check.settingsURL, fix: check.fix)
+    }
+
+    /// Makes the change behind a row's button. If macOS does not take it, says so and opens the pane to do it by hand.
+    @MainActor
+    static func apply(_ fix: MacCheck.Fix) {
+        switch fix {
+        case .turnOffSwipe(let fingers):
+            if TrackpadGestureSettings.turnOffSwipe(fingers: fingers) {
+                Log.info("Turned off the macOS \(fingers)-finger horizontal swipe")
+                return
+            }
+            Log.error("Could not turn off the macOS \(fingers)-finger horizontal swipe")
+            NSApp.activate()
+            let alert = NSAlert()
+            alert.messageText = "No se pudo cambiar el gesto de macOS"
+            alert.informativeText = "Cambialo en Ajustes del Sistema → Trackpad → Más gestos: elegí «Desactivado» en «Cambiar entre apps en pantalla completa»."
+            alert.addButton(withTitle: "Abrir Ajustes")
+            alert.addButton(withTitle: "Cerrar")
+            if alert.runModal() == .alertFirstButtonReturn { NSWorkspace.shared.open(MacChecks.trackpadURL) }
+        }
     }
 }

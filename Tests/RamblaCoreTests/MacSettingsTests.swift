@@ -152,7 +152,8 @@ private func conflict(_ action: Action, _ rectangleAction: String = "leftHalf") 
         (3, [2], [0], true),
         (3, [], [2], false),           // the four-finger setting is irrelevant to a three-finger Rambla gesture
         (3, [0], [2], false),
-        (3, [1], [2], false),          // 1 is "swipe between pages", not Spaces
+        (3, [1], [2], true),           // 1 is "swipe between pages": the browser would go back while the strip slides
+        (4, [1], [0], false),          // …which only ever uses three fingers
         (3, [0, 2], [], true),
         (4, [2, 2], [2, 2], true),     // the user's Mac, with the default gesture
         (3, [2, 2], [2, 2], true),     // the user's Mac, after switching Rambla to three fingers
@@ -169,17 +170,62 @@ private func conflict(_ action: Action, _ rectangleAction: String = "leftHalf") 
     }
 }
 
-@Test func macChecksTrackpadWarningNamesTheGestureAndOpensTheTrackpadPane() throws {
+private func trackpadRow(three: [Int], four: [Int], fingers: Int, canChange: Bool) throws -> MacCheck {
     var mac = tidyMac()
-    mac.threeFingerSwipe = [2]
-    mac.fourFingerSwipe = [2]
-    for fingers in [3, 4] {
-        let check = try row("trackpad-gesture", in: MacChecks.evaluate(mac, trackpad: TrackpadPrefs(fingers: fingers)))
-        #expect(check.status == .warning)
-        #expect(check.detail.contains("macOS también cambia de escritorio con ese gesto"))
-        #expect(check.detail.contains("\(fingers) dedos"))
-        #expect(check.settingsURL == MacChecks.trackpadURL)
+    mac.threeFingerSwipe = three
+    mac.fourFingerSwipe = four
+    mac.canChangeTrackpadGestures = canChange
+    return try row("trackpad-gesture", in: MacChecks.evaluate(mac, trackpad: TrackpadPrefs(fingers: fingers)))
+}
+
+@Test func macChecksExplainThatTheThreeFingerOptionAlsoTurnsOnFour() throws {
+    // The user's Mac: Trackpad → Más gestos shows «3 dedos», which System Settings stores as 2 for both counts.
+    let fixable = try trackpadRow(three: [2, 2], four: [2, 2], fingers: 4, canChange: true)
+    #expect(fixable.status == .warning)
+    #expect(fixable.detail.contains("«3 dedos»"))
+    #expect(fixable.detail.contains("activa también el de 4"))
+    #expect(fixable.detail.contains("sigue cambiando de escritorio con 3"))
+    #expect(fixable.fix == .turnOffSwipe(fingers: 4))
+    #expect(fixable.settingsURL == MacChecks.trackpadURL)
+
+    let manual = try trackpadRow(three: [2, 2], four: [2, 2], fingers: 4, canChange: false)
+    #expect(manual.status == .warning)
+    #expect(manual.fix == nil)
+    #expect(manual.detail.contains("«Desactivado»"))
+    #expect(!manual.detail.contains(MacCheck.Fix.turnOffSwipe(fingers: 4).title))
+}
+
+@Test func macChecksFourFingerSwitchingAloneLeavesTheKeyboardForDesktops() throws {
+    let check = try trackpadRow(three: [0], four: [2], fingers: 4, canChange: true)
+    #expect(check.fix == .turnOffSwipe(fingers: 4))
+    #expect(check.detail.contains("⌃←"))
+    #expect(!check.detail.contains("«3 dedos»"))
+}
+
+@Test func macChecksThreeFingerConflictsNameTheMacOSGesture() throws {
+    let spaces = try trackpadRow(three: [2], four: [2], fingers: 3, canChange: true)
+    #expect(spaces.fix == .turnOffSwipe(fingers: 3))
+    #expect(spaces.detail.contains("cambia de escritorio con 3 dedos"))
+    #expect(spaces.detail.contains("sigue cambiando de escritorio con 4"))
+
+    let pages = try trackpadRow(three: [1], four: [0], fingers: 3, canChange: true)
+    #expect(pages.fix == .turnOffSwipe(fingers: 3))
+    #expect(pages.detail.contains("pasa de página con 3 dedos"))
+
+    let manualPages = try trackpadRow(three: [1], four: [0], fingers: 3, canChange: false)
+    #expect(manualPages.fix == nil)
+    #expect(manualPages.detail.contains("Cambiar de página"))
+}
+
+@Test func macChecksOfferAFixOnlyForAConflict() throws {
+    var mac = tidyMac()
+    mac.canChangeTrackpadGestures = true
+    for check in MacChecks.evaluate(mac, trackpad: TrackpadPrefs()) {
+        #expect(check.fix == nil, "row \(check.id)")
     }
+    let clear = try trackpadRow(three: [2], four: [0], fingers: 4, canChange: true)
+    #expect(clear.status == .ok)
+    #expect(clear.fix == nil)
 }
 
 @Test func macChecksTrackpadHasNoConflictWhileRamblaGestureIsOff() throws {

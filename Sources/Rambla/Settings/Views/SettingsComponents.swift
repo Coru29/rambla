@@ -84,9 +84,11 @@ final class ChecksModel: ObservableObject {
     }
 }
 
-/// One line of a checks list: status icon, title and detail, and a button that opens the matching System Settings pane.
+/// One line of a checks list: status icon, title and detail, and buttons to fix it (when Rambla can) or to open
+/// the matching System Settings pane. `onFix` runs after a fix, to read the system again.
 struct CheckRow: View {
     let result: CheckResult
+    var onFix: () -> Void = {}
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -105,8 +107,17 @@ struct CheckRow: View {
                 }
             }
             Spacer(minLength: 8)
-            if let url = result.settingsURL {
-                Button("Abrir Ajustes") { NSWorkspace.shared.open(url) }
+            VStack(alignment: .trailing, spacing: 6) {
+                if let fix = result.fix {
+                    Button(fix.title) {
+                        SystemChecks.apply(fix)
+                        onFix()
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                if let url = result.settingsURL {
+                    Button("Abrir Ajustes") { NSWorkspace.shared.open(url) }
+                }
             }
         }
     }

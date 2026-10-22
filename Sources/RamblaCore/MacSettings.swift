@@ -35,6 +35,9 @@ public struct MacSettings: Equatable, Sendable {
     public var fourFingerSwipe: [Int]
     /// `TrackpadThreeFingerDrag`, one entry for each domain that defines it.
     public var threeFingerDrag: [Bool]
+    /// Rambla can change the swipes above itself, through the back end of the Trackpad pane (private API, so a
+    /// macOS update could take it away). Without it, a conflict row explains how to change them by hand.
+    public var canChangeTrackpadGestures: Bool
     public var rectangle: RectangleStatus
 
     /// The defaults describe a Mac where every key is absent, nothing is granted and Rectangle is closed.
@@ -48,6 +51,7 @@ public struct MacSettings: Equatable, Sendable {
                 threeFingerSwipe: [Int] = [],
                 fourFingerSwipe: [Int] = [],
                 threeFingerDrag: [Bool] = [],
+                canChangeTrackpadGestures: Bool = false,
                 rectangle: RectangleStatus = .notRunning) {
         self.accessibilityTrusted = accessibilityTrusted
         self.displaysShareSpaces = displaysShareSpaces
@@ -59,6 +63,7 @@ public struct MacSettings: Equatable, Sendable {
         self.threeFingerSwipe = threeFingerSwipe
         self.fourFingerSwipe = fourFingerSwipe
         self.threeFingerDrag = threeFingerDrag
+        self.canChangeTrackpadGestures = canChangeTrackpadGestures
         self.rectangle = rectangle
     }
 }
@@ -67,19 +72,33 @@ public struct MacSettings: Equatable, Sendable {
 public struct MacCheck: Equatable, Sendable {
     public enum Status: Equatable, Sendable { case ok, warning, info }
 
+    /// A change Rambla can make itself, offered as a button on the row.
+    public enum Fix: Equatable, Sendable {
+        /// Turn off the macOS horizontal swipe with this many fingers (switching desktops or pages).
+        case turnOffSwipe(fingers: Int)
+
+        public var title: String {
+            switch self {
+            case .turnOffSwipe: return "Apagarlo en macOS"
+            }
+        }
+    }
+
     public var id: String
     public var title: String
     public var status: Status
     public var detail: String
     /// A System Settings pane that holds the setting, if there is one worth linking.
     public var settingsURL: URL?
+    public var fix: Fix?
 
-    public init(id: String, title: String, status: Status, detail: String, settingsURL: URL? = nil) {
+    public init(id: String, title: String, status: Status, detail: String, settingsURL: URL? = nil, fix: Fix? = nil) {
         self.id = id
         self.title = title
         self.status = status
         self.detail = detail
         self.settingsURL = settingsURL
+        self.fix = fix
     }
 }
 
@@ -91,6 +110,8 @@ public enum MacChecks {
 
     /// The macOS value of the swipe-between-full-screen-apps gesture, which is what switches Spaces.
     private static let switchSpacesGesture = 2
+    /// The macOS value of the three-finger swipe between pages (back and forward in browsers and Finder).
+    private static let swipePagesGesture = 1
     /// How many conflicting actions the Rectangle row names before it says "y N más".
     private static let namedConflicts = 3
 
@@ -168,29 +189,52 @@ public enum MacChecks {
                 : "macOS acomoda las ventanas al arrastrarlas (\(active.joined(separator: ", "))) y compite con Rambla. Conviene apagarlo en Escritorio y Dock.")
     }
 
-    /// Only the setting that matches Rambla's finger count matters: macOS switches Spaces with the three-finger swipe
-    /// or the four-finger swipe independently. Either trackpad (built-in or Magic Trackpad) can be the one in use,
-    /// and an absent key is not a conflict.
+    /// Only the swipe with Rambla's finger count matters. Three fingers collide with both "swipe between pages" (1)
+    /// and "swipe between full-screen apps" (2, which switches desktops); four fingers only ever switch desktops.
+    /// Either trackpad (built-in or Magic Trackpad) can be the one in use, and an absent key is not a conflict.
+    ///
+    /// The Trackpad pane hides one trap: its «3 dedos» option for full-screen apps stores 2 for both three and four
+    /// fingers, so a four-finger Rambla swipe also switches desktops while the pane reads «3 dedos», and the pane has
+    /// no way to turn off only the four-finger one. Rambla can (`Fix.turnOffSwipe`), when the back end is there.
     private static func trackpadGesture(_ s: MacSettings, _ trackpad: TrackpadPrefs) -> MacCheck {
         let id = "trackpad-gesture", title = "Gesto del trackpad"
         guard trackpad.enabled else {
             return MacCheck(id: id, title: title, status: .ok,
                             detail: "El gesto de Rambla está desactivado: no hay conflicto.", settingsURL: trackpadURL)
         }
-        let macOSValues: [Int]
-        switch trackpad.fingers {
-        case 3: macOSValues = s.threeFingerSwipe
-        case 4: macOSValues = s.fourFingerSwipe
-        default: macOSValues = []   // macOS has no horizontal swipe with any other number of fingers
+        let fingers = trackpad.fingers
+        let threeSwitches = s.threeFingerSwipe.contains(switchSpacesGesture)
+        let fourSwitches = s.fourFingerSwipe.contains(switchSpacesGesture)
+        let threePages = s.threeFingerSwipe.contains(swipePagesGesture)
+        let detail: String
+        switch fingers {
+        case 4 where fourSwitches && threeSwitches:
+            detail = "macOS también cambia de escritorio con 4 dedos: su opción «3 dedos» de «Cambiar entre apps en pantalla completa» activa también el de 4, y Ajustes no deja apagar solo ese. "
+                + (s.canChangeTrackpadGestures
+                    ? "«\(MacCheck.Fix.turnOffSwipe(fingers: 4).title)» lo apaga y macOS sigue cambiando de escritorio con 3 dedos."
+                    : "Elegí «Desactivado» en Trackpad → Más gestos, o pasá Rambla a 3 dedos y macOS a «4 dedos».")
+        case 4 where fourSwitches:
+            detail = "macOS cambia de escritorio con 4 dedos, el mismo gesto que usa Rambla. "
+                + (s.canChangeTrackpadGestures
+                    ? "«\(MacCheck.Fix.turnOffSwipe(fingers: 4).title)» lo apaga; para cambiar de escritorio quedan ⌃← y ⌃→."
+                    : "Elegí «Desactivado» en Trackpad → Más gestos → «Cambiar entre apps en pantalla completa».")
+        case 3 where threeSwitches:
+            detail = "macOS también cambia de escritorio con 3 dedos («Cambiar entre apps en pantalla completa»). "
+                + (s.canChangeTrackpadGestures
+                    ? "«\(MacCheck.Fix.turnOffSwipe(fingers: 3).title)» apaga ese gesto"
+                        + (fourSwitches ? " y macOS sigue cambiando de escritorio con 4 dedos." : "; para cambiar de escritorio quedan ⌃← y ⌃→.")
+                    : "Elegí «4 dedos» o «Desactivado» en Trackpad → Más gestos.")
+        case 3 where threePages:
+            detail = "macOS pasa de página con 3 dedos y lo haría a la vez que Rambla mueve la tira. "
+                + (s.canChangeTrackpadGestures
+                    ? "«\(MacCheck.Fix.turnOffSwipe(fingers: 3).title)» apaga ese gesto."
+                    : "Elegí «Ir a la izquierda o la derecha con 2 dedos» en Trackpad → Más gestos → «Cambiar de página».")
+        default:
+            return MacCheck(id: id, title: title, status: .ok,
+                            detail: "macOS no usa el deslizamiento horizontal de \(fingers) dedos.", settingsURL: trackpadURL)
         }
-        let conflict = macOSValues.contains(switchSpacesGesture)
-        return MacCheck(
-            id: id, title: title,
-            status: conflict ? .warning : .ok,
-            detail: conflict
-                ? "Rambla usa el deslizamiento horizontal con \(trackpad.fingers) dedos y macOS también cambia de escritorio con ese gesto. Conviene desactivarlo o pasarlo a otra cantidad de dedos en Trackpad → Más gestos (deslizar entre apps a pantalla completa)."
-                : "macOS no usa el deslizamiento de \(trackpad.fingers) dedos para cambiar de escritorio.",
-            settingsURL: trackpadURL)
+        return MacCheck(id: id, title: title, status: .warning, detail: detail, settingsURL: trackpadURL,
+                        fix: s.canChangeTrackpadGestures ? .turnOffSwipe(fingers: fingers) : nil)
     }
 
     /// Three-finger drag takes over every three-finger movement, so it only collides with a three-finger Rambla gesture.
