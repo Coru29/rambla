@@ -181,7 +181,7 @@ Con un solo botón (el del medio, por ejemplo), un clic sin mover sigue funciona
 - **Recomendado**: dejá activado "Las pantallas tienen Spaces separados" (viene así en macOS). Con dos monitores, lo ideal es poner el segundo **arriba o abajo** del principal en Ajustes del Sistema → Pantallas → Organizar. Lado a lado también funciona, pero las ventanas solo pueden asomarse hasta la mitad hacia el otro monitor antes de estacionarse.
 - Las ventanas en **pantalla completa** (botón verde) salen de la tira mientras están así y vuelven a su lugar cuando salís.
 - Las ventanas **minimizadas** o de apps **ocultas** (⌘H) dejan su lugar sin ocupar espacio y reaparecen en el mismo sitio.
-- Si una pantalla queda **desconectada más de 15 segundos** (por ejemplo, al sacar la notebook del dock), sus ventanas pasan a la tira de la pantalla a la que las mueve macOS. Cuando la pantalla vuelve, empieza con una tira nueva: el orden que tenía no se recupera. Si una desconexión dura menos (un cambio de resolución, un dock que tarda en despertar), no se pierde nada.
+- Si **desconectás una pantalla** (por ejemplo, al sacar la notebook del dock) y pasan más de 15 segundos, sus ventanas se suman a la tira de la pantalla donde las deja macOS. **Cuando la volvés a conectar, vuelven a su lugar**, en el mismo orden y con sus anchos; las ventanas que abriste mientras tanto quedan donde estaban. Mientras no vuelve, Rambla recuerda su orden hasta un mes, aunque reinicies.
 
 ## 12. Ayudas visuales
 

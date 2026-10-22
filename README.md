@@ -34,7 +34,7 @@ Every window is a column on one horizontal strip that keeps going past the edges
 - **Mouse**: hold ⌃⌘ and turn the wheel to go through the columns, or hold the mouse buttons you choose (the middle one, the side buttons 4 + 5 together…) and move the mouse: sideways slides the strip, up for full width, down to go back. Drag a window onto another column to reorder; resize it to set the column width. Gets along with Mac Mouse Fix.
 - **Focus border** and **dim inactive windows** (optional), focus follows mouse / mouse follows focus (optional).
 - **Per-app rules** (tile or float, initial width, where new windows open) and per-display on/off.
-- **Remembers the layout** across restarts; launch at login.
+- **Remembers the layout** across restarts, and when you plug a display back in, its windows return to their places; launch at login.
 - **Plays well with [Rectangle](https://rectangleapp.com)**: default shortcuts use ⌃⌘, so they don't clash with Rectangle's default ⌃⌥ set (with its Spectacle set a couple do, and Rambla tells you), and if Rectangle (or any other app) moves a window, that window leaves the strip and stays where it was put. The Mac page of the settings lists any shortcut that collides with your Rectangle setup.
 - **Automation**: `rambla://` URLs, a `rambla` command-line tool and Raycast script export.
 - **English and Spanish**: the interface follows your Mac's language.
@@ -94,10 +94,6 @@ Rambla checks these for you in **Settings → Mac**:
 - **Automatically rearrange Spaces based on most recent use**: off.
 - **Stage Manager** and **drag windows to screen edges to tile**: off.
 - With two displays, placing the second one **above or below** the main one works best. Side by side works too: windows only slide halfway toward the other display before they are parked.
-
-## Known limitations
-
-If a display stays disconnected for more than 15 seconds (unplugging a laptop from its dock, for example), its windows join the strip of the display macOS moves them to, and Rambla does not restore that display's arrangement when it comes back.
 
 ## Automation
 

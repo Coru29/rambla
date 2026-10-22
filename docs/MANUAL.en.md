@@ -181,7 +181,7 @@ With a single button (the middle one, say), a click without moving still works a
 - **Recommended**: keep "Displays have separate Spaces" on (the macOS default). With two monitors, ideally place the second one **above or below** the main one in System Settings → Displays → Arrange. Side by side works too, but windows can only peek halfway toward the other monitor before they are parked.
 - **Full-screen** windows (green button) leave the strip while they are full screen and come back to their place when you exit.
 - **Minimized** windows and windows of **hidden** apps (⌘H) leave their place without taking space and reappear in the same spot.
-- If a display stays **disconnected for more than 15 seconds** (unplugging a laptop from its dock, for example), its windows join the strip of the display macOS moves them to. When it comes back, it starts with a new strip: its old arrangement is not restored. A shorter absence (a resolution change, a dock slow to wake) loses nothing.
+- If you **unplug a display** (taking a laptop off its dock, for example) and more than 15 seconds go by, its windows join the strip of the display macOS moves them to. **When you plug it back in, they go back to their places**, in the same order and with their widths; windows you opened meanwhile stay where they are. Until it returns, Rambla remembers its arrangement for up to a month, even across restarts.
 
 ## 12. Visual aids
 

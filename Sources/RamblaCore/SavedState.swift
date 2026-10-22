@@ -19,12 +19,108 @@ public struct SavedStrip: Codable, Equatable, Sendable {
     public var displayUUID: String
     public var spaceKey: String
     public var strip: Strip
+    /// When the strip was last in view; files from before 1.0.1 have none.
+    public var lastSeen: Date?
 
-    public init(displayUUID: String, spaceKey: String, strip: Strip) {
+    public init(displayUUID: String, spaceKey: String, strip: Strip, lastSeen: Date? = nil) {
         self.displayUUID = displayUUID
         self.spaceKey = spaceKey
         self.strip = strip
+        self.lastSeen = lastSeen
     }
+
+    func isFor(displayUUID: String, spaceKey: String) -> Bool {
+        self.displayUUID == displayUUID && self.spaceKey == spaceKey
+    }
+}
+
+/// The strips that are not in view: those saved for a Space not visited since Rambla started, and those of a display
+/// that was unplugged. Each is taken back when its display and Space are in view again, and until then it is saved
+/// with the live strips, so its arrangement survives restarts.
+public struct StripArchive: Equatable, Sendable {
+    /// How long an archived strip is kept: a month away from the office monitor still finds it as it was, while the
+    /// strip of a Space deleted long ago stops being carried.
+    public static let maxAge: TimeInterval = 30 * 24 * 60 * 60
+
+    public private(set) var strips: [SavedStrip] = []
+    /// Every window the archived strips hold, by the id they have in them.
+    public private(set) var refs: [WindowID: WindowRef] = [:]
+    /// Strips archived during this session: their window ids are still the live ones.
+    private var current: Set<String> = []
+
+    public init() {}
+
+    /// The archive at launch: every strip of the saved file, dated now when the file has no date.
+    public init(loading state: SavedState?, at now: Date) {
+        guard let state else { return }
+        strips = state.strips.map { strip in
+            var strip = strip
+            if strip.lastSeen == nil { strip.lastSeen = now }
+            return strip
+        }
+        for ref in state.refs { refs[ref.id] = ref }
+    }
+
+    /// Archives `strip` (the one of an unplugged display, seen until `now`), replacing any of the same display and Space.
+    public mutating func store(_ strip: SavedStrip, refs: [WindowRef], at now: Date) {
+        var strip = strip
+        strip.lastSeen = now
+        strips.removeAll { $0.isFor(displayUUID: strip.displayUUID, spaceKey: strip.spaceKey) }
+        strips.append(strip)
+        for ref in refs { self.refs[ref.id] = ref }
+        current.insert(Self.key(strip.displayUUID, strip.spaceKey))
+    }
+
+    /// Takes the strip of that display and Space out of the archive, to restore it.
+    public mutating func take(displayUUID: String, spaceKey: String) -> SavedStrip? {
+        guard let index = strips.firstIndex(where: { $0.isFor(displayUUID: displayUUID, spaceKey: spaceKey) }) else {
+            return nil
+        }
+        current.remove(Self.key(displayUUID, spaceKey))
+        return strips.remove(at: index)
+    }
+
+    /// The archived strip of that display and Space, left in the archive.
+    public func strip(displayUUID: String, spaceKey: String) -> SavedStrip? {
+        strips.first { $0.isFor(displayUUID: displayUUID, spaceKey: spaceKey) }
+    }
+
+    /// The strip archived during this session for that display, when it is the only one: an unplugged display's
+    /// desktop can come back under a new key. With several, nothing (only exact keys can tell them apart).
+    public func onlyCurrentStrip(displayUUID: String) -> SavedStrip? {
+        let mine = strips.filter { $0.displayUUID == displayUUID && current.contains(Self.key($0.displayUUID, $0.spaceKey)) }
+        return mine.count == 1 ? mine.first : nil
+    }
+
+    /// Whether the strip of that display and Space was archived during this session, so its ids are live ids.
+    public func isFromThisSession(displayUUID: String, spaceKey: String) -> Bool {
+        current.contains(Self.key(displayUUID, spaceKey))
+    }
+
+    /// What to save: the live strips, seen `now`, then the archived ones that no live strip replaces and that are not
+    /// older than `maxAge`, with the refs of every window they hold (once each).
+    public func merged(into live: SavedState, at now: Date) -> SavedState {
+        var state = live
+        state.strips = live.strips.map { strip in
+            var strip = strip
+            strip.lastSeen = now
+            return strip
+        }
+        var known = Set(state.refs.map(\.id))
+        for strip in strips {
+            guard !live.strips.contains(where: { $0.isFor(displayUUID: strip.displayUUID, spaceKey: strip.spaceKey) }),
+                  let seen = strip.lastSeen, now.timeIntervalSince(seen) <= Self.maxAge else { continue }
+            state.strips.append(strip)
+            for id in strip.strip.allWindows where !known.contains(id) {
+                guard let ref = refs[id] else { continue }
+                state.refs.append(ref)
+                known.insert(id)
+            }
+        }
+        return state
+    }
+
+    private static func key(_ displayUUID: String, _ spaceKey: String) -> String { displayUUID + "/" + spaceKey }
 }
 
 /// The contents of `state.json`.

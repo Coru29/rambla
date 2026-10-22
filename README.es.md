@@ -32,7 +32,7 @@ Cada ventana es una columna de una tira horizontal que sigue más allá de los b
 - **Mouse**: con ⌃⌘ apretado, la ruedita recorre las columnas. También podés mantener apretados los botones que elijas (el del medio, los laterales 4 + 5 juntos…) y mover el mouse: a los costados desliza la tira, hacia arriba da el ancho completo y hacia abajo vuelve. Arrastrá una ventana sobre otra columna para reordenar, o cambiale el tamaño para fijar el ancho de su columna. Convive con Mac Mouse Fix.
 - Opcionales: **borde en la ventana enfocada**, **atenuar las inactivas**, el foco sigue al mouse y el mouse sigue al foco.
 - **Reglas por app**: mosaico o flotante, ancho inicial y dónde se abren. Además, se puede activar o desactivar por pantalla.
-- **Recuerda el layout** al reiniciar y puede arrancar con la Mac.
+- **Recuerda el layout** al reiniciar, y al volver a conectar una pantalla sus ventanas vuelven a su lugar. Puede arrancar con la Mac.
 - **Convive con [Rectangle](https://rectangleapp.com)**: los atajos usan ⌃⌘, así que no chocan con los ⌃⌥ del set normal de Rectangle (con su set Spectacle chocan un par, y Rambla te avisa). Si Rectangle (u otra app) mueve una ventana, esa ventana sale de la tira y queda donde la pusieron. La página Mac de la configuración avisa si algún atajo choca con tu Rectangle.
 - **Automatización**: enlaces `rambla://`, comando de terminal `rambla` y exportación de scripts para Raycast.
 - **Español e inglés**: la interfaz sigue el idioma de tu Mac.
@@ -92,10 +92,6 @@ Rambla los revisa en **Configuración → Mac**:
 - **Reorganizar Spaces automáticamente según el uso más reciente**: desactivado.
 - **Stage Manager** y **arrastrar ventanas a los bordes para organizarlas**: desactivados.
 - Con dos pantallas, lo mejor es poner la segunda **arriba o abajo** de la principal. Lado a lado también funciona, pero las ventanas solo pueden salir hasta la mitad hacia la otra pantalla antes de estacionarse.
-
-## Limitaciones conocidas
-
-Si una pantalla queda desconectada más de 15 segundos (por ejemplo, al sacar la notebook del dock), sus ventanas pasan a la tira de la pantalla a la que las mueve macOS, y cuando la pantalla vuelve Rambla no recupera el orden que tenía.
 
 ## Automatización
 

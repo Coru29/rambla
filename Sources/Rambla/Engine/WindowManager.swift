@@ -76,8 +76,11 @@ final class WindowManager {
     var onStateChanged: (() -> Void)?
     /// Called when a command or gesture should flash the strip indicator.
     var indicatorHook: ((StripKey, NSEvent.ModifierFlags?) -> Void)?
-    /// Saved layout from the previous run; strips are rebuilt from it the first time each one is seen.
+    /// Saved layout from the previous run (its floating windows; the strips go to `archive`).
     var restoreState: SavedState?
+    /// Strips not in view: those of the previous run not seen yet, and those of unplugged displays. Each is rebuilt
+    /// the first time its display and Space are in view again, and saved meanwhile.
+    var archive = StripArchive()
     var restoredKeys: Set<StripKey> = []
     /// Saved ids of the floating windows not matched yet; each one floats a single live window.
     var pendingFloating: Set<WindowID> = []
@@ -107,6 +110,7 @@ final class WindowManager {
         displays = Displays.current()
         frontmostPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
         restoreState = StateStore.load()
+        archive = StripArchive(loading: restoreState, at: Date())
         pendingFloating = Set(restoreState?.floating ?? [])
         launchTime = CFAbsoluteTimeGetCurrent()
         observeSystem()
@@ -529,7 +533,7 @@ final class WindowManager {
         var managed = Set(strips.values.flatMap(\.allWindows))
         let candidates = windows.values
             .filter { $0.kind != .ignore && visible.contains($0.id) && !managed.contains($0.id) && !floating.contains($0.id) }
-        restoreFromSavedState(keys: keys, candidates: candidates)
+        restoreFromSavedState(keys: keys, candidates: candidates, visible: visible)
         managed = Set(strips.values.flatMap(\.allWindows))
         let orphans = windows.values
             .filter { $0.kind == .tile && visible.contains($0.id) && !managed.contains($0.id) && !floating.contains($0.id) }
@@ -563,7 +567,8 @@ final class WindowManager {
 
     /// macOS moves the windows of an unplugged display to the remaining ones, but they stayed in that display's strips,
     /// which no longer lay anything out: untiled and out of reach of the shortcuts. Once the display has been gone for
-    /// `goneDisplayDelay`, its strips are dropped and the windows join the strips of the displays they are on now.
+    /// `goneDisplayDelay`, its strips go to the archive and the windows join the strips of the displays they are on
+    /// now; when the display comes back, `restoreFromSavedState` takes them back to their places.
     private func dropStripsOfDisconnectedDisplays(now: TimeInterval) {
         let connected = Set(displays.map(\.uuid))
         for uuid in connected { displayGoneSince[uuid] = nil }
@@ -576,13 +581,18 @@ final class WindowManager {
                 continue
             }
             for key in Array(strips.keys) where key.displayUUID == uuid {
+                if let spaceKey = spaceKeys[key], let strip = strips[key], !strip.columns.isEmpty {
+                    archive.store(SavedStrip(displayUUID: uuid, spaceKey: spaceKey, strip: strip),
+                                  refs: strip.allWindows.compactMap(ref), at: Date())
+                }
                 strips[key] = nil
                 results[key] = nil
                 hidden[key] = nil
                 spaceKeys[key] = nil
+                restoredKeys.remove(key)
             }
             displayGoneSince[uuid] = nil
-            Log.info("Display \(uuid.prefix(8)) disconnected: its windows join the strips of the displays they are on")
+            Log.info("Display \(uuid.prefix(8)) disconnected: its windows join the strips of the displays they are on until it comes back")
         }
     }
 
