@@ -94,7 +94,7 @@ If you don't like something, everything can be changed in **Settings**: Rambla's
 
 You can also focus as usual: with a click, ⌘Tab, the Dock or Mission Control. The strip slides all the same.
 
-**Overview.** **⌃⌘O** (or a long move down with the mouse buttons, see chapter 10) shows the whole strip of the display at a glance: every window with its app and title, the stacks, the tabs and the pinned columns. A bar on top marks the part that is on screen now. Click a window to go there, or pick it with the arrows and press ↩; 1 … 9 jump to that column. Esc, ⌘W, a click outside or ⌃⌘O again close it. While it is open, Rambla's focus shortcuts (⌃⌘ + arrows, ⌃⌘1 … 9) move the selection instead of the strip.
+**Overview.** **⌃⌘O** (or a long move down with the mouse buttons, see chapter 10) shows the whole strip of the display at a glance: every window with its app and title, the stacks, the tabs and the pinned columns. A bar on top marks the part that is on screen now. Click a window to go there, or pick it with the arrows and press ↩; 1 … 9 jump to that column. To change the order, drag a window to another place, or choose it and press ⇧← or ⇧→ (⌃⌘⇧← → too): its column moves in the strip (pinned ones stay at their edge). Esc, ⌘W, a click outside or ⌃⌘O again close it. While it is open, Rambla's focus shortcuts (⌃⌘ + arrows, ⌃⌘1 … 9) move the selection instead of the strip.
 
 **Centering.** By default the strip moves just enough for the focused column to be fully visible. In Settings → General you can make it center the column **always** or **only when the strip does not fit on the screen**. **⌃⌘C** centers the focused column at any time.
 

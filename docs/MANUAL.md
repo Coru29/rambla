@@ -94,7 +94,7 @@ Si algo no te gusta, todo se puede cambiar en **Configuración** (menú de Rambl
 
 También podés enfocar como siempre: con un click, ⌘Tab, el Dock o Mission Control. La tira se desliza igual.
 
-**Vista general.** Con **⌃⌘O** (o bajando bastante con los botones del mouse, ver el capítulo 10) ves toda la tira de la pantalla en chico: cada ventana con su app y su título, las pilas, las pestañas y las columnas fijadas. Una barra arriba marca la parte que está en pantalla ahora. Hacé click en una ventana para ir a ella, o elegila con las flechas y tocá ↩; con 1 … 9 vas directo a esa columna. Esc, ⌘W, un click afuera o ⌃⌘O de nuevo la cierran. Mientras está abierta, los atajos de Rambla para moverte (⌃⌘ + flechas, ⌃⌘1 … 9) mueven la selección en vez de la tira.
+**Vista general.** Con **⌃⌘O** (o bajando bastante con los botones del mouse, ver el capítulo 10) ves toda la tira de la pantalla en chico: cada ventana con su app y su título, las pilas, las pestañas y las columnas fijadas. Una barra arriba marca la parte que está en pantalla ahora. Hacé click en una ventana para ir a ella, o elegila con las flechas y tocá ↩; con 1 … 9 vas directo a esa columna. Para cambiar el orden, arrastrá una ventana a otro lugar, o elegila y tocá ⇧← o ⇧→ (también ⌃⌘⇧← →): su columna se mueve en la tira (las fijadas quedan en su borde). Esc, ⌘W, un click afuera o ⌃⌘O de nuevo la cierran. Mientras está abierta, los atajos de Rambla para moverte (⌃⌘ + flechas, ⌃⌘1 … 9) mueven la selección en vez de la tira.
 
 **Centrado.** Por defecto, la tira se mueve lo justo para que la columna enfocada se vea entera. En Configuración → General podés elegir que la centre **siempre** o **solo si la tira no entra en la pantalla**. Con **⌃⌘C** centrás la columna enfocada en cualquier momento.
 

@@ -176,3 +176,40 @@ private func overview(_ strip: Strip, hidden: Set<WindowID> = [], area: Double =
     #expect(drawn.cards.map(\.lowerBound) == [0, 74, 128])
     #expect(drawn.viewport == 32.0...160.0)
 }
+
+// MARK: - Reordering
+
+@Test func aColumnMovesAmongTheUnpinnedOnes() throws {
+    // Columns A B C, D pinned left and E pinned right: the cards are D | A B C | E.
+    let s = strip([300, 500, 400, 200, 250], pinned: [3: .left, 4: .right])
+    let o = overview(s, pinnedWidths: [3: 200, 4: 250])
+    #expect(o.cards.map(\.column) == [3, 0, 1, 2, 4])
+    #expect(o.cards.map(\.id) == [3, 0, 1, 2, 4].map { s.columns[$0].id })
+    #expect(o.movable == 1...3)
+    // A to where C is: the strip moves column 0 to index 2.
+    let move = try #require(o.columnMove(card: 1, to: 3))
+    #expect(move.from == 0 && move.to == 2)
+    var moved = s
+    moved.moveColumn(from: move.from, to: move.to)
+    #expect(moved.visualOrder(hidden: []).map { moved.columns[$0].windows[0] } == [4, 2, 3, 1, 5])
+    // Pinned columns stay put, and a card dropped where it was moves nothing.
+    #expect(o.columnMove(card: 0, to: 2) == nil)
+    #expect(o.columnMove(card: 1, to: 4) == nil)
+    #expect(o.columnMove(card: 2, to: 2) == nil)
+}
+
+@Test func aDraggedCardLandsWhereItsCenterIs() {
+    // Cards at 0…300, 310…810 and 820…1220, drawn at scale 1.
+    let o = overview(strip([300, 500, 400]))
+    let drawn = o.drawn(scale: 1, minimumWidth: 44, minimumGap: 10)
+    #expect(o.dropSlot(forCard: 0, center: 150, in: drawn) == 0)
+    #expect(o.dropSlot(forCard: 0, center: 559, in: drawn) == 0)                // short of the second card's center
+    #expect(o.dropSlot(forCard: 0, center: 561, in: drawn) == 1)
+    #expect(o.dropSlot(forCard: 0, center: 1500, in: drawn) == 2)
+    #expect(o.dropSlot(forCard: 2, center: -50, in: drawn) == 0)
+    // Never past a pinned column, which itself does not move.
+    let pinned = overview(strip([300, 500, 400], pinned: [0: .left]), pinnedWidths: [0: 300])
+    let pinnedDrawn = pinned.drawn(scale: 1, minimumWidth: 44, minimumGap: 10)
+    #expect(pinned.dropSlot(forCard: 2, center: -50, in: pinnedDrawn) == 1)
+    #expect(pinned.dropSlot(forCard: 0, center: 1500, in: pinnedDrawn) == 0)
+}

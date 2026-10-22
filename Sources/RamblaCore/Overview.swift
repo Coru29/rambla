@@ -4,7 +4,9 @@ import Foundation
 /// to one. Positions are strip points (the view scales them to fit its screen): the left-pinned column first, then the
 /// strip's columns in order, then the right-pinned one, `gap` apart. It also keeps the selection the keyboard moves.
 public struct Overview: Equatable, Sendable {
-    public struct Card: Equatable, Sendable {
+    public struct Card: Equatable, Identifiable, Sendable {
+        /// The column's id: the card stays the same card when the columns move.
+        public var id: UUID
         /// Index of the column in the strip.
         public var column: Int
         public var x: Double
@@ -86,7 +88,7 @@ public struct Overview: Equatable, Sendable {
                     end = max(end ?? to, to)
                 }
             }
-            cards.append(Card(column: index, x: x, width: width, windows: column.windows,
+            cards.append(Card(id: column.id, column: index, x: x, width: width, windows: column.windows,
                               active: min(max(column.active, 0), max(column.windows.count - 1, 0)),
                               tabbed: column.mode == .tabbed, pinned: column.pinned, collapsed: collapsed))
             x += width + gap
@@ -135,6 +137,28 @@ public struct Overview: Equatable, Sendable {
         guard cards.indices.contains(selection.card) else { return nil }
         let windows = cards[selection.card].windows
         return windows.indices.contains(selection.row) ? windows[selection.row] : nil
+    }
+
+    /// The cards whose columns can move: those between the pinned ones (nil when every column is pinned).
+    public var movable: ClosedRange<Int>? {
+        let open = cards.indices.filter { cards[$0].pinned == nil }
+        guard let first = open.first, let last = open.last else { return nil }
+        return first...last
+    }
+
+    /// Where a card dragged with its center at `center` (drawn points) lands: after every other movable card whose
+    /// center is left of it. A pinned card stays where it is.
+    public func dropSlot(forCard card: Int, center: Double, in drawn: Drawn) -> Int {
+        guard let movable, movable.contains(card) else { return card }
+        let before = movable.filter { $0 != card && (drawn.cards[$0].lowerBound + drawn.cards[$0].upperBound) / 2 < center }
+        return movable.lowerBound + before.count
+    }
+
+    /// Moving the column of `card` to the place of the card at `slot`: the arguments `Strip.moveColumn(from:to:)`
+    /// takes. Nil for a pinned column, a place outside the unpinned ones, or the card's own place.
+    public func columnMove(card: Int, to slot: Int) -> (from: Int, to: Int)? {
+        guard let movable, movable.contains(card), movable.contains(slot), slot != card else { return nil }
+        return (cards[card].column, cards[slot].column)
     }
 
     /// The window of the `number`th card from 1, the one its column shows. Like ⌃⌘1…9, it counts only the columns

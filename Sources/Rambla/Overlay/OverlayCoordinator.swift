@@ -9,7 +9,9 @@ final class OverlayCoordinator {
         onSelect: { [weak self] id in self?.selectColumn(id) },
         onMove: { [weak self] from, to in self?.moveColumn(from: from, to: to) })
     private lazy var tabBars = TabBarController { [weak self] id in self?.engine.focusTab(id) }
-    private lazy var overview = OverviewController { [weak self] id, key in self?.focusFromOverview(id, in: key) }
+    private lazy var overview = OverviewController(
+        onChoose: { [weak self] id, key in self?.focusFromOverview(id, in: key) },
+        onMove: { [weak self] from, to, key, window in self?.moveFromOverview(from: from, to: to, in: key, selecting: window) })
     private let border = FocusBorderController()
     private let dimmer = DimmerController()
     private var indicatorKey: StripKey?
@@ -121,7 +123,8 @@ final class OverlayCoordinator {
         overview.show(content, key: key, on: display.screen)
     }
 
-    private func overviewContent(for key: StripKey, display: DisplayInfo) -> OverviewContent? {
+    /// `selecting` is the window the overview starts on (the focused one when nil).
+    private func overviewContent(for key: StripKey, display: DisplayInfo, selecting: WindowID? = nil) -> OverviewContent? {
         guard let strip = engine.strips[key], !strip.columns.isEmpty, let result = engine.results[key] else { return nil }
         let hidden = engine.hidden[key] ?? []
         var pinned: [UUID: Double] = [:]
@@ -129,7 +132,7 @@ final class OverlayCoordinator {
             if let frame = result.columnFrames[column.id] { pinned[column.id] = Double(frame.width) }
         }
         let overview = Overview(strip: strip, metrics: result.metrics, pinnedWidths: pinned, gap: engine.prefs.innerGap,
-                                hidden: hidden, focused: engine.focusedWindow)
+                                hidden: hidden, focused: selecting ?? engine.focusedWindow)
         var items: [WindowID: OverviewItem] = [:]
         for column in strip.columns {
             for id in column.windows {
@@ -153,6 +156,13 @@ final class OverlayCoordinator {
         }
         content.cardHeight = display.visible.height * content.scale
         return content
+    }
+
+    /// A column moved in the overview: the strip behind it changes, and the overview shows it as it is now.
+    private func moveFromOverview(from: Int, to: Int, in key: StripKey, selecting window: WindowID?) -> OverviewContent? {
+        guard let display = engine.display(for: key) else { return nil }
+        engine.moveColumn(in: key, from: from, to: to)
+        return overviewContent(for: key, display: display, selecting: window)
     }
 
     /// A window chosen in the overview, unless it closed meanwhile.

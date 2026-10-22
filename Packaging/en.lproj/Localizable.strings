@@ -332,7 +332,7 @@
 "Mover ventana hacia abajo" = "Move window down";
 "Mandar a la siguiente pantalla" = "Send to next display";
 "Vista general" = "Overview";
-"← → elegí una ventana · ↩ la enfoca · esc cierra" = "← → choose a window · ↩ focuses it · esc closes";
+"← → elegí una ventana · arrastrala o ⇧← → para moverla · ↩ la enfoca · esc cierra" = "← → choose a window · drag it or ⇧← → to move it · ↩ focuses it · esc closes";
 "Rotar ancho" = "Cycle width";
 "Ancho completo" = "Full width";
 "Centrar columna" = "Center column";

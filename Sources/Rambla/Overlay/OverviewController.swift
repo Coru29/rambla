@@ -75,20 +75,26 @@ final class OverviewState: ObservableObject {
 
 /// The overview ("Vista general"): the whole strip of one display at once, over a blurred screen, to see every window
 /// and jump to one. A click on a window (or ↩ on the chosen one, or its number) focuses it and closes the overview;
-/// esc, ⌘W, a click elsewhere, the shortcut again, another app or another desktop close it as it was.
+/// esc, ⌘W, a click elsewhere, the shortcut again, another app or another desktop close it as it was. Dragging a window
+/// to another place, or ⇧← → on the chosen one, moves its column in the strip.
 ///
 /// The panel takes the keyboard without activating Rambla, so whatever app was in front stays in front until a
 /// window is chosen. It exists only while shown.
 @MainActor
 final class OverviewController {
     private let onChoose: (WindowID, StripKey) -> Void
+    /// Moves a column of the strip (`Strip.moveColumn(from:to:)`) and gives the overview of the strip as it is then,
+    /// with that window chosen; nil when nothing moved.
+    private let onMove: (_ from: Int, _ to: Int, _ key: StripKey, _ selecting: WindowID?) -> OverviewContent?
     private let state = OverviewState()
     private var panel: OverviewPanel?
     private var observers: [(NotificationCenter, NSObjectProtocol)] = []
     private(set) var shownKey: StripKey?
 
-    init(onChoose: @escaping (WindowID, StripKey) -> Void) {
+    init(onChoose: @escaping (WindowID, StripKey) -> Void,
+         onMove: @escaping (_ from: Int, _ to: Int, _ key: StripKey, _ selecting: WindowID?) -> OverviewContent?) {
         self.onChoose = onChoose
+        self.onMove = onMove
     }
 
     var isShown: Bool { shownKey != nil }
@@ -141,6 +147,26 @@ final class OverviewController {
         state.content = content
     }
 
+    /// Moves the column of `card` to the place of the card at `slot` (a drop, or one place over with ⇧← →). The
+    /// overview then shows the strip as it is, with that column's window chosen. False when it cannot go there.
+    @discardableResult
+    private func moveColumn(card: Int, to slot: Int) -> Bool {
+        guard let key = shownKey, let overview = state.content?.overview,
+              let move = overview.columnMove(card: card, to: slot) else { return false }
+        let moved = overview.cards[card]
+        let window = overview.selection.card == card ? overview.window(at: overview.selection) : moved.windows[moved.active]
+        guard let content = onMove(move.from, move.to, key, window) else { return false }
+        state.content = content
+        return true
+    }
+
+    private func moveChosenColumn(by step: Int) {
+        guard let card = state.content?.overview.selection.card, moveColumn(card: card, to: card + step) else {
+            NSSound.beep()
+            return
+        }
+    }
+
     // MARK: - Keyboard
 
     /// Returns true when the overview used the key.
@@ -148,6 +174,8 @@ final class OverviewController {
         guard let overview = state.content?.overview else { return false }
         switch event.keyCode {
         case KeyCode.escape: hide()
+        case KeyCode.left where event.modifierFlags.contains(.shift): moveChosenColumn(by: -1)
+        case KeyCode.right where event.modifierFlags.contains(.shift): moveChosenColumn(by: 1)
         case KeyCode.left: move(.left)
         case KeyCode.right: move(.right)
         case KeyCode.down: move(.down)
@@ -161,8 +189,9 @@ final class OverviewController {
     }
 
     /// A Rambla shortcut while the overview is on screen. Its hot keys reach Rambla before the panel sees them, so the
-    /// ones that move the focus move the selection instead, ⌃⌘1…9 choose, and the overview's own closes it. Any other
-    /// closes it and then acts on the strip as usual. Returns true when the overview used the shortcut.
+    /// ones that move the focus move the selection instead, ⌃⌘1…9 choose, ⌃⌘⇧← → move the chosen window's column,
+    /// and the overview's own closes it. Any other closes it and then acts on the strip as usual. Returns true when the
+    /// overview used the shortcut.
     func perform(_ action: Action) -> Bool {
         guard let overview = state.content?.overview, isShown else { return false }
         switch action {
@@ -172,6 +201,8 @@ final class OverviewController {
         case .focusDown: move(.down)
         case .focusFirst: move(.first)
         case .focusLast: move(.last)
+        case .moveLeft: moveChosenColumn(by: -1)
+        case .moveRight: moveChosenColumn(by: 1)
         case .focus1, .focus2, .focus3, .focus4, .focus5, .focus6, .focus7, .focus8, .focus9:
             choose(Int(action.rawValue.split(separator: "-").last!).flatMap(overview.window(atCard:)))
         case .overview: hide()
@@ -195,6 +226,7 @@ final class OverviewController {
         let hosting = OverviewHostingView(rootView: OverviewView(
             state: state,
             choose: { [weak self] id in self?.choose(id) },
+            move: { [weak self] card, slot in self?.moveColumn(card: card, to: slot) },
             dismiss: { [weak self] in self?.hide() }))
         hosting.frame = blur.bounds
         hosting.autoresizingMask = [.width, .height]
@@ -259,12 +291,28 @@ final class OverviewHostingView<Content: View>: NSHostingView<Content> {
 
 // MARK: - Views
 
-/// Like Mission Control: the desktop blurred and darkened, the strip as a row of miniature windows.
+/// Like Mission Control: the desktop blurred and darkened, the strip as a row of miniature windows. A window dragged
+/// to another place lifts off the row, the others make room where it would land, and once let go it glides there
+/// before its column moves in the strip.
 struct OverviewView: View {
     @ObservedObject var state: OverviewState
     let choose: (WindowID?) -> Void
+    /// Moves the column of a card to the place of the card at a slot.
+    let move: (_ card: Int, _ slot: Int) -> Void
     let dismiss: () -> Void
     @State private var hovered: WindowID?
+    @State private var drag: CardDrag?
+
+    /// A card being dragged to another place in the row.
+    private struct CardDrag {
+        var card: Int
+        /// How far the pointer moved since the drag began.
+        var offset: Double
+        /// Let go on this place: the card glides there before the strip changes.
+        var landing: Int?
+    }
+
+    private static let row = "overview.row"
 
     var body: some View {
         ZStack {
@@ -274,7 +322,7 @@ struct OverviewView: View {
             if let content = state.content {
                 VStack(spacing: 34) {
                     strip(content)
-                    Text("← → elegí una ventana · ↩ la enfoca · esc cierra")
+                    Text("← → elegí una ventana · arrastrala o ⇧← → para moverla · ↩ la enfoca · esc cierra")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.white.opacity(0.55))
                 }
@@ -285,20 +333,27 @@ struct OverviewView: View {
     }
 
     private func strip(_ content: OverviewContent) -> some View {
+        let overview = content.overview
         let drawn = content.drawn
         let gap = drawn.cards.count > 1 ? drawn.cards[1].lowerBound - drawn.cards[0].upperBound : 0
+        let (order, slot) = arrangement(overview, drawn)
         return GeometryReader { geometry in
             ScrollViewReader { proxy in
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(alignment: .top, spacing: CGFloat(gap)) {
-                        ForEach(Array(content.overview.cards.enumerated()), id: \.offset) { index, card in
-                            OverviewCard(card: card, index: index, content: content, hovered: $hovered, choose: choose)
-                                .frame(width: CGFloat(drawn.cards[index].upperBound - drawn.cards[index].lowerBound),
-                                       height: content.cardHeight)
-                                .id(index)
+                        ForEach(order, id: \.self) { index in
+                            cell(index, content, drawn)
                         }
                     }
-                    .overlay(alignment: .topLeading) { viewport(drawn) }
+                    .animation(.spring(response: 0.3, dampingFraction: 0.86), value: slot)
+                    .coordinateSpace(.named(Self.row))
+                    .overlay(alignment: .topLeading) {
+                        if let drag {
+                            lifted(drag, content, drawn)
+                        } else {
+                            viewport(drawn)
+                        }
+                    }
                     .padding(.horizontal, 70)
                     .padding(.vertical, 28)
                     // Centered when the strip is shorter than the screen, and a click beside the cards closes too.
@@ -306,13 +361,94 @@ struct OverviewView: View {
                     .contentShape(Rectangle())
                     .onTapGesture(perform: dismiss)
                 }
-                .onAppear { proxy.scrollTo(content.overview.selection.card, anchor: .center) }
-                .onChange(of: content.overview.selection) { _, selection in
-                    withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(selection.card, anchor: .center) }
+                .onAppear { proxy.scrollTo(overview.cards[overview.selection.card].id, anchor: .center) }
+                .onChange(of: overview.selection) { _, selection in
+                    guard overview.cards.indices.contains(selection.card) else { return }
+                    withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(overview.cards[selection.card].id, anchor: .center) }
                 }
             }
         }
         .frame(height: content.cardHeight + 56)
+    }
+
+    /// One card in the row. The one being dragged leaves a dashed outline where it will land.
+    private func cell(_ index: Int, _ content: OverviewContent, _ drawn: Overview.Drawn) -> some View {
+        let card = content.overview.cards[index]
+        let dragged = drag?.card == index
+        return OverviewCard(card: card, index: index, content: content, hovered: $hovered, choose: choose)
+            .frame(width: CGFloat(drawn.cards[index].upperBound - drawn.cards[index].lowerBound), height: content.cardHeight)
+            .opacity(dragged ? 0 : 1)
+            .overlay {
+                if dragged {
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(.white.opacity(0.4), style: StrokeStyle(lineWidth: 1.5, dash: [6, 5]))
+                }
+            }
+            // A click still chooses: the drag only starts once the pointer has moved. Pinned columns stay put.
+            .highPriorityGesture(dragGesture(index, content, drawn), including: card.pinned == nil ? .all : .subviews)
+            .id(card.id)
+    }
+
+    private func dragGesture(_ index: Int, _ content: OverviewContent, _ drawn: Overview.Drawn) -> some Gesture {
+        DragGesture(minimumDistance: 6, coordinateSpace: .named(Self.row))
+            .onChanged { value in
+                guard drag?.landing == nil else { return }
+                drag = CardDrag(card: index, offset: value.translation.width)
+            }
+            .onEnded { _ in land(content, drawn) }
+    }
+
+    /// The cards in the order they are drawn, and the place the dragged one would land on: the others make room there.
+    private func arrangement(_ overview: Overview, _ drawn: Overview.Drawn) -> (order: [Int], slot: Int?) {
+        var order = Array(overview.cards.indices)
+        guard let drag, order.indices.contains(drag.card) else { return (order, nil) }
+        let span = drawn.cards[drag.card]
+        let slot = drag.landing
+            ?? overview.dropSlot(forCard: drag.card, center: (span.lowerBound + span.upperBound) / 2 + drag.offset, in: drawn)
+        order.remove(at: drag.card)
+        order.insert(drag.card, at: slot)
+        return (order, slot)
+    }
+
+    /// Let go: the card glides to the place it lands on, and only then its column moves, so the row it comes back to
+    /// is already in that order.
+    private func land(_ content: OverviewContent, _ drawn: Overview.Drawn) {
+        guard var landing = drag, landing.landing == nil else { return }
+        let (order, slot) = arrangement(content.overview, drawn)
+        guard let slot else { return }
+        let gap = drawn.cards.count > 1 ? drawn.cards[1].lowerBound - drawn.cards[0].upperBound : 0
+        let x = order.prefix(slot).reduce(0.0) { $0 + drawn.cards[$1].upperBound - drawn.cards[$1].lowerBound + gap }
+        landing.landing = slot
+        landing.offset = x - drawn.cards[landing.card].lowerBound
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.9), completionCriteria: .logicallyComplete) {
+            drag = landing
+        } completion: {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                drag = nil
+                if slot != landing.card { move(landing.card, slot) }
+            }
+        }
+    }
+
+    /// The dragged card, lifted, under the pointer; it never passes the pinned columns.
+    private func lifted(_ drag: CardDrag, _ content: OverviewContent, _ drawn: Overview.Drawn) -> some View {
+        let overview = content.overview
+        let span = drawn.cards[drag.card]
+        let width = span.upperBound - span.lowerBound
+        var x = span.lowerBound + drag.offset
+        if let movable = overview.movable {
+            x = min(max(x, drawn.cards[movable.lowerBound].lowerBound), drawn.cards[movable.upperBound].upperBound - width)
+        }
+        let up = drag.landing == nil
+        return OverviewCard(card: overview.cards[drag.card], index: drag.card, content: content, hovered: .constant(nil),
+                            choose: { _ in })
+            .frame(width: CGFloat(width), height: content.cardHeight)
+            .scaleEffect(up ? 1.04 : 1)
+            .shadow(color: .black.opacity(up ? 0.6 : 0.4), radius: up ? 28 : 14, y: up ? 18 : 8)
+            .offset(x: CGFloat(x))
+            .allowsHitTesting(false)
     }
 
     /// The part of the strip that is on screen now: a bar above the windows, like a scroll bar's thumb.
