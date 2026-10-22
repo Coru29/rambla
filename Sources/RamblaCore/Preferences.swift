@@ -245,19 +245,19 @@ public struct Preferences: Codable, Equatable, Sendable {
         }
     }
 
-    /// The shortcuts in effect for an action: the user's override, or the default.
+    /// The shortcuts in effect for an action: the user's override, or the defaults the user has not given to another
+    /// action (a default that comes with a new version must not take a combination already in use).
     public func shortcuts(for action: Action) -> [KeyCombo] {
-        shortcutOverrides[action] ?? DefaultShortcuts.table[action] ?? []
+        if let combos = shortcutOverrides[action] { return combos }
+        let taken = Set(shortcutOverrides.filter { $0.key != action }.values.joined())
+        return (DefaultShortcuts.table[action] ?? []).filter { !taken.contains($0) }
     }
 
-    /// Stores the user's shortcuts for an action. Setting exactly the defaults removes the override, so later
-    /// changes to the defaults still reach users who never customized that action.
+    /// Stores the user's shortcuts for an action. Setting exactly what the defaults give removes the override, so
+    /// later changes to the defaults still reach users who never customized that action.
     public mutating func setShortcuts(_ combos: [KeyCombo], for action: Action) {
-        if combos == (DefaultShortcuts.table[action] ?? []) {
-            shortcutOverrides[action] = nil
-        } else {
-            shortcutOverrides[action] = combos
-        }
+        shortcutOverrides[action] = nil
+        if combos != shortcuts(for: action) { shortcutOverrides[action] = combos }
     }
 
     /// The first rule written for this app, if any.

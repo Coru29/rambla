@@ -154,6 +154,25 @@ private func customizedPreferences() -> Preferences {
     #expect(p.shortcuts(for: .focusLeft) == DefaultShortcuts.table[.focusLeft])
 }
 
+@Test func aDefaultNeverTakesACombinationTheUserGaveToAnotherAction() {
+    // ⌃⌘O became the overview's default in 1.1.0: someone who had already given it to another action keeps it there.
+    var p = Preferences()
+    let o = KeyCombo(keyCode: KeyCode.o, modifiers: [.control, .command])
+    #expect(p.shortcuts(for: .overview) == [o])
+    p.setShortcuts([o], for: .cycleWidth)
+    #expect(p.shortcuts(for: .overview).isEmpty)
+    #expect(p.allShortcuts.filter { $0.value.contains(o) }.map(\.key) == [.cycleWidth])
+    // Asking for it on purpose stores it, even though it is the default.
+    p.setShortcuts([o], for: .overview)
+    #expect(p.shortcuts(for: .overview) == [o])
+    // Once the other action lets it go, the default is back.
+    p.setShortcuts([], for: .overview)
+    p.setShortcuts(DefaultShortcuts.table[.cycleWidth] ?? [], for: .cycleWidth)
+    p.setShortcuts([o], for: .overview)
+    #expect(p.shortcutOverrides[.overview] == nil)
+    #expect(p.shortcuts(for: .overview) == [o])
+}
+
 @Test func shortcutsFallBackToDefaultsAndHonorOverrides() {
     var p = Preferences()
     for action in Action.allCases { #expect(p.shortcuts(for: action) == (DefaultShortcuts.table[action] ?? [])) }
