@@ -172,6 +172,7 @@ Una columna puede tener varias ventanas.
 - **Recomendado**: dejá activado "Las pantallas tienen Spaces separados" (viene así en macOS). Con dos monitores, lo ideal es poner el segundo **arriba o abajo** del principal en Ajustes del Sistema → Pantallas → Organizar. Lado a lado también funciona, pero las ventanas solo pueden asomarse hasta la mitad hacia el otro monitor antes de estacionarse.
 - Las ventanas en **pantalla completa** (botón verde) salen de la tira mientras están así y vuelven a su lugar cuando salís.
 - Las ventanas **minimizadas** o de apps **ocultas** (⌘H) dejan su lugar sin ocupar espacio y reaparecen en el mismo sitio.
+- Si una pantalla queda **desconectada más de 15 segundos** (por ejemplo, al sacar la notebook del dock), sus ventanas pasan a la tira de la pantalla a la que las mueve macOS. Cuando la pantalla vuelve, empieza con una tira nueva: el orden que tenía no se recupera. Si una desconexión dura menos (un cambio de resolución, un dock que tarda en despertar), no se pierde nada.
 
 ## 12. Ayudas visuales
 
@@ -218,6 +219,8 @@ Todas las acciones tienen un nombre corto, por ejemplo `focus-left`, `cycle-widt
 open -g "rambla://focus-left"
 open -g "rambla://cycle-width"
 ```
+
+Los enlaces ejecutan todas las acciones menos `close-window`: cualquier página web puede abrir un enlace, y así ninguna puede cerrarte una ventana. Esa acción funciona solo con el comando `rambla` y con su script de Raycast.
 
 **Terminal:** instalá el comando en Configuración → Automatización → "Instalar comando rambla".
 

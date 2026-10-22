@@ -95,15 +95,19 @@ Rambla checks these for you in **Settings → Mac**:
 - **Stage Manager** and **drag windows to screen edges to tile**: off.
 - With two displays, placing the second one **above or below** the main one works best. Side by side works too: windows only slide halfway toward the other display before they are parked.
 
+## Known limitations
+
+If a display stays disconnected for more than 15 seconds (unplugging a laptop from its dock, for example), its windows join the strip of the display macOS moves them to, and Rambla does not restore that display's arrangement when it comes back.
+
 ## Automation
 
 ```sh
-open -g "rambla://focus-left"        # any action id, e.g. focus-3, cycle-width, toggle-pause
+open -g "rambla://focus-left"        # any action id but close-window, e.g. focus-3, cycle-width
 rambla focus-right                   # after Settings → Automation → Install `rambla` Command
 rambla list                          # all actions
 ```
 
-Settings → Automation can also export one Raycast script per action.
+Settings → Automation can also export one Raycast script per action. Any web page can open a `rambla://` link, so links can't close windows: `close-window` runs only from the `rambla` command and from its Raycast script.
 
 ## Build from source
 

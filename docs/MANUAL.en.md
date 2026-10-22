@@ -172,6 +172,7 @@ A column can hold several windows.
 - **Recommended**: keep "Displays have separate Spaces" on (the macOS default). With two monitors, ideally place the second one **above or below** the main one in System Settings → Displays → Arrange. Side by side works too, but windows can only peek halfway toward the other monitor before they are parked.
 - **Full-screen** windows (green button) leave the strip while they are full screen and come back to their place when you exit.
 - **Minimized** windows and windows of **hidden** apps (⌘H) leave their place without taking space and reappear in the same spot.
+- If a display stays **disconnected for more than 15 seconds** (unplugging a laptop from its dock, for example), its windows join the strip of the display macOS moves them to. When it comes back, it starts with a new strip: its old arrangement is not restored. A shorter absence (a resolution change, a dock slow to wake) loses nothing.
 
 ## 12. Visual aids
 
@@ -218,6 +219,8 @@ Every action has a short name, for example `focus-left`, `cycle-width`, `focus-3
 open -g "rambla://focus-left"
 open -g "rambla://cycle-width"
 ```
+
+Links run every action except `close-window`: any web page can open a link, so none can close your windows. That action runs only from the `rambla` command and from its Raycast script.
 
 **Terminal:** install the command in Settings → Automation → **Install `rambla` Command**.
 

@@ -36,7 +36,7 @@ Cada ventana es una columna de una tira horizontal que sigue más allá de los b
 - **Convive con [Rectangle](https://rectangleapp.com)**: los atajos usan ⌃⌘, así que no chocan con los ⌃⌥ del set normal de Rectangle (con su set Spectacle chocan un par, y Rambla te avisa). Si Rectangle (u otra app) mueve una ventana, esa ventana sale de la tira y queda donde la pusieron. La página Mac de la configuración avisa si algún atajo choca con tu Rectangle.
 - **Automatización**: enlaces `rambla://`, comando de terminal `rambla` y exportación de scripts para Raycast.
 - **Español e inglés**: la interfaz sigue el idioma de tu Mac.
-- **Liviana**: Swift nativo (AppKit, con la configuración en SwiftUI), sin Electron y funciona por eventos. En reposo usa cerca de 0 % de CPU y ~12 MB de memoria.
+- **Liviana**: Swift nativo (AppKit, con la configuración en SwiftUI), sin Electron y basada en eventos. En reposo usa cerca de 0 % de CPU y ~12 MB de memoria.
 
 ## Privacidad
 
@@ -93,15 +93,19 @@ Rambla los revisa en **Configuración → Mac**:
 - **Stage Manager** y **arrastrar ventanas a los bordes para organizarlas**: desactivados.
 - Con dos pantallas, lo mejor es poner la segunda **arriba o abajo** de la principal. Lado a lado también funciona, pero las ventanas solo pueden salir hasta la mitad hacia la otra pantalla antes de estacionarse.
 
+## Limitaciones conocidas
+
+Si una pantalla queda desconectada más de 15 segundos (por ejemplo, al sacar la notebook del dock), sus ventanas pasan a la tira de la pantalla a la que las mueve macOS, y cuando la pantalla vuelve Rambla no recupera el orden que tenía.
+
 ## Automatización
 
 ```sh
-open -g "rambla://focus-left"        # cualquier acción, ej. focus-3, cycle-width, toggle-pause
+open -g "rambla://focus-left"        # cualquier acción menos close-window, ej. focus-3, cycle-width
 rambla focus-right                   # después de instalar el comando en Configuración → Automatización
 rambla list                          # todas las acciones
 ```
 
-En Configuración → Automatización también podés exportar un script de Raycast por acción.
+En Configuración → Automatización también podés exportar un script de Raycast por acción. Cualquier página web puede abrir un enlace `rambla://`, así que los enlaces no cierran ventanas: `close-window` funciona solo con el comando `rambla` y con su script de Raycast.
 
 ## Compilar desde el código
 
