@@ -113,7 +113,7 @@ private func conflict(_ action: Action, _ rectangleAction: String = "leftHalf") 
         mac.tilingWithOption = option
         return try row("macos-tiling", in: MacChecks.evaluate(mac, trackpad: TrackpadPrefs()))
     }
-    #expect(try tiling(nil, nil, nil).status == .ok)
+    #expect(try tiling(nil, nil, nil).status == .ok)            // macOS 14: absent means off
     #expect(try tiling(false, false, false).status == .ok)
 
     let edge = try tiling(true, false, false)
@@ -326,7 +326,7 @@ private func trackpadRow(three: [Int], four: [Int], fingers: Int, canChange: Boo
     let links = Dictionary(uniqueKeysWithValues: checks.map { ($0.id, $0.settingsURL) })
     #expect(links == [
         "accessibility": MacChecks.accessibilityURL, "separate-spaces": nil, "rearrange-spaces": MacChecks.desktopAndDockURL,
-        "stage-manager": nil, "macos-tiling": nil, "trackpad-gesture": MacChecks.trackpadURL,
+        "stage-manager": nil, "macos-tiling": MacChecks.desktopAndDockURL, "trackpad-gesture": MacChecks.trackpadURL,
         "vertical-gesture": MacChecks.trackpadURL, "three-finger-drag": nil, "rectangle": nil,
     ])
 }
@@ -383,4 +383,21 @@ private func verticalRow(three: [Int], four: [Int], fingers: Int, vertical: Bool
     mac.fourFingerVertSwipe = [2]
     let off = TrackpadPrefs(enabled: false, fingers: 4)
     #expect(try row("vertical-gesture", in: MacChecks.evaluate(mac, trackpad: off)).status == .ok)
+}
+
+@Test func macChecksTilingCountsAbsentKeysAsOnWhereMacOSShipsItOn() throws {
+    // macOS 15 and later tile by dragging out of the box, and the keys only appear once the user changes them.
+    var mac = tidyMac()
+    mac.tilingByEdgeDrag = nil
+    mac.tilingToMenuBar = nil
+    mac.tilingWithOption = nil
+    mac.macOSTilesByDefault = true
+    let stock = try row("macos-tiling", in: MacChecks.evaluate(mac, trackpad: TrackpadPrefs()))
+    #expect(stock.status == .warning)
+    #expect(stock.detail.contains("bordes") && stock.detail.contains("barra de menús") && stock.detail.contains("Opción"))
+    #expect(stock.settingsURL == MacChecks.desktopAndDockURL)
+    mac.tilingByEdgeDrag = false
+    mac.tilingToMenuBar = false
+    mac.tilingWithOption = false
+    #expect(try row("macos-tiling", in: MacChecks.evaluate(mac, trackpad: TrackpadPrefs())).status == .ok)
 }

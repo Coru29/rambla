@@ -37,6 +37,7 @@ enum SystemChecks {
             tilingByEdgeDrag: flag("EnableTilingByEdgeDrag", in: "com.apple.WindowManager"),
             tilingToMenuBar: flag("EnableTopTilingByEdgeDrag", in: "com.apple.WindowManager"),
             tilingWithOption: flag("EnableTilingOptionAccelerator", in: "com.apple.WindowManager"),
+            macOSTilesByDefault: ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 15,
             threeFingerSwipe: trackpadDomains.compactMap { integer("TrackpadThreeFingerHorizSwipeGesture", in: $0) },
             fourFingerSwipe: trackpadDomains.compactMap { integer("TrackpadFourFingerHorizSwipeGesture", in: $0) },
             threeFingerVertSwipe: trackpadDomains.compactMap { integer("TrackpadThreeFingerVertSwipeGesture", in: $0) },

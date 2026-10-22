@@ -26,6 +26,8 @@ public struct MacSettings: Equatable, Sendable {
     public var tilingToMenuBar: Bool?
     /// `com.apple.WindowManager` `EnableTilingOptionAccelerator`: holding ⌥ while dragging tiles the window.
     public var tilingWithOption: Bool?
+    /// macOS 15 and later tile by dragging out of the box: there, an absent tiling key means on.
+    public var macOSTilesByDefault: Bool
     /// `TrackpadThreeFingerHorizSwipeGesture`, one entry for each trackpad preferences domain that defines it
     /// (`com.apple.AppleMultitouchTrackpad` is the built-in trackpad and
     /// `com.apple.driver.AppleBluetoothMultitouch.trackpad` a Magic Trackpad). The value 2 means
@@ -52,6 +54,7 @@ public struct MacSettings: Equatable, Sendable {
                 tilingByEdgeDrag: Bool? = nil,
                 tilingToMenuBar: Bool? = nil,
                 tilingWithOption: Bool? = nil,
+                macOSTilesByDefault: Bool = false,
                 threeFingerSwipe: [Int] = [],
                 fourFingerSwipe: [Int] = [],
                 threeFingerVertSwipe: [Int] = [],
@@ -66,6 +69,7 @@ public struct MacSettings: Equatable, Sendable {
         self.tilingByEdgeDrag = tilingByEdgeDrag
         self.tilingToMenuBar = tilingToMenuBar
         self.tilingWithOption = tilingWithOption
+        self.macOSTilesByDefault = macOSTilesByDefault
         self.threeFingerSwipe = threeFingerSwipe
         self.fourFingerSwipe = fourFingerSwipe
         self.threeFingerVertSwipe = threeFingerVertSwipe
@@ -195,14 +199,15 @@ public enum MacChecks {
             (s.tilingByEdgeDrag, String(localized: "arrastrar a los bordes")),
             (s.tilingToMenuBar, String(localized: "arrastrar a la barra de menús")),
             (s.tilingWithOption, String(localized: "arrastrar con la tecla Opción")),
-        ].compactMap { $0.0 == true ? $0.1 : nil }
+        ].compactMap { ($0.0 ?? s.macOSTilesByDefault) ? $0.1 : nil }
         let list = active.joined(separator: ", ")
         return MacCheck(
             id: "macos-tiling", title: String(localized: "Mosaico por arrastre de macOS"),
             status: active.isEmpty ? .ok : .warning,
             detail: active.isEmpty
                 ? String(localized: "Apagado.")
-                : String(localized: "macOS acomoda las ventanas al arrastrarlas (\(list)) y compite con Rambla. Conviene apagarlo en Escritorio y Dock."))
+                : String(localized: "macOS acomoda las ventanas al arrastrarlas (\(list)) y compite con Rambla. Conviene apagarlo en Escritorio y Dock."),
+            settingsURL: desktopAndDockURL)
     }
 
     /// Only the swipe with Rambla's finger count matters. Three fingers collide with both "swipe between pages" (1)
