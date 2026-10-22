@@ -265,12 +265,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - CLI, signals
 
+    /// Only the commands left in `CLI.inbox` come from the `rambla` command; one carried by the notification itself
+    /// could come from any app, so it is trusted like a link.
     private func listenForCommands() {
         commandObserver = DistributedNotificationCenter.default().addObserver(
             forName: CLI.commandNotification, object: nil, queue: .main
         ) { [weak self] note in
-            guard let command = note.object as? String else { return }
-            MainActor.assumeIsolated { _ = self?.engine.perform(command: command, from: .commandLine) }
+            let carried = note.object as? String
+            MainActor.assumeIsolated {
+                guard let engine = self?.engine else { return }
+                if let carried { engine.perform(command: carried, from: .url) }
+                for command in CLI.takeCommands() { engine.perform(command: command, from: .commandLine) }
+            }
         }
     }
 

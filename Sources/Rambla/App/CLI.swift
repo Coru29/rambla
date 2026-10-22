@@ -35,9 +35,41 @@ enum CLI {
         return 0
     }
 
+    /// Where the `rambla` command leaves its commands for the running app: a folder only the user's own programs can
+    /// write to. The notification only says to look there, so an app that can post it but not write there (a
+    /// sandboxed one) gets no more than a link (`CommandPolicy`).
+    static var inbox: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/Rambla/Commands", isDirectory: true)
+    }
+
     private static func post(_ command: String) {
+        let file = inbox.appendingPathComponent(String(format: "%.6f-%d.command", Date().timeIntervalSince1970, getpid()))
+        let left: Bool
+        do {
+            try FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
+            try Data(command.utf8).write(to: file, options: .atomic)
+            left = true
+        } catch {
+            left = false
+        }
+        // Without the folder the command still goes, trusted like a link.
         DistributedNotificationCenter.default().postNotificationName(
-            commandNotification, object: command, userInfo: nil, deliverImmediately: true)
+            commandNotification, object: left ? nil : command, userInfo: nil, deliverImmediately: true)
+    }
+
+    /// The commands the `rambla` command left since the last call, oldest first. One older than a few seconds, left
+    /// when Rambla was not there to take it, is dropped.
+    static func takeCommands(now: Date = Date()) -> [String] {
+        let files = (try? FileManager.default.contentsOfDirectory(at: inbox, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+        var commands: [(date: Date, text: String)] = []
+        for file in files where file.pathExtension == "command" {
+            defer { try? FileManager.default.removeItem(at: file) }
+            guard let date = try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
+                  now.timeIntervalSince(date) < 5, let text = try? String(contentsOf: file, encoding: .utf8) else { continue }
+            commands.append((date, text))
+        }
+        return commands.sorted { $0.date < $1.date }.map(\.text)
     }
 
     /// Posts "<command> <reply-path>" and prints the file the app writes there.

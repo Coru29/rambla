@@ -2,9 +2,10 @@ import Foundation
 
 /// What the text commands may do depending on where they come from.
 ///
-/// Any web page can open a `rambla://` link (after one click on the browser's prompt) and any local process can post
-/// the distributed notification the `rambla` command uses, so neither is trusted with more than arranging windows.
-/// The command line also gets the diagnostics, but their replies are written only to Rambla's own reply file in the
+/// Any web page can open a `rambla://` link (after one click on the browser's prompt), so a link is trusted with no
+/// more than arranging windows. The command line is the `rambla` command, whose commands only the user's own programs
+/// can leave for the app (any app, even a sandboxed one, can post the notification that wakes it, and that alone counts
+/// as a link). It also gets the diagnostics, but their replies are written only to Rambla's own reply file in the
 /// user's temporary folder, never to a path chosen by whoever sent the command.
 public enum CommandPolicy {
     public enum Source: Sendable { case url, commandLine }
