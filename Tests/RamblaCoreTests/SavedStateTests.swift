@@ -219,3 +219,28 @@ private func savedColumn(_ windows: [WindowID], _ width: ColumnWidth = .fraction
     #expect(StateMatcher.match(saved: saved, live: live) == [1: 9, 2: 2])
     #expect(StateMatcher.match(saved: saved, live: live, byTitle: false) == [2: 2])
 }
+
+// MARK: - Floating windows after a restart
+
+/// Two windows of one app with one title, the strip one saved before the floating one (as `saveNow` writes them).
+private let tiled = WindowRef(id: 5, bundleID: "net.kovidgoyal.kitty", title: "zsh")
+private let floated = WindowRef(id: 9, bundleID: "net.kovidgoyal.kitty", title: "zsh")
+
+@Test func floatingRestoreNeverTakesTheWindowTheStripGot() {
+    // After a relaunch the tiled window keeps its id; the floating one is on another Space, so not a candidate.
+    let relaunch = StateMatcher.match(saved: [tiled, floated], live: [WindowRef(id: 5, bundleID: tiled.bundleID, title: "zsh")])
+    #expect(StateMatcher.floating(in: relaunch, pending: [9], byTitle: true).isEmpty)
+    // After a reboot both come back with new ids and the same title: each saved window keeps its own live one.
+    let reboot = StateMatcher.match(saved: [tiled, floated], live: [WindowRef(id: 101, bundleID: tiled.bundleID, title: "zsh"),
+                                                                      WindowRef(id: 102, bundleID: tiled.bundleID, title: "zsh")])
+    #expect(reboot[5] == 101)
+    #expect(StateMatcher.floating(in: reboot, pending: [9], byTitle: true) == [9: 102])
+}
+
+@Test func floatingRestoreUsesOnlyIdsOnceStartupIsOver() {
+    let both = StateMatcher.match(saved: [tiled, floated], live: [WindowRef(id: 5, bundleID: tiled.bundleID, title: "zsh"),
+                                                                    WindowRef(id: 9, bundleID: tiled.bundleID, title: "zsh")])
+    #expect(StateMatcher.floating(in: both, pending: [9], byTitle: false) == [9: 9])
+    let renamed = StateMatcher.match(saved: [floated], live: [WindowRef(id: 77, bundleID: tiled.bundleID, title: "zsh")])
+    #expect(StateMatcher.floating(in: renamed, pending: [9], byTitle: false).isEmpty)   // a title match only
+}

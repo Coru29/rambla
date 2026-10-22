@@ -59,6 +59,13 @@ public struct SavedState: Codable, Equatable, Sendable {
 }
 
 public enum StateMatcher {
+    /// The saved floating windows (`pending`) to float now, taken from the one pairing the strip restore used, so a
+    /// live window the strips got is never floated too. Past the first moments of a session (`byTitle` false) only
+    /// pairs with the same id count: a new window sharing a saved title is a different window.
+    public static func floating(in matches: [WindowID: WindowID], pending: Set<WindowID>, byTitle: Bool) -> [WindowID: WindowID] {
+        matches.filter { pending.contains($0.key) && (byTitle || $0.key == $0.value) }
+    }
+
     /// Maps saved window ids to the live windows they most likely are; saved windows with no match are absent.
     /// Pass 1 pairs windows with the same id and the same app (same login session). Pass 2 pairs what is left by app
     /// and identical non-empty title, in order (after a restart). Each live window is used at most once, and pass 1
