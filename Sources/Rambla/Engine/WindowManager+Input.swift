@@ -36,7 +36,7 @@ extension WindowManager {
     }
 
     /// Settles on a column edge (carrying the release `velocity`, in points per second, so a flick reaches the next
-    /// column) and focuses the most visible column, without another scroll.
+    /// column) and focuses the column it lands on, without another scroll.
     func slideEnded(velocity: Double) {
         guard let key = gestureKey else { return }
         gestureKey = nil
@@ -121,9 +121,10 @@ extension WindowManager {
         return nil
     }
 
-    /// Gives keyboard focus without scrolling the strip when macOS reports the change back.
+    /// Gives keyboard focus without scrolling the strip when macOS reports the change back. A window that already has
+    /// the focus gets no report, so nothing is suppressed for it (a leftover would keep a later ⌘Tab from revealing it).
     func focusWithoutScrolling(_ id: WindowID) {
-        revealSuppressedFor = id
+        revealSuppressedFor = id == focusedWindow ? nil : id
         focusedWindow = id
         worker(for: id)?.focus(id)
         overlayHook?()

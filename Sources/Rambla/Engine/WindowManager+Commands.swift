@@ -121,6 +121,7 @@ extension WindowManager {
 
     /// Focuses a strip window: real keyboard focus through its app, then scrolls it into view.
     func focus(window id: WindowID, in key: StripKey) {
+        revealSuppressedFor = nil   // this focus reveals by itself; an older suppression must not outlive it
         focusedWindow = id
         strips[key]?.focus(window: id)
         worker(for: id)?.focus(id)
