@@ -12,6 +12,9 @@ struct DisplayInfo: Equatable {
     let currentSpace: UInt64?
     /// Stable key of the current Space (its UUID), used to persist strips across restarts.
     let currentSpaceKey: String
+    /// Every Space of the display, by id and by key (empty when macOS does not say).
+    let spaceIDs: Set<UInt64>
+    let spaceKeys: Set<String>
     let isFullscreenSpace: Bool
     let screen: NSScreen
 
@@ -59,6 +62,7 @@ enum Displays {
                 id: id, uuid: uuid, name: screen.localizedName,
                 frame: axRect(screen.frame), visible: axRect(screen.visibleFrame),
                 currentSpace: current, currentSpaceKey: key,
+                spaceIDs: Set(entry?.uuids.keys.map { $0 } ?? []), spaceKeys: Set(entry?.uuids.values.map { $0 } ?? []),
                 isFullscreenSpace: current.map { entry?.fullscreen.contains($0) ?? false } ?? false,
                 screen: screen
             )

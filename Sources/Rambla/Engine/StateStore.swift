@@ -36,6 +36,19 @@ enum StateStore {
         }
         return state
     }
+
+    /// The login session Rambla runs in. macOS numbers windows again after a logout or a restart, so a saved window id
+    /// names the same window only within the session it was saved in.
+    static let session: String = {
+        let info = CGSessionCopyCurrentDictionary() as? [String: Any] ?? [:]
+        if let uuid = info["CGSSessionUniqueSessionUUID"] as? String { return uuid }
+        // Where macOS does not say, this boot and this login's audit session tell it apart.
+        var boot = [CChar](repeating: 0, count: 64)
+        var size = boot.count
+        sysctlbyname("kern.bootsessionuuid", &boot, &size, nil, 0)
+        let bootID = boot.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
+        return bootID + "/" + String(describing: info["kCGSSessionAuditIDKey"] ?? "")
+    }()
 }
 
 extension WindowManager {
@@ -50,22 +63,21 @@ extension WindowManager {
 
     func saveNow() {
         // No window known at all (Accessibility lists none while the screen is locked) is no layout: keep the file's.
-        guard !windows.isEmpty else { return }
+        guard onlyBundles == nil, !windows.isEmpty else { return }
         var refs: [RamblaCore.WindowRef] = []
         var saved: [SavedStrip] = []
         for (key, strip) in strips where !strip.columns.isEmpty {
             guard let spaceKey = spaceKeys[key] else { continue }
-            saved.append(SavedStrip(displayUUID: key.displayUUID, spaceKey: spaceKey, strip: strip))
-            for id in strip.allWindows {
-                if let record = windows[id] { refs.append(RamblaCore.WindowRef(id: id, bundleID: record.bundleID ?? "", title: record.title)) }
-            }
+            let mine = strip.allWindows.compactMap(ref)
+            saved.append(SavedStrip(displayUUID: key.displayUUID, spaceKey: spaceKey, strip: strip, session: StateStore.session,
+                                    refs: mine))
+            refs += mine
         }
         // Only the windows the user floated: the ones Rambla floated by itself go back to the strip after a restart.
         let chosen = floating.subtracting(autoFloated)
-        for id in chosen {
-            if let record = windows[id] { refs.append(RamblaCore.WindowRef(id: id, bundleID: record.bundleID ?? "", title: record.title)) }
-        }
-        StateStore.save(archive.merged(into: SavedState(refs: refs, strips: saved, floating: Array(chosen)), at: Date()))
+        refs += chosen.compactMap(ref)
+        let live = SavedState(session: StateStore.session, refs: refs, strips: saved, floating: Array(chosen))
+        StateStore.save(archive.merged(into: live, at: Date()))
     }
 
     /// What is needed to recognise the window again after a restart.
@@ -73,36 +85,48 @@ extension WindowManager {
         windows[id].map { RamblaCore.WindowRef(id: id, bundleID: $0.bundleID ?? "", title: $0.title) }
     }
 
-    /// The first time a display and Space are in view this session, or when an unplugged display comes back, rebuild
-    /// their strip from the archive: windows are matched by id, then by app + title (after a restart ids are new), and
-    /// the ones the archive does not know are added afterwards in x order. A display that comes back takes back its
-    /// windows from the strips they joined meanwhile, as long as they are on screen and the user did not float them.
+    /// The first time a display and Space are in view this session, rebuild their strip from the archive; the windows
+    /// it does not know are added afterwards in x order. Windows are matched the way the session the strip was saved in
+    /// allows (`StateMatcher`). A display that comes back takes back, for `returnWindow`, the windows of the strips
+    /// archived when it was unplugged, from the strips they joined meanwhile, as long as they are on screen and the
+    /// user did not float them.
     func restoreFromSavedState(keys: [StripKey], candidates: [WindowRecord], visible: Set<WindowID>) {
-        // Without a window to place in a strip (Rambla started while the screen was locked, when Accessibility lists
-        // none), wait for one instead of using up the restore of the strips seen now.
-        guard windows.values.contains(where: { $0.kind == .tile }) else { return }
-        let live = candidates.map { RamblaCore.WindowRef(id: $0.id, bundleID: $0.bundleID ?? "", title: $0.title) }
-        let matches = StateMatcher.match(saved: Array(archive.refs.values), live: live)
         for key in keys where !restoredKeys.contains(key) {
-            restoredKeys.insert(key)
-            guard let spaceKey = spaceKeys[key] else { continue }
-            // Archived this session (an unplugged display): its ids are live ones. `onlyCurrentStrip` only finds those.
+            guard let spaceKey = spaceKeys[key], let display = displays.first(where: { $0.uuid == key.displayUUID })
+            else { continue }
+            let returning = returningDisplays[key.displayUUID] != nil
             guard let saved = archive.strip(displayUUID: key.displayUUID, spaceKey: spaceKey)
-                ?? archive.onlyCurrentStrip(displayUUID: key.displayUUID) else { continue }
-            let returning = archive.isFromThisSession(displayUUID: saved.displayUUID, spaceKey: saved.spaceKey)
-            let alreadyPlaced = Set(strips.values.flatMap(\.allWindows))
-            var map = matches.filter { !alreadyPlaced.contains($0.value) }
-            if returning {
-                // The display came back: its windows are wherever macOS put them meanwhile.
-                for id in saved.strip.allWindows where map[id] == nil {
-                    guard let record = windows[id], record.kind == .tile, visible.contains(id), !floating.contains(id),
-                          !map.values.contains(id) else { continue }
-                    map[id] = id
-                }
+                ?? (returning && !display.spaceKeys.isEmpty
+                    ? archive.strayStrip(displayUUID: key.displayUUID, spaces: display.spaceKeys) : nil) else {
+                restoredKeys.insert(key)
+                continue
             }
+            // Apps are still listing their windows: rebuilt now, the strip would get only the first ones.
+            guard !waitingForWindowLists else { continue }
+            let takesBack = returning && saved.unplugged
+            let pool: [WindowRecord]
+            if takesBack {
+                pool = windows.values.filter { $0.kind == .tile && visible.contains($0.id) && !floating.contains($0.id) }
+            } else {
+                // The windows no other strip holds, those that already joined this one included. Without one of this
+                // display among them, wait for it instead of using up the arrangement (Accessibility lists no window
+                // while the screen is locked).
+                let placed = Set(strips.filter { $0.key != key }.values.flatMap(\.allWindows))
+                pool = candidates.filter { !placed.contains($0.id) } + (strips[key]?.allWindows ?? []).compactMap { windows[$0] }
+                guard pool.contains(where: {
+                    $0.kind == .tile && Displays.best(for: $0.frame, in: displays)?.uuid == key.displayUUID
+                }) else { continue }
+            }
+            let map = StateMatcher.match(saved: saved.refs, live: pool.compactMap { ref($0.id) }, session: saved.session,
+                                         current: StateStore.session)
             var restored = saved.strip.remapped(map)
-            // None of its windows is here: it stays archived, for a later restart.
-            guard !restored.columns.isEmpty else { continue }
+            guard !restored.columns.isEmpty else {
+                // None of its windows is here. A display that is coming back tries again with the next change. Any
+                // other Space starts as it is, with other windows: its live strip replaces the archived one when saved.
+                if !takesBack { restoredKeys.insert(key) }
+                continue
+            }
+            restoredKeys.insert(key)
             _ = archive.take(displayUUID: saved.displayUUID, spaceKey: saved.spaceKey)
             for id in restored.allWindows {
                 for other in Array(strips.keys) where other != key && strips[other]!.contains(id) {
@@ -115,14 +139,19 @@ extension WindowManager {
                 }
             }
             strips[key] = restored
-            Log.info(returning ? "Display \(key.displayUUID.prefix(8)) is back: \(restored.allWindows.count) windows in their places"
+            Log.info(takesBack ? "Display \(key.displayUUID.prefix(8)) is back: \(restored.allWindows.count) windows in their places"
                                : "Restored \(restored.allWindows.count) windows on display \(key.displayUUID.prefix(8))")
         }
-        // Each saved floating window floats one live window, once, from the same pairing the strips used. Titles only
-        // count while apps are still bringing their windows back after Rambla starts.
-        guard !pendingFloating.isEmpty else { return }
+        // Each saved floating window floats one live window, once, among those no strip took (so not while strips wait
+        // for the apps). Titles only count while apps are still bringing their windows back after Rambla starts.
+        guard !pendingFloating.isEmpty, !waitingForWindowLists, let file = restoreState else { return }
         let startingUp = CFAbsoluteTimeGetCurrent() - launchTime < Self.restoreByTitleWindow
-        for (savedID, liveID) in StateMatcher.floating(in: matches, pending: pendingFloating, byTitle: startingUp) {
+        let placed = Set(strips.values.flatMap(\.allWindows))
+        let live = candidates.filter { !placed.contains($0.id) }.compactMap { ref($0.id) }
+        let saved = file.refs.filter { pendingFloating.contains($0.id) }
+        let matches = StateMatcher.match(saved: saved, live: live, session: file.session, current: StateStore.session,
+                                         byTitle: startingUp)
+        for (savedID, liveID) in matches {
             pendingFloating.remove(savedID)
             markFloating(liveID)
         }

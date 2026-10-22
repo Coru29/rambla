@@ -32,7 +32,9 @@ final class WindowManager {
     private(set) var prefs = Preferences()
     private(set) var isRunning = false
     private(set) var isPaused = false
-    private var onlyBundles: Set<String>?
+    /// Test mode (`--only-bundle`): only these apps' windows are managed, and the user's saved layout is neither read
+    /// nor written.
+    private(set) var onlyBundles: Set<String>?
 
     private var workers: [pid_t: AppWorker] = [:]
     private var appLaunchTimes: [pid_t: CFAbsoluteTime] = [:]
@@ -57,9 +59,15 @@ final class WindowManager {
     /// How long a display must stay disconnected before its windows join the strips where they are now: long enough
     /// for a dock or a monitor that is slow to come back after a wake.
     private static let goneDisplayDelay: TimeInterval = 15
-    /// The reconcile that checks again once a gone display's time is up. Separate from `scheduleReconcile`, which would
-    /// otherwise hold every other reconcile until then.
-    private var goneDisplayCheck: DispatchWorkItem?
+    /// The reconcile that checks again once a display's time is up (gone long enough, or done coming back), and when.
+    /// Separate from `scheduleReconcile`, which would otherwise hold every other reconcile until then.
+    private var displayCheck: DispatchWorkItem?
+    private var displayCheckAt: CFAbsoluteTime = 0
+    /// How long a display that appears (plugged in again, or there when Rambla starts) may take back the windows of its
+    /// strips archived when it was unplugged.
+    static let returnWindow: CFAbsoluteTime = 10
+    /// Displays that appeared, and until when they may take their windows back.
+    private(set) var returningDisplays: [String: CFAbsoluteTime] = [:]
     private var graceUntil: CFAbsoluteTime = 0
     private var reconcileScheduled = false
     var pendingReveal: StripKey?
@@ -84,6 +92,12 @@ final class WindowManager {
     /// the first time its display and Space are in view again, and saved meanwhile.
     var archive = StripArchive()
     var restoredKeys: Set<StripKey> = []
+    /// Apps asked to list their windows (at launch, after an unlock, on a desktop change) that have not answered yet,
+    /// and until when to wait for them: a strip rebuilt before they answer gets only the windows of the apps that
+    /// answered first.
+    private var awaitingWindowLists: Set<pid_t> = []
+    private var awaitingUntil: CFAbsoluteTime = 0
+    private static let windowListWait: CFAbsoluteTime = 2
     /// Saved ids of the floating windows not matched yet; each one floats a single live window.
     var pendingFloating: Set<WindowID> = []
     /// When Rambla started: saved windows are matched by title only for `restoreByTitleWindow` seconds after it.
@@ -111,12 +125,15 @@ final class WindowManager {
         dragTracker.setEnabled(true)
         displays = Displays.current()
         frontmostPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
-        restoreState = StateStore.load()
+        restoreState = onlyBundles == nil ? StateStore.load() : nil
         archive = StripArchive(loading: restoreState, at: Date())
         pendingFloating = Set(restoreState?.floating ?? [])
         launchTime = CFAbsoluteTimeGetCurrent()
+        // A display may have been plugged back while Rambla was not running.
+        for display in displays { returningDisplays[display.uuid] = launchTime + Self.returnWindow }
         observeSystem()
         NSWorkspace.shared.runningApplications.forEach(register)
+        awaitWindowLists()
         if let only = onlyBundles { Log.info("Test mode: managing only \(only.sorted().joined(separator: ", "))") }
         // Give every app's worker a moment to report its windows so the saved layout restores in one go.
         scheduleReconcile(after: 0.6)
@@ -145,7 +162,7 @@ final class WindowManager {
         } else {
             isPaused = false
             Log.info("Resumed")
-            workers.values.forEach { $0.rescan() }
+            rescanAll()
             scheduleReconcile()
         }
         onStateChanged?()
@@ -199,7 +216,7 @@ final class WindowManager {
             overlayHook?()
             frontmostPID.flatMap { self.workers[$0] }?.refreshFocused()
             grace(1.0)
-            workers.values.forEach { $0.rescan() }
+            rescanAll()
             scheduleReconcile(after: 0.15)
         }
         observe(ws, NSWorkspace.didWakeNotification) { [weak self] _ in self?.screensWoke() }
@@ -229,7 +246,7 @@ final class WindowManager {
     /// Every app lists its windows again, and one reconcile takes all the answers after the same wait as at launch.
     /// Right after an unlock Accessibility may still list nothing: while no window is known, it tries twice more.
     private func readWindowsAgain(retries: Int = 2) {
-        workers.values.forEach { $0.rescan() }
+        rescanAll()
         scheduleReconcile(after: 0.6)
         guard retries > 0 else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
@@ -290,11 +307,27 @@ final class WindowManager {
 
     private func unregister(_ pid: pid_t) {
         appLaunchTimes[pid] = nil
+        awaitingWindowLists.remove(pid)
         guard let worker = workers.removeValue(forKey: pid) else { return }
         worker.stop()
         for (id, record) in windows where record.pid == pid { removeWindow(id) }
         scheduleReconcile()
     }
+
+    /// Every app lists its windows again; saved strips wait for the answers.
+    private func rescanAll() {
+        workers.values.forEach { $0.rescan() }
+        awaitWindowLists()
+    }
+
+    private func awaitWindowLists() {
+        awaitingWindowLists = Set(workers.keys)
+        awaitingUntil = CFAbsoluteTimeGetCurrent() + Self.windowListWait
+        checkDisplaysAgain(after: Self.windowListWait + 0.05)
+    }
+
+    /// Some app has not listed its windows yet (`awaitingWindowLists`).
+    var waitingForWindowLists: Bool { !awaitingWindowLists.isEmpty && CFAbsoluteTimeGetCurrent() < awaitingUntil }
 
     func worker(for id: WindowID) -> AppWorker? {
         windows[id].flatMap { workers[$0.pid] }
@@ -306,6 +339,7 @@ final class WindowManager {
         guard isRunning else { return }
         switch event {
         case .appWindows(let pid, let snapshots):
+            awaitingWindowLists.remove(pid)
             // An app launched while Rambla runs often shows its first window before its observer exists:
             // those windows are new too, so they open next to the focused column.
             let launchedRecently = appLaunchTimes[pid].map { CFAbsoluteTimeGetCurrent() - $0 < 10 } ?? false
@@ -478,6 +512,7 @@ final class WindowManager {
     private func reconcile() {
         reconcileScheduled = false
         guard isRunning, !isPaused else { return }
+        let connectedBefore = Set(displays.map(\.uuid))
         displays = Displays.current()
         let existing = Self.windowIDs(onScreenOnly: false)
         let visible = Self.windowIDs(onScreenOnly: true)
@@ -487,7 +522,9 @@ final class WindowManager {
             worker(for: id)?.forgetWindow(id)
             removeWindow(id)
         }
+        followReturningDisplays(connectedBefore: connectedBefore, now: now)
         dropStripsOfDisconnectedDisplays(now: ProcessInfo.processInfo.systemUptime)
+        archiveStripsOfGoneSpaces()
 
         let keys = currentKeys
         for display in enabledDisplays {
@@ -550,8 +587,9 @@ final class WindowManager {
         }
         for record in orphans {
             // A window on a disabled display stays untouched: look it up among all displays.
-            guard let display = Displays.best(for: record.frame, in: displays),
-                  let key = currentKey(of: display), keys.contains(key) else { continue }
+            // A strip waiting to be rebuilt takes its windows then, in their places.
+            guard let display = Displays.best(for: record.frame, in: displays), let key = currentKey(of: display),
+                  keys.contains(key), restoredKeys.contains(key) || !waitingForWindowLists else { continue }
             insert(record, into: key)
             // A window that joins at the end can have the focus (it came back from somewhere): show it.
             if record.id == focusedWindow { strips[key]!.focus(window: record.id) }
@@ -567,6 +605,24 @@ final class WindowManager {
         onStateChanged?()
     }
 
+    /// A display that appears may take back, for `returnWindow`, the windows of its strips archived when it was
+    /// unplugged. Once that time is up its strips are matched like any other saved strip, so a desktop visited later
+    /// never pulls windows the user is working with somewhere else.
+    private func followReturningDisplays(connectedBefore: Set<String>, now: CFAbsoluteTime) {
+        let connected = Set(displays.map(\.uuid))
+        for uuid in connected.subtracting(connectedBefore) { returningDisplays[uuid] = now + Self.returnWindow }
+        for (uuid, until) in returningDisplays {
+            if !connected.contains(uuid) {
+                returningDisplays[uuid] = nil
+            } else if until <= now {
+                returningDisplays[uuid] = nil
+                archive.settle(displayUUID: uuid)
+            } else {
+                checkDisplaysAgain(after: until - now + 0.1)
+            }
+        }
+    }
+
     /// macOS moves the windows of an unplugged display to the remaining ones, but they stayed in that display's strips,
     /// which no longer lay anything out: untiled and out of reach of the shortcuts. Once the display has been gone for
     /// `goneDisplayDelay`, its strips go to the archive and the windows join the strips of the displays they are on
@@ -579,31 +635,56 @@ final class WindowManager {
             let since = displayGoneSince[uuid] ?? now
             displayGoneSince[uuid] = since
             guard now - since >= Self.goneDisplayDelay else {
-                checkGoneDisplays(after: Self.goneDisplayDelay - (now - since) + 0.1)
+                checkDisplaysAgain(after: Self.goneDisplayDelay - (now - since) + 0.1)
                 continue
             }
-            for key in Array(strips.keys) where key.displayUUID == uuid {
-                if let spaceKey = spaceKeys[key], let strip = strips[key], !strip.columns.isEmpty {
-                    archive.store(SavedStrip(displayUUID: uuid, spaceKey: spaceKey, strip: strip),
-                                  refs: strip.allWindows.compactMap(ref), at: Date())
-                }
-                strips[key] = nil
-                results[key] = nil
-                hidden[key] = nil
-                spaceKeys[key] = nil
-                restoredKeys.remove(key)
-            }
+            for key in Array(strips.keys) where key.displayUUID == uuid { archiveStrip(key, unplugged: true) }
             displayGoneSince[uuid] = nil
             Log.info("Display \(uuid.prefix(8)) disconnected: its windows join the strips of the displays they are on until it comes back")
         }
     }
 
-    private func checkGoneDisplays(after delay: TimeInterval) {
-        goneDisplayCheck?.cancel()
-        let item = DispatchWorkItem { [weak self] in
-            MainActor.assumeIsolated { self?.scheduleReconcile() }
+    /// A display that comes back before `goneDisplayDelay` can come back with new ids for its desktops, and a desktop
+    /// can be removed: a strip whose desktop is no longer on its display would keep its windows out of reach. It goes
+    /// to the archive (a display coming back takes it back under the desktop's new key) and its windows join the strips
+    /// of the desktops they are on now.
+    private func archiveStripsOfGoneSpaces() {
+        for display in displays {
+            guard let current = display.currentSpace, display.spaceIDs.contains(current) else { continue }
+            for key in Array(strips.keys) where key.displayUUID == display.uuid && !display.spaceIDs.contains(key.spaceID) {
+                archiveStrip(key, unplugged: returningDisplays[display.uuid] != nil)
+                Log.info("Desktop \(key.spaceID) is no longer on display \(display.uuid.prefix(8)): its strip goes to the archive")
+            }
         }
-        goneDisplayCheck = item
+    }
+
+    /// Takes a strip out of the live state, into the archive when it holds windows of a known desktop.
+    private func archiveStrip(_ key: StripKey, unplugged: Bool) {
+        if let spaceKey = spaceKeys[key], let strip = strips[key], !strip.columns.isEmpty {
+            archive.store(SavedStrip(displayUUID: key.displayUUID, spaceKey: spaceKey, strip: strip, session: StateStore.session,
+                                     refs: strip.allWindows.compactMap(ref), unplugged: unplugged), at: Date())
+        }
+        strips[key] = nil
+        results[key] = nil
+        hidden[key] = nil
+        spaceKeys[key] = nil
+        restoredKeys.remove(key)
+    }
+
+    /// A reconcile `delay` seconds from now, unless one is already due sooner: each reconcile asks again for what is
+    /// still pending.
+    private func checkDisplaysAgain(after delay: TimeInterval) {
+        let at = CFAbsoluteTimeGetCurrent() + delay
+        if displayCheck != nil, displayCheckAt <= at { return }
+        displayCheck?.cancel()
+        let item = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                self?.displayCheck = nil
+                self?.scheduleReconcile()
+            }
+        }
+        displayCheck = item
+        displayCheckAt = at
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
     }
 
@@ -722,7 +803,7 @@ final class WindowManager {
         floating.subtract(autoFloated)
         autoFloated.removeAll()
         requested.removeAll()
-        workers.values.forEach { $0.rescan() }
+        rescanAll()
         scheduleReconcile()
     }
 

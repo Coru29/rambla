@@ -19,14 +19,37 @@ public struct SavedStrip: Codable, Equatable, Sendable {
     public var displayUUID: String
     public var spaceKey: String
     public var strip: Strip
-    /// When the strip was last in view; files from before 1.0.1 have none.
+    /// When the strip was last in view; files from before 1.1.0 have none.
     public var lastSeen: Date?
+    /// The login session it was last in view in: within it, its window ids are still the live ones. Files from before
+    /// 1.1.0 do not say.
+    public var session: String?
+    /// Its windows, to recognise them again. Files from before 1.1.0 keep them only in `SavedState.refs`.
+    public var refs: [WindowRef]
+    /// Archived because its display was unplugged: when the display comes back, the strip takes its windows back from
+    /// the strips they joined meanwhile.
+    public var unplugged: Bool
 
-    public init(displayUUID: String, spaceKey: String, strip: Strip, lastSeen: Date? = nil) {
+    public init(displayUUID: String, spaceKey: String, strip: Strip, lastSeen: Date? = nil, session: String? = nil,
+                refs: [WindowRef] = [], unplugged: Bool = false) {
         self.displayUUID = displayUUID
         self.spaceKey = spaceKey
         self.strip = strip
         self.lastSeen = lastSeen
+        self.session = session
+        self.refs = refs
+        self.unplugged = unplugged
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        displayUUID = try container.decode(String.self, forKey: .displayUUID)
+        spaceKey = try container.decode(String.self, forKey: .spaceKey)
+        strip = try container.decode(Strip.self, forKey: .strip)
+        lastSeen = try container.decodeIfPresent(Date.self, forKey: .lastSeen)
+        session = try container.decodeIfPresent(String.self, forKey: .session)
+        refs = try container.decodeIfPresent([WindowRef].self, forKey: .refs) ?? []
+        unplugged = try container.decodeIfPresent(Bool.self, forKey: .unplugged) ?? false
     }
 
     func isFor(displayUUID: String, spaceKey: String) -> Bool {
@@ -43,32 +66,29 @@ public struct StripArchive: Equatable, Sendable {
     public static let maxAge: TimeInterval = 30 * 24 * 60 * 60
 
     public private(set) var strips: [SavedStrip] = []
-    /// Every window the archived strips hold, by the id they have in them.
-    public private(set) var refs: [WindowID: WindowRef] = [:]
-    /// Strips archived during this session: their window ids are still the live ones.
-    private var current: Set<String> = []
 
     public init() {}
 
-    /// The archive at launch: every strip of the saved file, dated now when the file has no date.
+    /// The archive at launch: every strip of the saved file, dated now when the file has no date. Strips from before
+    /// 1.1.0 (no session) take their windows' refs from the file's shared list.
     public init(loading state: SavedState?, at now: Date) {
         guard let state else { return }
+        var shared: [WindowID: WindowRef] = [:]
+        for ref in state.refs where shared[ref.id] == nil { shared[ref.id] = ref }
         strips = state.strips.map { strip in
             var strip = strip
             if strip.lastSeen == nil { strip.lastSeen = now }
+            if strip.session == nil { strip.refs = strip.strip.allWindows.compactMap { shared[$0] } }
             return strip
         }
-        for ref in state.refs { refs[ref.id] = ref }
     }
 
     /// Archives `strip` (the one of an unplugged display, seen until `now`), replacing any of the same display and Space.
-    public mutating func store(_ strip: SavedStrip, refs: [WindowRef], at now: Date) {
+    public mutating func store(_ strip: SavedStrip, at now: Date) {
         var strip = strip
         strip.lastSeen = now
         strips.removeAll { $0.isFor(displayUUID: strip.displayUUID, spaceKey: strip.spaceKey) }
         strips.append(strip)
-        for ref in refs { self.refs[ref.id] = ref }
-        current.insert(Self.key(strip.displayUUID, strip.spaceKey))
     }
 
     /// Takes the strip of that display and Space out of the archive, to restore it.
@@ -76,7 +96,6 @@ public struct StripArchive: Equatable, Sendable {
         guard let index = strips.firstIndex(where: { $0.isFor(displayUUID: displayUUID, spaceKey: spaceKey) }) else {
             return nil
         }
-        current.remove(Self.key(displayUUID, spaceKey))
         return strips.remove(at: index)
     }
 
@@ -85,20 +104,24 @@ public struct StripArchive: Equatable, Sendable {
         strips.first { $0.isFor(displayUUID: displayUUID, spaceKey: spaceKey) }
     }
 
-    /// The strip archived during this session for that display, when it is the only one: an unplugged display's
-    /// desktop can come back under a new key. With several, nothing (only exact keys can tell them apart).
-    public func onlyCurrentStrip(displayUUID: String) -> SavedStrip? {
-        let mine = strips.filter { $0.displayUUID == displayUUID && current.contains(Self.key($0.displayUUID, $0.spaceKey)) }
-        return mine.count == 1 ? mine.first : nil
+    /// For a display that is back with its desktop under a new key: the one strip archived when it was unplugged, as
+    /// long as that strip's desktop is gone from the display (`spaces`, the keys the display has now); while it is
+    /// still there, its own key will find it. With several, nothing: only exact keys can tell them apart.
+    public func strayStrip(displayUUID: String, spaces: Set<String>) -> SavedStrip? {
+        let mine = strips.filter { $0.displayUUID == displayUUID && $0.unplugged }
+        guard mine.count == 1, let only = mine.first, !spaces.contains(only.spaceKey) else { return nil }
+        return only
     }
 
-    /// Whether the strip of that display and Space was archived during this session, so its ids are live ids.
-    public func isFromThisSession(displayUUID: String, spaceKey: String) -> Bool {
-        current.contains(Self.key(displayUUID, spaceKey))
+    /// The display is back and had its chance to take its windows back: from now on its strips are matched like any
+    /// other saved strip, so a desktop visited later never pulls windows the user is working with somewhere else.
+    public mutating func settle(displayUUID: String) {
+        for index in strips.indices where strips[index].displayUUID == displayUUID { strips[index].unplugged = false }
     }
 
     /// What to save: the live strips, seen `now`, then the archived ones that no live strip replaces and that are not
-    /// older than `maxAge`, with the refs of every window they hold (once each).
+    /// older than `maxAge`. Each strip keeps its own refs; `refs` also lists every window once, the live ones first,
+    /// for the floating windows and for older versions of Rambla.
     public func merged(into live: SavedState, at now: Date) -> SavedState {
         var state = live
         state.strips = live.strips.map { strip in
@@ -111,16 +134,10 @@ public struct StripArchive: Equatable, Sendable {
             guard !live.strips.contains(where: { $0.isFor(displayUUID: strip.displayUUID, spaceKey: strip.spaceKey) }),
                   let seen = strip.lastSeen, now.timeIntervalSince(seen) <= Self.maxAge else { continue }
             state.strips.append(strip)
-            for id in strip.strip.allWindows where !known.contains(id) {
-                guard let ref = refs[id] else { continue }
-                state.refs.append(ref)
-                known.insert(id)
-            }
+            for ref in strip.refs where known.insert(ref.id).inserted { state.refs.append(ref) }
         }
         return state
     }
-
-    private static func key(_ displayUUID: String, _ spaceKey: String) -> String { displayUUID + "/" + spaceKey }
 }
 
 /// The contents of `state.json`.
@@ -130,15 +147,19 @@ public struct SavedState: Codable, Equatable, Sendable {
     public static let currentVersion = 2
 
     public var version: Int
-    /// Every window that appears in `strips` or `floating`, for matching after a restart.
+    /// The login session the file was written in, which the ids of `refs` and `floating` belong to. Files from before
+    /// 1.1.0 do not say.
+    public var session: String?
+    /// Every window that appears in `strips` or `floating`, once, for matching after a restart.
     public var refs: [WindowRef]
     public var strips: [SavedStrip]
     /// Windows the user took out of the strip.
     public var floating: [WindowID]
 
-    public init(version: Int = SavedState.currentVersion, refs: [WindowRef] = [], strips: [SavedStrip] = [],
-                floating: [WindowID] = []) {
+    public init(version: Int = SavedState.currentVersion, session: String? = nil, refs: [WindowRef] = [],
+                strips: [SavedStrip] = [], floating: [WindowID] = []) {
         self.version = version
+        self.session = session
         self.refs = refs
         self.strips = strips
         self.floating = floating
@@ -155,26 +176,33 @@ public struct SavedState: Codable, Equatable, Sendable {
 }
 
 public enum StateMatcher {
-    /// The saved floating windows (`pending`) to float now, taken from the one pairing the strip restore used, so a
-    /// live window the strips got is never floated too. Past the first moments of a session (`byTitle` false) only
-    /// pairs with the same id count: a new window sharing a saved title is a different window.
-    public static func floating(in matches: [WindowID: WindowID], pending: Set<WindowID>, byTitle: Bool) -> [WindowID: WindowID] {
-        matches.filter { pending.contains($0.key) && (byTitle || $0.key == $0.value) }
+    /// Maps saved window ids to the live windows they most likely are, the way the login session they were saved in
+    /// allows (`session`; files from before 1.1.0 do not say):
+    /// - in this one (`current`) ids are the live ones, so only the same id counts: a window that shares a saved title
+    ///   is another window;
+    /// - in an earlier one ids were handed out again, so only the app and the title count;
+    /// - when unknown, ids first and then titles.
+    /// Titles count only with `byTitle`: past the first moments of a session, a new window sharing a saved title is
+    /// another window too.
+    public static func match(saved: [WindowRef], live: [WindowRef], session: String?, current: String,
+                             byTitle: Bool = true) -> [WindowID: WindowID] {
+        let sameSession = session == current
+        return match(saved: saved, live: live, byID: session == nil || sameSession, byTitle: byTitle && !sameSession)
     }
 
     /// Maps saved window ids to the live windows they most likely are; saved windows with no match are absent.
-    /// Pass 1 pairs windows with the same id and the same app (same login session). Pass 2 pairs what is left by app
-    /// and identical non-empty title, in order (after a restart). Each live window is used at most once, and pass 1
-    /// claims its windows first so a title match can never steal a window whose id is known. Without `byTitle` only
-    /// pass 1 runs: past the first moments of a session, a new window sharing a saved title is a different window.
-    public static func match(saved: [WindowRef], live: [WindowRef], byTitle: Bool = true) -> [WindowID: WindowID] {
+    /// Pass 1 (`byID`) pairs windows with the same id and the same app (same login session). Pass 2 (`byTitle`) pairs
+    /// what is left by app and identical non-empty title, in order (after a restart). Each live window is used at most
+    /// once, and pass 1 claims its windows first so a title match can never steal a window whose id is known.
+    public static func match(saved: [WindowRef], live: [WindowRef], byID: Bool = true,
+                             byTitle: Bool = true) -> [WindowID: WindowID] {
         var mapping: [WindowID: WindowID] = [:]
         var claimed = Set<Int>()   // indices into `live`
 
         var liveIndexByID: [WindowID: Int] = [:]
         for (index, ref) in live.enumerated() where liveIndexByID[ref.id] == nil { liveIndexByID[ref.id] = index }
 
-        for ref in saved where mapping[ref.id] == nil {
+        for ref in saved where byID && mapping[ref.id] == nil {
             guard let index = liveIndexByID[ref.id], !claimed.contains(index), live[index].bundleID == ref.bundleID
             else { continue }
             mapping[ref.id] = live[index].id

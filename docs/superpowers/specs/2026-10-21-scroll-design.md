@@ -163,11 +163,14 @@ Modificador base **⌃⌘** y **⌃⌘⇧** para la variante "mover". Ninguno ch
 - Si la app está oculta (⌘H), la ventana minimizada o es una pestaña nativa inactiva, su columna se **colapsa**. No ocupa lugar y reaparece en el mismo sitio al volver.
 - **Pestañas nativas** (Finder, Terminal): si aparece una ventana nueva de la misma app con el mismo marco que una que acaba de ocultarse, se agrupa en la misma columna (best effort).
 - Si una ventana se pasa a otro escritorio desde Mission Control, se la mueve a la tira de ese escritorio en la próxima reconciliación.
+- **Pantalla desconectada**: pasados 15 s, sus tiras van al archivo (ver Persistencia) y sus ventanas se suman a las tiras de las pantallas donde las deja macOS. Durante los 10 s después de que vuelve (o de que arranca Rambla con ella conectada), cada tira archivada así recupera las ventanas que estén a la vista, de la tira donde estén, salvo las flotantes; si su escritorio volvió con otra clave y era el único archivado de esa pantalla, va al escritorio que muestre. Pasado ese tiempo se trata como cualquier tira archivada.
+- Una tira cuyo escritorio ya no está en su pantalla (borrado, o la pantalla volvió antes de los 15 s con otros escritorios) va al archivo, y sus ventanas se suman a las tiras de los escritorios donde estén.
 
 ### Persistencia
 
 - Se guardan el orden de columnas, los anchos, las pilas, las pestañas, las columnas fijadas y las flotantes, en `~/Library/Application Support/Rambla/state.json`, 1 s después de cada cambio.
-- Al reiniciar Rambla se restauran por ID de ventana. Al reiniciar la Mac, por app + título (best effort).
+- Cada tira guardada lleva sus ventanas (ID, app y título) y la sesión de la Mac en que se vio por última vez. Dentro de esa sesión las ventanas se reconocen solo por ID (una ventana nueva con el mismo título es otra); después de cerrar sesión o reiniciar la Mac, solo por app + título (best effort). Los archivos de antes de 1.1.0 no dicen la sesión: primero ID, después título.
+- **Archivo**: las tiras que no están a la vista (escritorios no visitados desde que arrancó Rambla, pantallas desconectadas) se guardan junto con las vivas, hasta 30 días desde la última vez que se vieron. Una tira se reconstruye la primera vez que su pantalla y escritorio están a la vista y aparece alguna ventana de esa pantalla para ubicar; si ninguna de sus ventanas está, el escritorio arranca como está y su tira viva reemplaza a la archivada.
 - Las preferencias van en UserDefaults (`io.github.coru29.Rambla`).
 - Arrancar con la Mac usa `SMAppService.mainApp`.
 
