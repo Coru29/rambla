@@ -311,6 +311,7 @@ final class WindowManager {
         autoFloated.remove(id)
         requested[id] = nil
         hiddenSince[id] = nil
+        for key in Array(hidden.keys) { hidden[key]?.remove(id) }
         animator.cancel(id)
         for key in strips.keys where strips[key]!.contains(id) {
             strips[key]!.remove(window: id)
@@ -468,7 +469,7 @@ final class WindowManager {
             }
         }
         for id in visible { hiddenSince[id] = nil }
-        hidden = hiddenNow
+        hidden = HiddenWindows.update(hidden, found: hiddenNow, looked: Set(keys), exists: { strips[$0] != nil })
 
         // Windows that stopped being tileable (rules changed) leave their strips. A window in native full screen keeps
         // its column, hidden like a minimized one, so it comes back to its place when it leaves full screen.
@@ -492,7 +493,7 @@ final class WindowManager {
         // The focused window was hidden (full screen, minimized, its app hidden) and is back: the strip may have scrolled
         // meanwhile, so bring it into view instead of laying it out wherever its column is now.
         if let focused = focusedWindow, let key = key(containing: focused), keys.contains(key),
-           hiddenBefore[key]?.contains(focused) == true, hidden[key]?.contains(focused) != true {
+           HiddenWindows.returned(focused, on: key, before: hiddenBefore, now: hidden) {
             strips[key]!.focus(window: focused)
             revealKeys.insert(key)
         }
