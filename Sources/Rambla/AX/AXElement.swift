@@ -90,6 +90,7 @@ enum AX {
             isMinimized: bool(window, kAXMinimizedAttribute) ?? false,
             isFullscreen: bool(window, "AXFullScreen") ?? false,
             hasCloseButton: element(window, kAXCloseButtonAttribute) != nil,
+            hasFullscreenButton: element(window, kAXFullScreenButtonAttribute) != nil,
             bundleID: bundleID,
             appIsRegular: appIsRegular
         )

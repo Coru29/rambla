@@ -66,11 +66,13 @@ private func changed(_ edit: (inout WindowTraits) -> Void) -> WindowTraits {
     #expect(classify(ordinaryWindow, rules: [otherRule]) == .tile)
     // A window without a bundle id matches no rule.
     #expect(classify(changed { $0.bundleID = nil }, rules: [otherRule]) == .tile)
-    // A tile rule does not rescue windows that are not tileable.
+    // A tile rule tiles the app's windows whatever their subrole, but cannot tile what Rambla cannot size or close.
     let tileRule = AppRule(bundleID: "com.apple.TextEdit", name: "TextEdit", behavior: .tile)
     #expect(classify(ordinaryWindow, rules: [tileRule]) == .tile)
-    #expect(classify(changed { $0.subrole = "AXDialog" }, rules: [tileRule]) == .float)
+    #expect(classify(changed { $0.subrole = "AXDialog" }, rules: [tileRule]) == .tile)
+    #expect(classify(changed { $0.subrole = nil }, rules: [tileRule]) == .tile)
     #expect(classify(changed { $0.isResizable = false }, rules: [tileRule]) == .float)
+    #expect(classify(changed { $0.subrole = "AXDialog"; $0.hasCloseButton = false }, rules: [tileRule]) == .float)
     // The first rule for a bundle decides.
     let floatFirst = AppRule(bundleID: "com.apple.TextEdit", name: "TextEdit", behavior: .float)
     #expect(classify(ordinaryWindow, rules: [floatFirst, tileRule]) == .float)
@@ -80,4 +82,16 @@ private func changed(_ edit: (inout WindowTraits) -> Void) -> WindowTraits {
 @Test func classifierIgnoresMinimizedFlag() {
     // Minimized windows stay in the strip (their column collapses), so the flag is not a classification input.
     #expect(classify(changed { $0.isMinimized = true }) == .tile)
+}
+
+@Test func classifierTilesMainWindowsThatCallThemselvesDialogs() {
+    // Some apps (WhatsApp) report their main window as AXDialog. A full screen button gives it away: dialogs,
+    // panels and alerts never have one.
+    #expect(classify(changed { $0.subrole = "AXDialog"; $0.hasFullscreenButton = true }) == .tile)
+    #expect(classify(changed { $0.subrole = nil; $0.hasFullscreenButton = true }) == .tile)
+    #expect(classify(changed { $0.subrole = "AXDialog"; $0.hasFullscreenButton = false }) == .float)
+    // Still not tileable without a size Rambla can set or a close button, and a float rule still wins.
+    #expect(classify(changed { $0.subrole = "AXDialog"; $0.hasFullscreenButton = true; $0.isResizable = false }) == .float)
+    let floatRule = AppRule(bundleID: "com.apple.TextEdit", name: "TextEdit", behavior: .float)
+    #expect(classify(changed { $0.subrole = "AXDialog"; $0.hasFullscreenButton = true }, rules: [floatRule]) == .float)
 }
