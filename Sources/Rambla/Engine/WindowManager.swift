@@ -49,11 +49,15 @@ final class WindowManager {
     /// Last frame Rambla asked for, per window (the final target, not animation frames).
     private(set) var requested: [WindowID: CGRect] = [:]
     private var hiddenSince: [WindowID: CFAbsoluteTime] = [:]
-    /// Displays that have strips but are not connected, and since when (a resolution change or a wake can drop a
-    /// display for a moment).
+    /// Displays that have strips but are not connected, and since when (a resolution change, a dock or a wake can drop
+    /// a display for a while). Time asleep does not count: waking starts the count again.
     private var displayGoneSince: [String: CFAbsoluteTime] = [:]
-    /// How long a display must stay disconnected before its windows join the strips where they are now.
-    private static let goneDisplayDelay: CFAbsoluteTime = 3
+    /// How long a display must stay disconnected before its windows join the strips where they are now: long enough
+    /// for a dock or a monitor that is slow to come back after a wake.
+    private static let goneDisplayDelay: CFAbsoluteTime = 15
+    /// The reconcile that checks again once a gone display's time is up. Separate from `scheduleReconcile`, which would
+    /// otherwise hold every other reconcile until then.
+    private var goneDisplayCheck: DispatchWorkItem?
     private var graceUntil: CFAbsoluteTime = 0
     private var reconcileScheduled = false
     var pendingReveal: StripKey?
@@ -191,6 +195,7 @@ final class WindowManager {
             scheduleReconcile(after: 0.15)
         }
         observe(ws, NSWorkspace.didWakeNotification) { [weak self] _ in
+            self?.displayGoneSince.removeAll()
             self?.grace(2.5)
             self?.scheduleReconcile(after: 0.8)
         }
@@ -520,7 +525,7 @@ final class WindowManager {
             let since = displayGoneSince[uuid] ?? now
             displayGoneSince[uuid] = since
             guard now - since >= Self.goneDisplayDelay else {
-                scheduleReconcile(after: Self.goneDisplayDelay - (now - since) + 0.1)
+                checkGoneDisplays(after: Self.goneDisplayDelay - (now - since) + 0.1)
                 continue
             }
             for key in Array(strips.keys) where key.displayUUID == uuid {
@@ -532,6 +537,15 @@ final class WindowManager {
             displayGoneSince[uuid] = nil
             Log.info("Display \(uuid.prefix(8)) disconnected: its windows join the strips of the displays they are on")
         }
+    }
+
+    private func checkGoneDisplays(after delay: TimeInterval) {
+        goneDisplayCheck?.cancel()
+        let item = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated { self?.scheduleReconcile() }
+        }
+        goneDisplayCheck = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
     }
 
     private func insert(_ record: WindowRecord, into key: StripKey) {
@@ -690,6 +704,8 @@ final class WindowManager {
         let previous = windows[id]?.frame
         windows[id]?.frame = frame
         guard !isPaused, let key = key(containing: id) else { return }
+        // macOS is moving the windows of a display that went away; they join another strip once it is gone for good.
+        guard displays.contains(where: { $0.uuid == key.displayUUID }) else { return }
         if mouseDown {
             dragTracker.began(id, startFrame: requested[id] ?? previous ?? frame)
             worker(for: id)?.freeze(id, true)
