@@ -82,9 +82,11 @@ final class MouseButtonTracker: @unchecked Sendable {
         return .renewed
     }
 
+    /// Someone is waiting for it: a pending retry tries at once.
     @MainActor
     func startRecording(_ recording: Recording) {
         lock.withLock { self.recording = recording }
+        retry.reset()
         update(restart: false)
     }
 
