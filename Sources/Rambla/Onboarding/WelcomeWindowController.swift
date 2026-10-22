@@ -2,35 +2,15 @@ import AppKit
 import SwiftUI
 
 /// The welcome guide ("Bienvenida a Rambla"): shown the first time Rambla runs, and from the menu afterwards.
-///
-/// Rambla normally has no Dock icon. While this window is open it becomes a regular app (Dock icon, ⌘Tab) so
-/// the window can take focus, and it goes back to being a menu bar app when the window closes.
+/// While it is open Rambla is a regular app, so the window can take focus (see `AppWindows`).
 @MainActor
 final class WelcomeWindowController: NSObject, NSWindowDelegate {
     static let shared = WelcomeWindowController()
     /// The UserDefaults flag that says the guide has already opened once.
     static let shownKey = "welcomeShown"
 
-    /// The calls the controller makes on the app itself. Real AppKit by default; a harness swaps them for recorders
-    /// so that checking the controller never shows a window, takes focus or changes how the app appears.
-    struct Hooks {
-        var setActivationPolicy: @MainActor (NSApplication.ActivationPolicy) -> Void = { _ = NSApp.setActivationPolicy($0) }
-        var present: @MainActor (NSWindow) -> Void = { window in
-            window.makeKeyAndOrderFront(nil)
-            // If macOS declines to activate Rambla, the window must still be seen.
-            window.orderFrontRegardless()
-            NSApp.activate()
-        }
-        /// Whether a regular window other than `closing` is open: the settings window needs the Dock icon and the
-        /// menu bar as much as this one does. Panels (alerts) and borderless overlays do not count.
-        var hasOtherRegularWindow: @MainActor (NSWindow) -> Bool = { closing in
-            NSApp.windows.contains { $0 !== closing && $0.isVisible && $0.styleMask.contains(.titled) && !($0 is NSPanel) }
-        }
-    }
-
     private(set) var window: WelcomeWindow?
     private(set) var model: WelcomeModel?
-    var hooks = Hooks()
 
     /// True the first time it is asked on this Mac, and never again: the flag is set on the spot, so closing the
     /// guide half way is final.
@@ -47,7 +27,7 @@ final class WelcomeWindowController: NSObject, NSWindowDelegate {
 
     /// Opens the guide at its first step, or brings it forward if it is already open.
     func show() {
-        present(window ?? makeWindow(model: WelcomeModel()))
+        AppWindows.present(window ?? makeWindow(model: WelcomeModel()))
     }
 
     func close() {
@@ -72,11 +52,6 @@ final class WelcomeWindowController: NSObject, NSWindowDelegate {
         return window
     }
 
-    private func present(_ window: NSWindow) {
-        hooks.setActivationPolicy(.regular)
-        hooks.present(window)
-    }
-
     func windowWillClose(_ notification: Notification) {
         guard let closing = notification.object as? NSWindow, closing === window else { return }
         model?.stop()
@@ -84,7 +59,7 @@ final class WelcomeWindowController: NSObject, NSWindowDelegate {
         model = nil
         // The window is still in the middle of closing: let go of it only after this turn of the run loop.
         DispatchQueue.main.async { withExtendedLifetime(closing) {} }
-        if !hooks.hasOtherRegularWindow(closing) { hooks.setActivationPolicy(.accessory) }
+        AppWindows.willClose(closing)
     }
 }
 

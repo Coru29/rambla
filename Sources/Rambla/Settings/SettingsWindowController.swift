@@ -1,8 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// Owns the settings window. While it is open Rambla is a regular app (Dock icon, ⌘Tab); closing it goes back to a
-/// menu bar agent and releases the window, so a closed settings window costs no memory.
+/// Owns the settings window. While it is open Rambla is a regular app (Dock icon, ⌘Tab, see `AppWindows`); closing
+/// it releases the window, so a closed settings window costs no memory.
 @MainActor
 final class SettingsWindowController: NSObject, NSWindowDelegate {
     static let shared = SettingsWindowController()
@@ -22,19 +22,9 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     /// Opens the window (or brings the open one forward) and activates the app.
     func show() {
-        installMainMenuIfNeeded()
-        NSApp.setActivationPolicy(.regular)
         let window = self.window ?? makeWindow()
         self.window = window
-        if window.isMiniaturized { window.deminiaturize(nil) }
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
-        // The policy change is not instant: ask once more on the next turn if the first request did not stick.
-        DispatchQueue.main.async {
-            MainActor.assumeIsolated {
-                if !NSApp.isActive { NSApp.activate(ignoringOtherApps: true) }
-            }
-        }
+        AppWindows.present(window)
     }
 
     // MARK: - Window
@@ -71,49 +61,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         closing.delegate = nil
         window = nil
         hostingView = nil
-        NSApp.setActivationPolicy(.accessory)
+        AppWindows.willClose(closing)
         // The window is still on its way out of this call; let it go on the next turn.
         DispatchQueue.main.async { withExtendedLifetime(closing) {} }
-    }
-
-    // MARK: - Main menu
-
-    /// A regular app needs a menu bar: ⌘W closes the window, ⌘Q quits and ⌘C / ⌘V work in the text fields.
-    /// The menu bar agent has none of that until the settings window opens.
-    private func installMainMenuIfNeeded() {
-        guard NSApp.mainMenu == nil else { return }
-        let mainMenu = NSMenu()
-
-        let appMenu = submenu(titled: "Rambla", in: mainMenu)
-        appMenu.addItem(withTitle: "Ocultar Rambla", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
-        appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Salir de Rambla", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-
-        let fileMenu = submenu(titled: "Archivo", in: mainMenu)
-        fileMenu.addItem(withTitle: "Cerrar", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
-
-        let editMenu = submenu(titled: "Edición", in: mainMenu)
-        editMenu.addItem(withTitle: "Deshacer", action: Selector(("undo:")), keyEquivalent: "z")
-        let redo = editMenu.addItem(withTitle: "Rehacer", action: Selector(("redo:")), keyEquivalent: "z")
-        redo.keyEquivalentModifierMask = [.command, .shift]
-        editMenu.addItem(.separator())
-        editMenu.addItem(withTitle: "Cortar", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
-        editMenu.addItem(withTitle: "Copiar", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
-        editMenu.addItem(withTitle: "Pegar", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
-        editMenu.addItem(withTitle: "Seleccionar todo", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
-
-        let windowMenu = submenu(titled: "Ventana", in: mainMenu)
-        windowMenu.addItem(withTitle: "Minimizar", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
-        NSApp.windowsMenu = windowMenu
-
-        NSApp.mainMenu = mainMenu
-    }
-
-    private func submenu(titled title: String, in menu: NSMenu) -> NSMenu {
-        let item = NSMenuItem()
-        let submenu = NSMenu(title: title)
-        item.submenu = submenu
-        menu.addItem(item)
-        return submenu
     }
 }
