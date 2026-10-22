@@ -382,3 +382,18 @@
 "Rectangle detectado — convivencia activa. Atajos en conflicto: 0." = "Rectangle detected, working side by side. Conflicting shortcuts: 0.";
 "%@ y %lld más" = "%@ and %lld more";
 "Rectangle detectado — convivencia activa. Atajos en conflicto: %lld (%@). Se cambian en la sección Atajos." = "Rectangle detected, working side by side. Conflicting shortcuts: %lld (%@). Change them in Shortcuts.";
+
+/* Swipe up and down (Mission Control) */
+"Cambialo en Ajustes del Sistema → Trackpad → Más gestos: elegí otra cantidad de dedos o «Desactivado» para Mission Control." = "Change it in System Settings → Trackpad → More Gestures: choose another number of fingers or Off for Mission Control.";
+"Desactivá Mission Control y Exposé de apps en Trackpad → Más gestos, o apagá el gesto vertical de Rambla." = "Turn off Mission Control and App Exposé in Trackpad → More Gestures, or turn off Rambla’s vertical gesture.";
+"El gesto vertical de Rambla está desactivado: no hay conflicto." = "Rambla’s vertical gesture is off: no conflict.";
+"Elegí «3 dedos» o «Desactivado» para Mission Control en Trackpad → Más gestos." = "Choose three fingers or Off for Mission Control in Trackpad → More Gestures.";
+"Elegí «4 dedos» o «Desactivado» para Mission Control en Trackpad → Más gestos." = "Choose four fingers or Off for Mission Control in Trackpad → More Gestures.";
+"Gesto hacia arriba y abajo" = "Swipe up and down";
+"Hacia arriba, ancho completo; hacia abajo, el ancho de antes" = "Up for full width, down for the width it had";
+"macOS abre Mission Control con 3 dedos hacia arriba, el mismo gesto que usa Rambla." = "macOS opens Mission Control with a three-finger swipe up, the same gesture Rambla uses.";
+"macOS abre Mission Control con 4 dedos hacia arriba, el mismo gesto que usa Rambla." = "macOS opens Mission Control with a four-finger swipe up, the same gesture Rambla uses.";
+"macOS no usa el deslizamiento vertical de %lld dedos." = "macOS does not use the %lld-finger vertical swipe.";
+"macOS también abre Mission Control con 4 dedos hacia arriba: su opción «3 dedos» de Mission Control activa también el de 4." = "macOS also opens Mission Control with a four-finger swipe up: its three-finger option for Mission Control turns on the four-finger swipe too.";
+"«%@» lo apaga y Mission Control sigue con 3 dedos." = "“%@” turns it off, and Mission Control keeps working with three fingers.";
+"«%@» lo apaga; Mission Control queda en ⌃↑." = "“%@” turns it off; Mission Control stays on ⌃↑.";

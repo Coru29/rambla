@@ -769,6 +769,22 @@ import Foundation
         #expect(s.columns[0].widthBeforeFull == nil)
     }
 
+    @Test func setFullWidthOnlyChangesWhatIsNotAlreadySo() {
+        var s = strip([[1], [2]], focused: 1)
+        s.columns[1].width = .points(420)
+        s.setFullWidth(true)
+        #expect(s.columns[1].width == .fraction(1) && s.columns[1].widthBeforeFull == .points(420))
+        s.setFullWidth(true)                                   // a second swipe up keeps the width to go back to
+        #expect(s.columns[1].widthBeforeFull == .points(420))
+        s.setFullWidth(false)
+        #expect(s.columns[1].width == .points(420) && s.columns[1].widthBeforeFull == nil)
+        s.setFullWidth(false)                                  // nothing to go back to
+        #expect(s.columns[1].width == .points(420))
+        var none = strip([[1]], focused: nil)
+        none.setFullWidth(true)
+        #expect(none.columns[0].widthBeforeFull == nil)
+    }
+
     @Test func toggleFullWidthRestoresPointWidthsToo() {
         var s = strip([[1]], focused: 0)
         s.columns[0].width = .points(420)

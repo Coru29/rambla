@@ -29,7 +29,7 @@ Every window is a column on one horizontal strip that keeps going past the edges
 - **New windows open beside the focused one**; the strip scrolls to the focused window (centering: never, only when it overflows, always).
 - **Column widths**: presets (25/33/50/66/75 %), full width, wider/narrower, center, and **pin a column** to the left or right edge.
 - **Stacks and tabs**: put several windows in one column, stacked vertically or as tabs with a clickable tab bar.
-- **Trackpad**: a three- or four-finger swipe slides the strip; a short quick swipe reaches the next column.
+- **Trackpad**: a three- or four-finger swipe slides the strip; a short quick swipe reaches the next column. Swipe up for full width, down to go back.
 - **Strip indicator**: a frosted bar with one icon per column while you navigate; click a tile to jump, drag it to reorder.
 - **Mouse**: hold ⌃⌘ and turn the wheel to go through the columns; drag a window onto another column to reorder; resize it to set the column width.
 - **Focus border** and **dim inactive windows** (optional), focus follows mouse / mouse follows focus (optional).

@@ -54,12 +54,16 @@ public struct TrackpadPrefs: Codable, Equatable, Sendable {
     public var sensitivity: Double
     /// Natural direction: the strip follows the fingers.
     public var natural: Bool
+    /// Swiping up with the same fingers gives the focused column the full width; down gives back its width.
+    public var verticalSwipe: Bool
 
-    public init(enabled: Bool = true, fingers: Int = 4, sensitivity: Double = 1.0, natural: Bool = true) {
+    public init(enabled: Bool = true, fingers: Int = 4, sensitivity: Double = 1.0, natural: Bool = true,
+                verticalSwipe: Bool = true) {
         self.enabled = enabled
         self.fingers = fingers
         self.sensitivity = sensitivity
         self.natural = natural
+        self.verticalSwipe = verticalSwipe
     }
 
     public init(from decoder: Decoder) throws {
@@ -69,6 +73,7 @@ public struct TrackpadPrefs: Codable, Equatable, Sendable {
         fingers = try container.decodeIfPresent(Int.self, forKey: .fingers) ?? defaults.fingers
         sensitivity = try container.decodeIfPresent(Double.self, forKey: .sensitivity) ?? defaults.sensitivity
         natural = try container.decodeIfPresent(Bool.self, forKey: .natural) ?? defaults.natural
+        verticalSwipe = try container.decodeIfPresent(Bool.self, forKey: .verticalSwipe) ?? defaults.verticalSwipe
     }
 }
 

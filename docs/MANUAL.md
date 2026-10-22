@@ -157,6 +157,8 @@ Una columna puede tener varias ventanas.
 >
 > Configuración → Trackpad y mouse (y la página Mac) te avisa si el gesto de Rambla choca con el de macOS.
 
+**Ancho completo con el trackpad.** Deslizá con los mismos dedos **hacia arriba** y la columna enfocada ocupa todo el ancho de la pantalla, sin la pantalla completa de macOS (como ⌃⌘M). **Hacia abajo** vuelve al ancho que tenía. macOS abre Mission Control con ese gesto, y su opción «3 dedos» también deja activo el de 4: Configuración → Trackpad y mouse te avisa y lo apaga con **«Apagarlo en macOS»** (Mission Control sigue con 3 dedos y con ⌃↑). Si no lo querés, se desactiva en la misma página.
+
 **Mover la tira con la ruedita del mouse.** Mantené **⌃⌘** y girá la ruedita: cada paso enfoca la columna de al lado. Con un Magic Mouse, o con dos dedos en el trackpad, manteniendo ⌃⌘ la tira se desliza como con el gesto y se asienta al soltar. Sin las teclas, la ruedita funciona como siempre. Las teclas se cambian en Configuración → Trackpad y mouse.
 
 **El mouse sigue al foco / el foco sigue al mouse.** Son dos opciones de Configuración → Apariencia y vienen apagadas. La primera lleva el puntero al centro de la ventana que enfocás con un atajo. La segunda enfoca la ventana que tenga el puntero encima, sin mover la tira.
@@ -185,7 +187,7 @@ Abrila desde el ícono de la barra de menú → **Configuración…**. Mientras 
 |---|---|
 | **General** | Activar o pausar, arrancar con la Mac, animaciones y su velocidad, centrado, ancho de ventanas nuevas, mantener altura original, separación entre ventanas y margen, anchos prefijados, paso de ajuste, qué hacer cuando otra app mueve una ventana |
 | **Atajos** | Cambiar cualquier atajo (cada acción admite dos). Hacé click en el atajo y apretá la combinación nueva: ⎋ cancela y ⌫ lo borra. Avisa si choca con Rectangle o si macOS no lo deja usar. "Restaurar predeterminados" vuelve todo a como venía. |
-| **Trackpad y mouse** | El gesto del trackpad (dedos, sensibilidad, dirección natural), los conflictos con macOS y la ruedita del mouse |
+| **Trackpad y mouse** | El gesto del trackpad (dedos, sensibilidad, dirección natural, hacia arriba para el ancho completo), los conflictos con macOS y la ruedita del mouse |
 | **Apariencia** | Barra indicadora, borde de foco, atenuar inactivas, mouse ↔ foco |
 | **Apps** | Reglas por app: que flote siempre (ideal para calculadoras, reproductores o chats chiquitos), ancho inicial y dónde se abren sus ventanas (al lado de la enfocada, al principio o al final) |
 | **Pantallas** | Activar o desactivar Rambla en cada monitor |

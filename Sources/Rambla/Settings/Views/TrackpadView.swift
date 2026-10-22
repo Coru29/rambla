@@ -30,6 +30,7 @@ struct TrackpadView: View {
         .onAppear(perform: refresh)
         .onChange(of: store.prefs.trackpad.fingers) { refresh() }
         .onChange(of: store.prefs.trackpad.enabled) { refresh() }
+        .onChange(of: store.prefs.trackpad.verticalSwipe) { refresh() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             refresh()
         }
@@ -49,6 +50,8 @@ struct TrackpadView: View {
                       display: SettingsFormat.multiplier)
                 .disabled(!enabled)
             Toggle("Dirección natural", isOn: $store.prefs.trackpad.natural)
+                .disabled(!enabled)
+            Toggle("Hacia arriba, ancho completo; hacia abajo, el ancho de antes", isOn: $store.prefs.trackpad.verticalSwipe)
                 .disabled(!enabled)
         } header: {
             Text("Trackpad")

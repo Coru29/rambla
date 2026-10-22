@@ -58,6 +58,18 @@ extension WindowManager {
         onStateChanged?()
     }
 
+    /// Swipe up: the focused column takes the full width of the screen (without macOS's full screen); swipe down:
+    /// back to the width it had.
+    func verticalSwipe(up: Bool) {
+        guard isRunning, !isPaused, gestureKey == nil, let key = activeStripKey(), var strip = strips[key] else { return }
+        Log.info("Trackpad swipe \(up ? "up: full width" : "down: previous width")")
+        strip.setFullWidth(up)
+        strips[key] = strip
+        reveal(key)
+        indicatorHook?(key, nil)
+        onStateChanged?()
+    }
+
     /// One notch of the mouse wheel with the chosen keys held: focus the next column (`direction` > 0) or the
     /// previous one of the strip under the pointer, like the keyboard shortcuts do.
     func wheelStep(_ direction: Int) {

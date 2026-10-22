@@ -39,6 +39,7 @@ private func decodePreferences(_ json: String) throws -> Preferences {
     #expect(p.trackpad.fingers == 4)
     #expect(p.trackpad.sensitivity == 1.0)
     #expect(p.trackpad.natural == true)
+    #expect(p.trackpad.verticalSwipe == true)
     #expect(p.mouse == MousePrefs())
     #expect(p.mouse.enabled == true)
     #expect(p.mouse.modifiers == [.control, .command])
@@ -64,6 +65,7 @@ private func decodePreferences(_ json: String) throws -> Preferences {
     #expect(p.focusBorder.colorHex == "#0A84FF")
     #expect(p.focusBorder.width == 3)
     #expect(p.trackpad.sensitivity == 1.0)
+    #expect(p.trackpad.verticalSwipe == true)
     #expect(p.dimInactive.enabled == false)
     #expect(p.mouse.modifiers == [.control, .command])
 }
@@ -86,7 +88,7 @@ private func customizedPreferences() -> Preferences {
     p.dimInactive = DimPrefs(enabled: true, amount: 0.4)
     p.focusFollowsMouse = true
     p.mouseFollowsFocus = true
-    p.trackpad = TrackpadPrefs(enabled: false, fingers: 3, sensitivity: 1.5, natural: false)
+    p.trackpad = TrackpadPrefs(enabled: false, fingers: 3, sensitivity: 1.5, natural: false, verticalSwipe: false)
     p.mouse = MousePrefs(enabled: false, modifiers: [.option, .command])
     p.appRules = [
         AppRule(bundleID: "com.apple.finder", name: "Finder", behavior: .float),

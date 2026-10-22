@@ -14,7 +14,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var gestures = GestureTracker(
         onBegin: { [weak self] in self?.engine.gestureBegan() },
         onChange: { [weak self] dx in self?.engine.gestureChanged(dx) },
-        onEnd: { [weak self] velocity in self?.engine.gestureEnded(velocity: velocity) })
+        onEnd: { [weak self] velocity in self?.engine.gestureEnded(velocity: velocity) },
+        onVertical: { [weak self] up in self?.engine.verticalSwipe(up: up) })
     private lazy var wheel = ScrollWheelTracker(handlers: .init(
         step: { [weak self] columns in self?.engine.wheelStep(columns) },
         slideBegan: { [weak self] in self?.engine.gestureBegan() },
@@ -134,7 +135,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func applyInputs() {
         let prefs = store.prefs
         let active = !engine.isPaused && prefs.enabled
-        gestures.configure(enabled: active && prefs.trackpad.enabled, fingers: prefs.trackpad.fingers)
+        gestures.configure(enabled: active && prefs.trackpad.enabled, fingers: prefs.trackpad.fingers,
+                           vertical: prefs.trackpad.verticalSwipe)
         wheel.configure(enabled: active && prefs.mouse.enabled, modifiers: prefs.mouse.modifiers)
         mouseFocus.setEnabled(active && prefs.focusFollowsMouse)
     }

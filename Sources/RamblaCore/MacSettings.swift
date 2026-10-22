@@ -33,6 +33,10 @@ public struct MacSettings: Equatable, Sendable {
     public var threeFingerSwipe: [Int]
     /// `TrackpadFourFingerHorizSwipeGesture`, one entry for each domain that defines it. Same values as above.
     public var fourFingerSwipe: [Int]
+    /// `TrackpadThreeFingerVertSwipeGesture`: 2 means Mission Control (up) and App Exposé (down).
+    public var threeFingerVertSwipe: [Int]
+    /// `TrackpadFourFingerVertSwipeGesture`, with the same values.
+    public var fourFingerVertSwipe: [Int]
     /// `TrackpadThreeFingerDrag`, one entry for each domain that defines it.
     public var threeFingerDrag: [Bool]
     /// Rambla can change the swipes above itself, through the back end of the Trackpad pane (private API, so a
@@ -50,6 +54,8 @@ public struct MacSettings: Equatable, Sendable {
                 tilingWithOption: Bool? = nil,
                 threeFingerSwipe: [Int] = [],
                 fourFingerSwipe: [Int] = [],
+                threeFingerVertSwipe: [Int] = [],
+                fourFingerVertSwipe: [Int] = [],
                 threeFingerDrag: [Bool] = [],
                 canChangeTrackpadGestures: Bool = false,
                 rectangle: RectangleStatus = .notRunning) {
@@ -62,6 +68,8 @@ public struct MacSettings: Equatable, Sendable {
         self.tilingWithOption = tilingWithOption
         self.threeFingerSwipe = threeFingerSwipe
         self.fourFingerSwipe = fourFingerSwipe
+        self.threeFingerVertSwipe = threeFingerVertSwipe
+        self.fourFingerVertSwipe = fourFingerVertSwipe
         self.threeFingerDrag = threeFingerDrag
         self.canChangeTrackpadGestures = canChangeTrackpadGestures
         self.rectangle = rectangle
@@ -76,10 +84,12 @@ public struct MacCheck: Equatable, Sendable {
     public enum Fix: Equatable, Sendable {
         /// Turn off the macOS horizontal swipe with this many fingers (switching desktops or pages).
         case turnOffSwipe(fingers: Int)
+        /// Turn off the macOS vertical swipe with this many fingers (Mission Control and App Exposé).
+        case turnOffVerticalSwipe(fingers: Int)
 
         public var title: String {
             switch self {
-            case .turnOffSwipe: return String(localized: "Apagarlo en macOS")
+            case .turnOffSwipe, .turnOffVerticalSwipe: return String(localized: "Apagarlo en macOS")
             }
         }
     }
@@ -110,7 +120,7 @@ public enum MacChecks {
     public static let trackpadURL = URL(string: "x-apple.systempreferences:com.apple.Trackpad-Settings.extension")!
 
     /// The rows about the trackpad gesture, which the trackpad pages show next to the gesture's settings.
-    public static let trackpadCheckIDs = ["trackpad-gesture", "three-finger-drag"]
+    public static let trackpadCheckIDs = ["trackpad-gesture", "vertical-gesture", "three-finger-drag"]
 
     /// The macOS value of the swipe-between-full-screen-apps gesture, which is what switches Spaces.
     private static let switchSpacesGesture = 2
@@ -128,6 +138,7 @@ public enum MacChecks {
             stageManager(settings),
             tiling(settings),
             trackpadGesture(settings, trackpad),
+            verticalGesture(settings, trackpad),
             threeFingerDrag(settings, trackpad),
         ]
         if let rectangle = rectangle(settings) { checks.append(rectangle) }
@@ -247,6 +258,47 @@ public enum MacChecks {
         }
         return MacCheck(id: id, title: title, status: .warning, detail: problem + " " + remedy, settingsURL: trackpadURL,
                         fix: canFix ? .turnOffSwipe(fingers: fingers) : nil)
+    }
+
+    /// Rambla's swipe up (full width) and down collide with Mission Control and App Exposé when macOS uses the same
+    /// fingers for them. The pane's «3 dedos» choice for Mission Control also stores 2 for four fingers, the same
+    /// trap as the horizontal swipe.
+    private static func verticalGesture(_ s: MacSettings, _ trackpad: TrackpadPrefs) -> MacCheck {
+        let id = "vertical-gesture", title = String(localized: "Gesto hacia arriba y abajo")
+        guard trackpad.enabled, trackpad.verticalSwipe else {
+            return MacCheck(id: id, title: title, status: .ok,
+                            detail: String(localized: "El gesto vertical de Rambla está desactivado: no hay conflicto."),
+                            settingsURL: trackpadURL)
+        }
+        let fingers = trackpad.fingers
+        let three = s.threeFingerVertSwipe.contains(switchSpacesGesture)
+        let four = s.fourFingerVertSwipe.contains(switchSpacesGesture)
+        let canFix = s.canChangeTrackpadGestures
+        let button = MacCheck.Fix.turnOffVerticalSwipe(fingers: fingers).title
+        let problem: String, remedy: String
+        switch fingers {
+        case 4 where four && three:
+            problem = String(localized: "macOS también abre Mission Control con 4 dedos hacia arriba: su opción «3 dedos» de Mission Control activa también el de 4.")
+            remedy = canFix
+                ? String(localized: "«\(button)» lo apaga y Mission Control sigue con 3 dedos.")
+                : String(localized: "Desactivá Mission Control y Exposé de apps en Trackpad → Más gestos, o apagá el gesto vertical de Rambla.")
+        case 4 where four:
+            problem = String(localized: "macOS abre Mission Control con 4 dedos hacia arriba, el mismo gesto que usa Rambla.")
+            remedy = canFix
+                ? String(localized: "«\(button)» lo apaga; Mission Control queda en ⌃↑.")
+                : String(localized: "Elegí «3 dedos» o «Desactivado» para Mission Control en Trackpad → Más gestos.")
+        case 3 where three:
+            problem = String(localized: "macOS abre Mission Control con 3 dedos hacia arriba, el mismo gesto que usa Rambla.")
+            remedy = canFix
+                ? String(localized: "«\(button)» lo apaga; Mission Control queda en ⌃↑.")
+                : String(localized: "Elegí «4 dedos» o «Desactivado» para Mission Control en Trackpad → Más gestos.")
+        default:
+            return MacCheck(id: id, title: title, status: .ok,
+                            detail: String(localized: "macOS no usa el deslizamiento vertical de \(fingers) dedos."),
+                            settingsURL: trackpadURL)
+        }
+        return MacCheck(id: id, title: title, status: .warning, detail: problem + " " + remedy, settingsURL: trackpadURL,
+                        fix: canFix ? .turnOffVerticalSwipe(fingers: fingers) : nil)
     }
 
     /// Three-finger drag takes over every three-finger movement, so it only collides with a three-finger Rambla gesture.

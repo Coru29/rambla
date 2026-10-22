@@ -16,11 +16,12 @@ enum TrackpadGestureSettings {
     /// Whether the back end can be loaded. Checks without loading it: Rambla only loads it to make a change.
     nonisolated static var isAvailable: Bool { dlopen_preflight(frameworkPath) }
 
-    /// Turns off macOS's horizontal swipe with `fingers` fingers (3 or 4) on this Mac and leaves the other one as it
-    /// is. True when the back end took the change.
-    static func turnOffSwipe(fingers: Int) -> Bool {
+    /// Turns off macOS's horizontal swipe (desktops, pages) or vertical one (Mission Control, App Exposé) with
+    /// `fingers` fingers (3 or 4) on this Mac, and leaves the other finger count as it is. True when the back end
+    /// took the change.
+    static func turnOffSwipe(fingers: Int, vertical: Bool) -> Bool {
         guard fingers == 3 || fingers == 4, let backend = loadBackend() else { return false }
-        let name = fingers == 3 ? "threeFingerHorizSwipe" : "fourFingerHorizSwipe"
+        let name = (fingers == 3 ? "threeFinger" : "fourFinger") + (vertical ? "VertSwipe" : "HorizSwipe")
         let getter = NSSelectorFromString(name)
         let setter = NSSelectorFromString("set" + name.prefix(1).uppercased() + name.dropFirst() + ":")
         guard backend.responds(to: getter), backend.responds(to: setter) else { return false }

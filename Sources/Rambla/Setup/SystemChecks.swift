@@ -39,6 +39,8 @@ enum SystemChecks {
             tilingWithOption: flag("EnableTilingOptionAccelerator", in: "com.apple.WindowManager"),
             threeFingerSwipe: trackpadDomains.compactMap { integer("TrackpadThreeFingerHorizSwipeGesture", in: $0) },
             fourFingerSwipe: trackpadDomains.compactMap { integer("TrackpadFourFingerHorizSwipeGesture", in: $0) },
+            threeFingerVertSwipe: trackpadDomains.compactMap { integer("TrackpadThreeFingerVertSwipeGesture", in: $0) },
+            fourFingerVertSwipe: trackpadDomains.compactMap { integer("TrackpadFourFingerVertSwipeGesture", in: $0) },
             threeFingerDrag: trackpadDomains.compactMap { flag("TrackpadThreeFingerDrag", in: $0) },
             canChangeTrackpadGestures: TrackpadGestureSettings.isAvailable,
             rectangle: isRectangleRunning ? .running(conflicts: rectangleConflicts(prefs: prefs)) : .notRunning)
@@ -86,20 +88,25 @@ enum SystemChecks {
     /// Makes the change behind a row's button. If macOS does not take it, says so and opens the pane to do it by hand.
     @MainActor
     static func apply(_ fix: MacCheck.Fix) {
+        let fingers: Int, vertical: Bool
         switch fix {
-        case .turnOffSwipe(let fingers):
-            if TrackpadGestureSettings.turnOffSwipe(fingers: fingers) {
-                Log.info("Turned off the macOS \(fingers)-finger horizontal swipe")
-                return
-            }
-            Log.error("Could not turn off the macOS \(fingers)-finger horizontal swipe")
-            NSApp.activate()
-            let alert = NSAlert()
-            alert.messageText = String(localized: "No se pudo cambiar el gesto de macOS")
-            alert.informativeText = String(localized: "Cambialo en Ajustes del Sistema → Trackpad → Más gestos: elegí «Desactivado» en «Cambiar entre apps en pantalla completa».")
-            alert.addButton(withTitle: String(localized: "Abrir Ajustes"))
-            alert.addButton(withTitle: String(localized: "Cerrar"))
-            if alert.runModal() == .alertFirstButtonReturn { NSWorkspace.shared.open(MacChecks.trackpadURL) }
+        case .turnOffSwipe(let count): fingers = count; vertical = false
+        case .turnOffVerticalSwipe(let count): fingers = count; vertical = true
         }
+        let gesture = vertical ? "vertical" : "horizontal"
+        if TrackpadGestureSettings.turnOffSwipe(fingers: fingers, vertical: vertical) {
+            Log.info("Turned off the macOS \(fingers)-finger \(gesture) swipe")
+            return
+        }
+        Log.error("Could not turn off the macOS \(fingers)-finger \(gesture) swipe")
+        NSApp.activate()
+        let alert = NSAlert()
+        alert.messageText = String(localized: "No se pudo cambiar el gesto de macOS")
+        alert.informativeText = vertical
+            ? String(localized: "Cambialo en Ajustes del Sistema → Trackpad → Más gestos: elegí otra cantidad de dedos o «Desactivado» para Mission Control.")
+            : String(localized: "Cambialo en Ajustes del Sistema → Trackpad → Más gestos: elegí «Desactivado» en «Cambiar entre apps en pantalla completa».")
+        alert.addButton(withTitle: String(localized: "Abrir Ajustes"))
+        alert.addButton(withTitle: String(localized: "Cerrar"))
+        if alert.runModal() == .alertFirstButtonReturn { NSWorkspace.shared.open(MacChecks.trackpadURL) }
     }
 }

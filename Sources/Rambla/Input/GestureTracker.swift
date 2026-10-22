@@ -8,32 +8,39 @@ private let tapCallback: CGEventTapCallBack = { _, type, event, userInfo in
     return Unmanaged.passUnretained(event)
 }
 
-/// Horizontal N-finger swipes on the trackpad, read from a listen-only event tap of gesture events
-/// (it never blocks or alters input). The tap exists only while the feature is on. Positions are the fingers'
-/// mean x on the trackpad, from 0 (left edge) to 1 (right edge); the release velocity is in those units per second.
+/// N-finger swipes on the trackpad, read from a listen-only event tap of gesture events (it never blocks or alters
+/// input). The tap exists only while the feature is on. Sideways slides the strip: positions are the fingers' mean x
+/// on the trackpad, from 0 (left edge) to 1 (right edge), and the release velocity is in those units per second.
+/// Up and down are one command each per swipe (`TrackpadSwipe` tells them apart).
 @MainActor
 final class GestureTracker {
     private let onBegin: () -> Void
     private let onChange: (_ dx: Double) -> Void
     private let onEnd: (_ velocity: Double) -> Void
+    private let onVertical: (_ up: Bool) -> Void
 
     private var tap: CFMachPort?
     private var source: CFRunLoopSource?
     private var fingers = 4
+    private var vertical = true
+    /// This swipe already went up or down: the rest of it is ignored.
+    private var verticalDone = false
     private var start: CGPoint?
     private var last: CGPoint?
     private var active = false
     private var velocity = VelocityTracker()
 
     init(onBegin: @escaping () -> Void, onChange: @escaping (_ dx: Double) -> Void,
-         onEnd: @escaping (_ velocity: Double) -> Void) {
+         onEnd: @escaping (_ velocity: Double) -> Void, onVertical: @escaping (_ up: Bool) -> Void) {
         self.onBegin = onBegin
         self.onChange = onChange
         self.onEnd = onEnd
+        self.onVertical = onVertical
     }
 
-    func configure(enabled: Bool, fingers: Int) {
+    func configure(enabled: Bool, fingers: Int, vertical: Bool) {
         self.fingers = fingers
+        self.vertical = vertical
         if enabled, tap == nil { install() }
         if !enabled { uninstall() }
     }
@@ -65,6 +72,7 @@ final class GestureTracker {
     private func reset(at time: TimeInterval) {
         if active { onEnd(velocity.velocity(at: time)) }
         active = false
+        verticalDone = false
         start = nil
         last = nil
         velocity.reset()
@@ -90,11 +98,18 @@ final class GestureTracker {
             return
         }
         if !active {
-            let dx = mean.x - start.x
-            let dy = mean.y - start.y
-            guard abs(dx) > 0.015, abs(dx) > abs(dy) else { return }
-            active = true
-            onBegin()
+            guard !verticalDone else { return }
+            switch TrackpadSwipe.kind(dx: mean.x - start.x, dy: mean.y - start.y) {
+            case .horizontal:
+                active = true
+                onBegin()
+            case .up where vertical, .down where vertical:
+                verticalDone = true
+                onVertical(mean.y > start.y)
+                return
+            default:
+                return
+            }
         }
         if let last { onChange(mean.x - last.x) }
         last = mean

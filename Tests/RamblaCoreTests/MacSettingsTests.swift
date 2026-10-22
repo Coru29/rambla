@@ -9,7 +9,8 @@ import Foundation
 private func tidyMac(rectangle: RectangleStatus = .notRunning) -> MacSettings {
     MacSettings(accessibilityTrusted: true, displaysShareSpaces: false, rearrangeSpaces: false, stageManager: false,
                 tilingByEdgeDrag: false, tilingToMenuBar: false, tilingWithOption: false,
-                threeFingerSwipe: [0], fourFingerSwipe: [0], threeFingerDrag: [false], rectangle: rectangle)
+                threeFingerSwipe: [0], fourFingerSwipe: [0], threeFingerVertSwipe: [0], fourFingerVertSwipe: [0],
+                threeFingerDrag: [false], rectangle: rectangle)
 }
 
 private func row(_ id: String, in checks: [MacCheck]) throws -> MacCheck {
@@ -28,11 +29,11 @@ private func conflict(_ action: Action, _ rectangleAction: String = "leftHalf") 
 
 @Test func macChecksListTheRowsInOrderAndRectangleOnlyWhileItRuns() {
     let ids = ["accessibility", "separate-spaces", "rearrange-spaces", "stage-manager", "macos-tiling",
-               "trackpad-gesture", "three-finger-drag"]
+               "trackpad-gesture", "vertical-gesture", "three-finger-drag"]
     #expect(MacChecks.evaluate(tidyMac(), trackpad: TrackpadPrefs()).map { $0.id } == ids)
     #expect(MacChecks.evaluate(tidyMac(rectangle: .running(conflicts: [])), trackpad: TrackpadPrefs()).map { $0.id } == ids + ["rectangle"])
     // Row ids are what the UI iterates over, so they must be unique.
-    #expect(Set(ids + ["rectangle"]).count == 8)
+    #expect(Set(ids + ["rectangle"]).count == 9)
 }
 
 @Test func macChecksATidyMacHasNothingToWarnAbout() {
@@ -43,17 +44,19 @@ private func conflict(_ action: Action, _ rectangleAction: String = "leftHalf") 
 }
 
 @Test func macChecksOnTheUsersMac() throws {
-    // Verified on the user's Mac: spans-displays and mru-spaces absent, Stage Manager and tiling explicitly off, both
-    // swipe gestures at 2 in both trackpad domains, Rectangle running with no collisions. Rambla's default is 4 fingers.
+    // Verified on the user's Mac: spans-displays and mru-spaces absent, Stage Manager and tiling explicitly off, every
+    // swipe gesture (sideways and vertical) at 2 in both trackpad domains, Rectangle running with no collisions.
+    // Rambla's default is 4 fingers.
     let mac = MacSettings(accessibilityTrusted: true, stageManager: false,
                           tilingByEdgeDrag: false, tilingToMenuBar: false, tilingWithOption: false,
-                          threeFingerSwipe: [2, 2], fourFingerSwipe: [2, 2], threeFingerDrag: [false, false],
-                          rectangle: .running(conflicts: []))
+                          threeFingerSwipe: [2, 2], fourFingerSwipe: [2, 2], threeFingerVertSwipe: [2, 2],
+                          fourFingerVertSwipe: [2, 2], threeFingerDrag: [false, false], rectangle: .running(conflicts: []))
     let checks = MacChecks.evaluate(mac, trackpad: TrackpadPrefs())
     let statuses = Dictionary(uniqueKeysWithValues: checks.map { ($0.id, $0.status) })
     #expect(statuses == [
         "accessibility": .ok, "separate-spaces": .ok, "rearrange-spaces": .warning, "stage-manager": .ok,
-        "macos-tiling": .ok, "trackpad-gesture": .warning, "three-finger-drag": .ok, "rectangle": .info,
+        "macos-tiling": .ok, "trackpad-gesture": .warning, "vertical-gesture": .warning, "three-finger-drag": .ok,
+        "rectangle": .info,
     ])
     #expect(try row("rearrange-spaces", in: checks).title == "Reorganizar Spaces")
     let rectangle = try row("rectangle", in: checks)
@@ -318,13 +321,13 @@ private func trackpadRow(three: [Int], four: [Int], fingers: Int, canChange: Boo
     #expect(MacChecks.desktopAndDockURL.absoluteString == "x-apple.systempreferences:com.apple.Desktop-Settings.extension")
     #expect(MacChecks.trackpadURL.absoluteString == "x-apple.systempreferences:com.apple.Trackpad-Settings.extension")
 
-    // Only Accessibility, Rearrange Spaces and the trackpad gesture open a pane.
+    // Only Accessibility, Rearrange Spaces and the trackpad gestures open a pane.
     let checks = MacChecks.evaluate(tidyMac(rectangle: .running(conflicts: [])), trackpad: TrackpadPrefs())
     let links = Dictionary(uniqueKeysWithValues: checks.map { ($0.id, $0.settingsURL) })
     #expect(links == [
         "accessibility": MacChecks.accessibilityURL, "separate-spaces": nil, "rearrange-spaces": MacChecks.desktopAndDockURL,
-        "stage-manager": nil, "macos-tiling": nil, "trackpad-gesture": MacChecks.trackpadURL, "three-finger-drag": nil,
-        "rectangle": nil,
+        "stage-manager": nil, "macos-tiling": nil, "trackpad-gesture": MacChecks.trackpadURL,
+        "vertical-gesture": MacChecks.trackpadURL, "three-finger-drag": nil, "rectangle": nil,
     ])
 }
 
@@ -334,4 +337,50 @@ private func trackpadRow(three: [Int], four: [Int], fingers: Int, canChange: Boo
     for id in MacChecks.trackpadCheckIDs {
         #expect(ids.contains(id), "\(id)")
     }
+}
+
+// MARK: - Swipe up and down
+
+private func verticalRow(three: [Int], four: [Int], fingers: Int, vertical: Bool = true, canChange: Bool = true) throws -> MacCheck {
+    var mac = tidyMac()
+    mac.threeFingerVertSwipe = three
+    mac.fourFingerVertSwipe = four
+    mac.canChangeTrackpadGestures = canChange
+    let trackpad = TrackpadPrefs(fingers: fingers, verticalSwipe: vertical)
+    return try row("vertical-gesture", in: MacChecks.evaluate(mac, trackpad: trackpad))
+}
+
+@Test func macChecksVerticalGestureCollidesWithMissionControlOnTheSameFingers() throws {
+    // (Rambla fingers, three-finger vertical values, four-finger vertical values, warns)
+    let table: [(Int, [Int], [Int], Bool)] = [
+        (4, [], [], false),
+        (4, [2], [0], false),
+        (4, [2, 2], [2, 2], true),       // the user's Mac: the pane says «3 dedos» and stores 2 for both
+        (4, [0], [2], true),
+        (3, [2], [0], true),
+        (3, [0], [2], false),
+    ]
+    for (fingers, three, four, warns) in table {
+        let check = try verticalRow(three: three, four: four, fingers: fingers)
+        #expect(check.status == (warns ? .warning : .ok), "fingers \(fingers), three \(three), four \(four)")
+        #expect((check.fix != nil) == warns)
+    }
+}
+
+@Test func macChecksVerticalConflictNamesMissionControlAndOffersTheFix() throws {
+    let check = try verticalRow(three: [2], four: [2], fingers: 4)
+    #expect(check.detail.contains("Mission Control"))
+    #expect(check.detail.contains("«3 dedos»"))
+    #expect(check.fix == .turnOffVerticalSwipe(fingers: 4))
+    let manual = try verticalRow(three: [2], four: [2], fingers: 4, canChange: false)
+    #expect(manual.fix == nil)
+    #expect(manual.status == .warning)
+}
+
+@Test func macChecksVerticalGestureIsQuietWhileItIsOff() throws {
+    #expect(try verticalRow(three: [2], four: [2], fingers: 4, vertical: false).status == .ok)
+    var mac = tidyMac()
+    mac.fourFingerVertSwipe = [2]
+    let off = TrackpadPrefs(enabled: false, fingers: 4)
+    #expect(try row("vertical-gesture", in: MacChecks.evaluate(mac, trackpad: off)).status == .ok)
 }
