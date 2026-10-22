@@ -146,14 +146,16 @@ Una columna puede tener varias ventanas.
 
 **Reordenar con el mouse.** Agarrá una ventana de la barra de título y soltala encima de otra columna. Se mueve a ese lugar, antes o después según de qué lado de la columna la sueltes. Si la soltás en otra pantalla, pasa a la tira de esa pantalla.
 
-**Deslizar con el trackpad.** Deslizá con **cuatro dedos** a izquierda o derecha (podés cambiarlo a tres): la tira sigue tus dedos y al soltar se acomoda en la columna más cercana.
+**Deslizar con el trackpad.** Deslizá con **cuatro dedos** a izquierda o derecha (podés cambiarlo a tres): la tira sigue tus dedos y al soltar se asienta en una columna. Un deslizamiento corto y rápido alcanza para pasar a la siguiente.
 
-> macOS también usa ese gesto para cambiar de escritorio y Rambla no lo puede bloquear. Elegí una de estas opciones:
+> macOS también usa ese gesto para cambiar de escritorio y Rambla no lo puede bloquear. Ojo con una trampa de Ajustes: en **«Cambiar entre apps en pantalla completa»**, la opción **«3 dedos»** deja activo también el gesto de 4 dedos, aunque no lo muestre. Elegí una de estas opciones:
 >
-> - **Cuatro dedos para Rambla (recomendado):** en Ajustes del Sistema → Trackpad → Más gestos, poné **"Deslizar entre apps a pantalla completa"** en **No**. Para cambiar de escritorio usá ⌃← / ⌃→.
-> - **Tres dedos para Rambla:** en Ajustes del Sistema, poné "Deslizar entre apps a pantalla completa" en cuatro dedos y "Deslizar entre páginas" en dos. Después elegí tres dedos en Configuración → Trackpad. Esta opción no sirve si usás "arrastrar con tres dedos".
+> - **Cuatro dedos para Rambla (recomendado):** en Configuración → Trackpad y mouse, tocá **«Apagarlo en macOS»**. Rambla apaga solo el gesto de 4 dedos de macOS, y el de 3 dedos sigue cambiando de escritorio. A mano, lo más parecido es elegir **«Desactivado»** en Ajustes del Sistema → Trackpad → Más gestos → «Cambiar entre apps en pantalla completa», y cambiar de escritorio con ⌃← / ⌃→.
+> - **Tres dedos para Rambla:** en Ajustes del Sistema → Trackpad → Más gestos, poné «Cambiar entre apps en pantalla completa» en **«4 dedos»** y «Cambiar de página» en **2 dedos**. Después elegí tres dedos en Configuración → Trackpad y mouse. Esta opción no sirve si usás «arrastrar con tres dedos».
 >
-> Configuración → Mac te dice si el gesto de Rambla choca con el de macOS. Algunos cambios del trackpad recién aplican después de cerrar sesión.
+> Configuración → Trackpad y mouse (y la página Mac) te avisa si el gesto de Rambla choca con el de macOS.
+
+**Mover la tira con la ruedita del mouse.** Mantené **⌃⌘** y girá la ruedita: cada paso enfoca la columna de al lado. Con un Magic Mouse, o con dos dedos en el trackpad, manteniendo ⌃⌘ la tira se desliza como con el gesto y se asienta al soltar. Sin las teclas, la ruedita funciona como siempre. Las teclas se cambian en Configuración → Trackpad y mouse.
 
 **El mouse sigue al foco / el foco sigue al mouse.** Son dos opciones de Configuración → Apariencia y vienen apagadas. La primera lleva el puntero al centro de la ventana que enfocás con un atajo. La segunda enfoca la ventana que tenga el puntero encima, sin mover la tira.
 
@@ -181,7 +183,7 @@ Abrila desde el ícono de la barra de menú → **Configuración…**. Mientras 
 |---|---|
 | **General** | Activar o pausar, arrancar con la Mac, animaciones y su velocidad, centrado, ancho de ventanas nuevas, mantener altura original, separación entre ventanas y margen, anchos prefijados, paso de ajuste, qué hacer cuando otra app mueve una ventana |
 | **Atajos** | Cambiar cualquier atajo (cada acción admite dos). Hacé click en el atajo y apretá la combinación nueva: ⎋ cancela y ⌫ lo borra. Avisa si choca con Rectangle o si macOS no lo deja usar. "Restaurar predeterminados" vuelve todo a como venía. |
-| **Trackpad** | Activar el gesto, cantidad de dedos, sensibilidad y dirección natural |
+| **Trackpad y mouse** | El gesto del trackpad (dedos, sensibilidad, dirección natural), los conflictos con macOS y la ruedita del mouse |
 | **Apariencia** | Barra indicadora, borde de foco, atenuar inactivas, mouse ↔ foco |
 | **Apps** | Reglas por app: que flote siempre (ideal para calculadoras, reproductores o chats chiquitos), ancho inicial y dónde se abren sus ventanas (al lado de la enfocada, al principio o al final) |
 | **Pantallas** | Activar o desactivar Rambla en cada monitor |
@@ -234,7 +236,7 @@ Los enlaces también sirven en Atajos de Apple, Alfred, Keyboard Maestro, Better
 
 **Una ventana salió sola de la tira.** Otra app la movió (Rectangle, un doble click en la barra de título, el botón verde con ⌥). Es a propósito: Rambla no pelea con otras apps. Devolvela con ⌃⌘T.
 
-**Deslizar con el trackpad cambia de escritorio.** macOS usa el mismo gesto: mirá la [sección 10](#10-mouse-y-trackpad).
+**Deslizar con el trackpad cambia de escritorio.** macOS usa el mismo gesto, aunque Ajustes diga «3 dedos»: mirá la [sección 10](#10-mouse-y-trackpad).
 
 **Un atajo no hace nada.** Puede que otra app ya lo use. Revisá Configuración → Atajos, que marca los que macOS no dejó registrar, y cambialo por otro.
 

@@ -148,14 +148,16 @@ A column can hold several windows.
 
 **Reorder with the mouse.** Grab a window by its title bar and drop it on another column. It moves to that place, before or after depending on which side of the column you drop it. If you drop it on another display, it moves to that display's strip.
 
-**Swipe with the trackpad.** Swipe left or right with **four fingers** (you can change it to three): the strip follows your fingers and settles on the nearest column when you let go.
+**Swipe with the trackpad.** Swipe left or right with **four fingers** (you can change it to three): the strip follows your fingers and settles on a column when you let go. A short quick swipe is enough to reach the next one.
 
-> macOS uses that gesture to switch desktops too, and Rambla cannot block it. Pick one of these setups:
+> macOS uses that gesture to switch desktops too, and Rambla cannot block it. Watch out for a trap in System Settings: for **"Swipe between full-screen applications"**, the **three-finger** option also keeps the four-finger swipe on, without showing it. Pick one of these setups:
 >
-> - **Four fingers for Rambla (recommended):** in System Settings → Trackpad → More Gestures, set **"Swipe between full-screen applications"** to **Off**. Switch desktops with ⌃← / ⌃→.
-> - **Three fingers for Rambla:** in System Settings, set "Swipe between full-screen applications" to four fingers and "Swipe between pages" to two. Then choose three fingers in Configuración → Trackpad. This option does not work if you use "three finger drag".
+> - **Four fingers for Rambla (recommended):** in Configuración → Trackpad y mouse (Trackpad & Mouse), click **"Apagarlo en macOS"** (turn it off in macOS). Rambla turns off only the macOS four-finger swipe, and three fingers still switch desktops. By hand, the closest you can get is setting "Swipe between full-screen applications" to **Off** in System Settings → Trackpad → More Gestures, and switching desktops with ⌃← / ⌃→.
+> - **Three fingers for Rambla:** in System Settings → Trackpad → More Gestures, set "Swipe between full-screen applications" to **four fingers** and "Swipe between pages" to **two fingers**. Then choose three fingers in Configuración → Trackpad y mouse. This option does not work if you use "three finger drag".
 >
-> Configuración → Mac tells you if Rambla's gesture collides with the system's. Some trackpad changes only apply after logging out.
+> Configuración → Trackpad y mouse (and the Mac page) tells you if Rambla's gesture collides with the system's.
+
+**Move the strip with the mouse wheel.** Hold **⌃⌘** and turn the wheel: each notch focuses the next column. With a Magic Mouse, or two fingers on a trackpad, holding ⌃⌘ slides the strip like the gesture, and it settles when you let go. Without the keys, the wheel scrolls as usual. You can change the keys in Configuración → Trackpad y mouse.
 
 **Mouse follows focus / focus follows mouse.** Two options in Configuración → Apariencia (Appearance), off by default. The first moves the pointer to the center of the window you focus with a shortcut. The second focuses the window under the pointer, without moving the strip.
 
@@ -183,7 +185,7 @@ Open them from the menu bar icon → **Configuración…**. While the window is 
 |---|---|
 | **General** | Enable or pause, launch at login, animations and their speed, centering, width of new windows, keep original height, gaps between windows and margin, preset widths, adjustment step, what to do when another app moves a window |
 | **Atajos** (Shortcuts) | Change any shortcut (each action takes two). Click the shortcut and press the new combination: ⎋ cancels and ⌫ clears it. It warns you if it clashes with Rectangle or if macOS doesn't allow it. "Restaurar predeterminados" (Restore defaults) brings everything back. |
-| **Trackpad** | Enable the gesture, number of fingers, sensitivity and natural direction |
+| **Trackpad y mouse** (Trackpad & Mouse) | The trackpad gesture (fingers, sensitivity, natural direction), conflicts with macOS and the mouse wheel |
 | **Apariencia** (Appearance) | Strip indicator, focus border, dim inactive windows, mouse ↔ focus |
 | **Apps** | Per-app rules: always float (great for calculators, players or small chats), initial width, and where its windows open (next to the focused one, at the start or at the end) |
 | **Pantallas** (Displays) | Turn Rambla on or off for each monitor |
@@ -236,7 +238,7 @@ The links also work in Apple Shortcuts, Alfred, Keyboard Maestro, BetterTouchToo
 
 **A window left the strip by itself.** Another app moved it (Rectangle, a double-click on the title bar, the green button with ⌥). That is on purpose: Rambla does not fight other apps. Put it back with ⌃⌘T.
 
-**Swiping on the trackpad switches desktops.** macOS uses the same gesture: see [section 10](#10-mouse-and-trackpad).
+**Swiping on the trackpad switches desktops.** macOS uses the same gesture, even when System Settings says three fingers: see [section 10](#10-mouse-and-trackpad).
 
 **A shortcut does nothing.** Another app may already use it. Check Configuración → Atajos, which flags the ones macOS did not let Rambla register, and pick another one.
 

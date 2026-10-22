@@ -29,9 +29,9 @@ Every window is a column on one horizontal strip that keeps going past the edges
 - **New windows open beside the focused one**; the strip scrolls to the focused window (centering: never, only when it overflows, always).
 - **Column widths**: presets (25/33/50/66/75 %), full width, wider/narrower, center, and **pin a column** to the left or right edge.
 - **Stacks and tabs**: put several windows in one column, stacked vertically or as tabs with a clickable tab bar.
-- **Trackpad**: a three- or four-finger swipe slides the strip and settles on the nearest column.
+- **Trackpad**: a three- or four-finger swipe slides the strip; a short quick swipe reaches the next column.
 - **Strip indicator**: a frosted bar with one icon per column while you navigate; click a tile to jump, drag it to reorder.
-- **Mouse**: drag a window onto another column to reorder; resize it to set the column width.
+- **Mouse**: hold ⌃⌘ and turn the wheel to go through the columns; drag a window onto another column to reorder; resize it to set the column width.
 - **Focus border** and **dim inactive windows** (optional), focus follows mouse / mouse follows focus (optional).
 - **Per-app rules** (tile or float, initial width, where new windows open) and per-display on/off.
 - **Remembers the layout** across restarts; launch at login.
@@ -83,7 +83,7 @@ All of them can be changed in **Settings → Atajos**.
 
 ## Trackpad
 
-macOS also receives every swipe and Rambla cannot stop it. If you use the four-finger swipe (default), set **System Settings → Trackpad → More Gestures → Swipe between full-screen applications** to *Off* (switch desktops with ⌃← / ⌃→), or pick three fingers in Rambla and keep the system one on four. **Settings → Mac** tells you if they collide.
+macOS also receives every swipe and Rambla cannot stop it. And in **System Settings → Trackpad → More Gestures → Swipe between full-screen applications**, the three-finger option also keeps the four-finger swipe on. If you use the four-finger swipe (default), click **"Apagarlo en macOS"** (turn it off in macOS) in **Settings → Trackpad & Mouse**: Rambla turns off only the macOS four-finger swipe, and three fingers still switch desktops. Or pick three fingers in Rambla and set the system one to four. Rambla tells you if they collide.
 
 ## Recommended macOS settings
 

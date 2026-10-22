@@ -27,9 +27,9 @@ Cada ventana es una columna de una tira horizontal que sigue más allá de los b
 - **Las ventanas nuevas se abren al lado de la enfocada** y la tira se desliza hasta la ventana enfocada. Centrado: nunca, solo si no entra o siempre.
 - **Anchos de columna**: prefijados (25/33/50/66/75 %), ancho completo, más ancha o más angosta, centrar y **fijar una columna** al borde izquierdo o derecho.
 - **Pilas y pestañas**: varias ventanas en una columna, apiladas o en pestañas con una barra en la que se puede hacer click.
-- **Trackpad**: deslizar con tres o cuatro dedos mueve la tira, que se asienta en la columna más cercana.
+- **Trackpad**: deslizar con tres o cuatro dedos mueve la tira; un deslizamiento corto y rápido pasa a la columna siguiente.
 - **Barra indicadora**: aparece al navegar con un ícono por columna; click para saltar, arrastrar para reordenar.
-- **Mouse**: arrastrá una ventana sobre otra columna para reordenar, o cambiale el tamaño para fijar el ancho de su columna.
+- **Mouse**: con ⌃⌘ apretado, la ruedita recorre las columnas; arrastrá una ventana sobre otra columna para reordenar, o cambiale el tamaño para fijar el ancho de su columna.
 - Opcionales: **borde en la ventana enfocada**, **atenuar las inactivas**, el foco sigue al mouse y el mouse sigue al foco.
 - **Reglas por app**: mosaico o flotante, ancho inicial y dónde se abren. Además, se puede activar o desactivar por pantalla.
 - **Recuerda el layout** al reiniciar y puede arrancar con la Mac.
@@ -81,7 +81,7 @@ Todos se pueden cambiar en **Configuración → Atajos**.
 
 ## Trackpad
 
-macOS también recibe cada deslizamiento y Rambla no lo puede frenar. Con el gesto de cuatro dedos (el que viene por defecto), poné **Ajustes del Sistema → Trackpad → Más gestos → Deslizar entre apps a pantalla completa** en *No* y cambiá de escritorio con ⌃← / ⌃→. La otra opción es elegir tres dedos en Rambla y dejar el de macOS en cuatro. En **Configuración → Mac** te avisa si chocan.
+macOS también recibe cada deslizamiento y Rambla no lo puede frenar. Y en **Ajustes del Sistema → Trackpad → Más gestos → Cambiar entre apps en pantalla completa**, la opción «3 dedos» deja activo también el de 4. Con el gesto de cuatro dedos (el que viene por defecto), tocá **«Apagarlo en macOS»** en **Configuración → Trackpad y mouse**: Rambla apaga solo el gesto de 4 dedos de macOS y el de 3 sigue cambiando de escritorio. La otra opción es elegir tres dedos en Rambla y poner el de macOS en «4 dedos». Rambla te avisa si chocan.
 
 ## Ajustes de macOS recomendados
 
