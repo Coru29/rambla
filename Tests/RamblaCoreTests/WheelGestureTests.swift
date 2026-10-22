@@ -130,6 +130,28 @@ private func swipe(_ phase: Event.Phase, _ deltaY: Double = 0, deltaX: Double = 
     #expect(wheel.handle(notch(-1, at: 7, keys: false)) == .pass)
 }
 
+@Test func afterAStalledSwipeTheNextTouchStartsOver() {
+    // A new swipe or a new touch without the keys is the app's; with the keys, a new swipe slides the strip again.
+    for (next, expected) in [(swipe(.began, -5, at: 7, keys: false), WheelGesture.Output.pass),
+                             (swipe(.mayBegin, at: 7, keys: false), .pass),
+                             (swipe(.began, -5, at: 7), .slide(5, first: true))] {
+        var wheel = WheelGesture()
+        #expect(wheel.handle(swipe(.began, -10, at: 6)) == .slide(10, first: true))
+        #expect(wheel.idle(at: 6.6) == .release(velocity: 0))
+        #expect(wheel.handle(next) == expected)
+    }
+}
+
+@Test func theMomentumOfAStalledSwipeIsSwallowedUntilItEnds() {
+    var wheel = WheelGesture()
+    #expect(wheel.handle(swipe(.began, -10, at: 6)) == .slide(10, first: true))
+    #expect(wheel.idle(at: 6.6) == .release(velocity: 0))
+    #expect(wheel.handle(swipe(.ended, at: 6.7)) == .swallow)
+    #expect(wheel.handle(swipe(.none, -20, at: 6.72, momentum: .began)) == .swallow)
+    #expect(wheel.handle(swipe(.none, -2, at: 6.9, momentum: .ended)) == .swallow)
+    #expect(wheel.handle(swipe(.changed, -5, at: 7, keys: false)) == .pass)
+}
+
 @Test func aNewSwipeOrANotchEndsASwipeThatLostItsEnd() {
     var wheel = WheelGesture()
     #expect(wheel.handle(swipe(.began, -10, at: 0)) == .slide(10, first: true))
