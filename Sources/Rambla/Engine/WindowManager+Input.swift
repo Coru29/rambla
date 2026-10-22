@@ -94,8 +94,10 @@ extension WindowManager {
             for (id, placement) in result.placements {
                 guard case .visible(let frame) = placement, frame.contains(point),
                       display.frame.contains(frame), id != focusedWindow else { continue }
-                // Only the window actually on top there: not the strip window under a floating one, a menu or the Dock.
-                guard Self.frontWindow(at: point) == id else { return }
+                // Only the window actually on top there: not the strip window under a floating one, a menu, the Dock
+                // or Rambla's own settings.
+                let ownWindows = Set(NSApp.windows.filter { $0.isVisible && $0.styleMask.contains(.titled) }.map(\.windowNumber))
+                guard Self.frontWindow(at: point, ownWindows: ownWindows) == id else { return }
                 strips[key]?.focus(window: id)
                 focusWithoutScrolling(id)
                 return
@@ -105,13 +107,15 @@ extension WindowManager {
 
     /// The window macOS shows on top at `point` (global top-left coordinates, like AX), or nil when it is not an
     /// ordinary window (a menu, the Dock, the menu bar). Rambla's own overlays (border, dimming, indicator) let the
-    /// pointer through and are skipped.
-    private static func frontWindow(at point: CGPoint) -> WindowID? {
+    /// pointer through and are skipped; its titled windows (`ownWindows`: settings, welcome) count like any other.
+    private static func frontWindow(at point: CGPoint, ownWindows: Set<Int>) -> WindowID? {
         guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
                 as? [[String: Any]] else { return nil }
         let own = ProcessInfo.processInfo.processIdentifier
         for info in list {
-            guard (info[kCGWindowOwnerPID as String] as? Int).map(pid_t.init) != own,
+            let number = info[kCGWindowNumber as String] as? Int ?? 0
+            let isOverlay = (info[kCGWindowOwnerPID as String] as? Int).map(pid_t.init) == own && !ownWindows.contains(number)
+            guard !isOverlay,
                   (info[kCGWindowAlpha as String] as? Double ?? 1) > 0,
                   let bounds = info[kCGWindowBounds as String] as? NSDictionary,
                   let rect = CGRect(dictionaryRepresentation: bounds), rect.contains(point) else { continue }
