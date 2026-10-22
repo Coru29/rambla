@@ -17,6 +17,10 @@
   <img src="https://img.shields.io/badge/macOS-14%2B-lightgrey" alt="macOS 14+">
 </p>
 
+<p align="center">
+  <a href="https://rambla-mac.app/#video"><img src="https://rambla-mac.app/assets/video/rambla-en-readme.gif" width="720" alt="Rambla at work: windows open beside each other on a strip that runs past the screen, the keyboard moves the focus, and a stack turns into tabs"></a>
+</p>
+
 ---
 
 Every window is a column on one horizontal strip that keeps going past the edges of your screen. Opening a window adds a column next to the one you are using **instead of shrinking everything else**, and the strip slides to show whatever you focus. It is the [niri](https://github.com/YaLTeR/niri) / PaperWM idea, built as a light native Mac app and inspired by the paid [ChainYourMac](https://chainyourmac.com).

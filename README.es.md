@@ -17,6 +17,10 @@
   <img src="https://img.shields.io/badge/macOS-14%2B-lightgrey" alt="macOS 14+">
 </p>
 
+<p align="center">
+  <a href="https://rambla-mac.app/#video"><img src="https://rambla-mac.app/assets/video/rambla-es-readme.gif" width="720" alt="Rambla en acción: las ventanas se abren una al lado de la otra en una tira que sigue más allá de la pantalla, el teclado mueve el foco y una pila pasa a pestañas"></a>
+</p>
+
 ---
 
 Cada ventana es una columna de una tira horizontal que sigue más allá de los bordes de la pantalla. Abrir una ventana agrega una columna al lado de la que estás usando **sin achicar las demás**, y la tira se desliza para mostrarte lo que enfocás. Es la idea de [niri](https://github.com/YaLTeR/niri) y PaperWM, hecha como una app nativa y liviana de Mac, inspirada en [ChainYourMac](https://chainyourmac.com), que es paga.
