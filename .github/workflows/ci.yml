@@ -11,11 +11,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Same toolchain as local development: the Command Line Tools, not Xcode.
-      - name: Select the Command Line Tools
+      # The Swift used for development (6.3, macOS 26 SDK). The runner's Command Line Tools are newer (Swift 6.4 with
+      # the macOS 27 beta SDK, where SwiftUI's @State is a macro whose plugin only ships inside Xcode), so CI builds
+      # with Xcode 26's toolchain.
+      - name: Select Xcode 26
         run: |
-          sudo xcode-select -s /Library/Developer/CommandLineTools
-          swift --version
+          XCODE=$(ls -d /Applications/Xcode_26*.app | sort -V | tail -n 1)
+          echo "DEVELOPER_DIR=$XCODE/Contents/Developer" >> "$GITHUB_ENV"
+          sudo xcode-select -s "$XCODE/Contents/Developer"
+          DEVELOPER_DIR="$XCODE/Contents/Developer" swift --version
 
       - name: Unit tests
         run: scripts/test.sh
