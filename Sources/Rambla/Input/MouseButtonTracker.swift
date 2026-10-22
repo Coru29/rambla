@@ -52,6 +52,7 @@ final class MouseButtonTracker: @unchecked Sendable {
     private var session: Session?
     private var enabled = false
     private var buttons: [Int] = []
+    private lazy var retry = MainActor.assumeIsolated { TapRetry(name: "Mouse button taps") }
 
     init(handlers: Handlers) {
         self.handlers = handlers
@@ -101,6 +102,7 @@ final class MouseButtonTracker: @unchecked Sendable {
     @MainActor
     private func update(restart: Bool) {
         let wanted = enabled || currentRecording != nil
+        if !wanted { retry.reset() }
         if let session, restart || !wanted {
             self.session = nil
             session.stop()
@@ -143,6 +145,18 @@ final class MouseButtonTracker: @unchecked Sendable {
                     case .vertical(let up): handlers.vertical(up)
                     }
                 }
+            }
+        }
+    }
+
+    /// Reported by a session's thread: whether its taps could be created.
+    fileprivate func sessionStarted(_ started: Session, ok: Bool) {
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated {
+                guard self.session === started else { return }
+                guard !ok else { return self.retry.reset() }
+                self.session = nil
+                self.retry.failed { [weak self] in self?.update(restart: false) }
             }
         }
     }
@@ -232,7 +246,7 @@ final class MouseButtonTracker: @unchecked Sendable {
             guard let motionTap = CGEvent.tapCreate(tap: .cghidEventTap, place: .headInsertEventTap, options: .defaultTap,
                                                     eventsOfInterest: moveMask, callback: mouseButtonCallback,
                                                     userInfo: userInfo) else {
-                Log.error("Mouse button taps could not be created")
+                tracker.sessionStarted(self, ok: false)
                 return
             }
             CGEvent.tapEnable(tap: motionTap, enable: false)
@@ -240,9 +254,10 @@ final class MouseButtonTracker: @unchecked Sendable {
                                                     eventsOfInterest: pressMask, callback: mouseButtonCallback,
                                                     userInfo: userInfo) else {
                 CFMachPortInvalidate(motionTap)
-                Log.error("Mouse button taps could not be created")
+                tracker.sessionStarted(self, ok: false)
                 return
             }
+            tracker.sessionStarted(self, ok: true)
             let loop = CFRunLoopGetCurrent()!
             let sources = [buttonTap, motionTap].map { CFMachPortCreateRunLoopSource(nil, $0, 0)! }
             sources.forEach { CFRunLoopAddSource(loop, $0, .commonModes) }

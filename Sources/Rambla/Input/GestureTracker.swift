@@ -43,18 +43,29 @@ final class GestureTracker {
     func configure(enabled: Bool, fingers: Int, vertical: Bool) {
         self.fingers = fingers
         self.vertical = vertical
+        self.enabled = enabled
         if enabled, tap == nil { install() }
-        if !enabled { uninstall() }
+        if !enabled {
+            retry.reset()
+            uninstall()
+        }
     }
+
+    private var enabled = false
+    private let retry = TapRetry(name: "Trackpad gesture tap")
 
     private func install() {
         let mask = CGEventMask(1) << 29 // NSEvent.EventType.gesture
         guard let tap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .listenOnly,
                                           eventsOfInterest: mask, callback: tapCallback,
                                           userInfo: Unmanaged.passUnretained(self).toOpaque()) else {
-            Log.error("Trackpad gesture tap could not be created")
+            retry.failed { [weak self] in
+                guard let self, self.enabled, self.tap == nil else { return }
+                self.install()
+            }
             return
         }
+        retry.reset()
         let source = CFMachPortCreateRunLoopSource(nil, tap, 0)
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)

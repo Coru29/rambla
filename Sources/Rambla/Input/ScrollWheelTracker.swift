@@ -32,6 +32,9 @@ final class ScrollWheelTracker: @unchecked Sendable {
     private var modifiers: Modifiers = []
     /// The running tap, if any. Main thread only.
     private var session: Session?
+    // Main thread only.
+    private var enabled = false
+    private lazy var retry = MainActor.assumeIsolated { TapRetry(name: "Scroll wheel tap") }
 
     init(handlers: Handlers) {
         self.handlers = handlers
@@ -40,6 +43,8 @@ final class ScrollWheelTracker: @unchecked Sendable {
     @MainActor
     func configure(enabled: Bool, modifiers: Modifiers) {
         lock.withLock { self.modifiers = modifiers }
+        self.enabled = enabled
+        if !enabled { retry.reset() }
         if enabled, session == nil {
             let session = Session(tracker: self)
             self.session = session
@@ -70,6 +75,23 @@ final class ScrollWheelTracker: @unchecked Sendable {
     var isOn: Bool { session != nil }
 
     fileprivate var wantedModifiers: Modifiers { lock.withLock { modifiers } }
+
+    /// Reported by a session's thread: whether its tap could be created.
+    fileprivate func sessionStarted(_ started: Session, ok: Bool) {
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated {
+                guard self.session === started else { return }
+                guard !ok else { return self.retry.reset() }
+                self.session = nil
+                self.retry.failed { [weak self] in
+                    guard let self, self.enabled, self.session == nil else { return }
+                    let session = Session(tracker: self)
+                    self.session = session
+                    session.start()
+                }
+            }
+        }
+    }
 
     /// Runs the engine call on the main thread. Blocks run in the order they were sent, so a slide never
     /// overtakes its own start or end.
@@ -137,9 +159,10 @@ final class ScrollWheelTracker: @unchecked Sendable {
             guard let tap = CGEvent.tapCreate(tap: .cghidEventTap, place: .headInsertEventTap, options: .defaultTap,
                                               eventsOfInterest: mask, callback: wheelCallback,
                                               userInfo: Unmanaged.passUnretained(self).toOpaque()) else {
-                Log.error("Scroll wheel tap could not be created")
+                tracker.sessionStarted(self, ok: false)
                 return
             }
+            tracker.sessionStarted(self, ok: true)
             let loop = CFRunLoopGetCurrent()!
             let source = CFMachPortCreateRunLoopSource(nil, tap, 0)
             CFRunLoopAddSource(loop, source, .commonModes)
