@@ -458,9 +458,11 @@ final class WindowManager {
         for id in visible { hiddenSince[id] = nil }
         hidden = hiddenNow
 
-        // Windows that stopped being tileable (rules changed) leave their strips.
+        // Windows that stopped being tileable (rules changed) leave their strips. A window in native full screen keeps
+        // its column, hidden like a minimized one, so it comes back to its place when it leaves full screen.
         for key in Array(strips.keys) {
-            for id in strips[key]!.allWindows where windows[id] != nil && windows[id]!.kind != .tile {
+            for id in strips[key]!.allWindows {
+                guard let record = windows[id], record.kind != .tile, !record.traits.isFullscreen else { continue }
                 strips[key]!.remove(window: id)
             }
         }
@@ -480,7 +482,9 @@ final class WindowManager {
             guard let display = Displays.best(for: record.frame, in: displays),
                   let key = currentKey(of: display), keys.contains(key) else { continue }
             insert(record, into: key)
-            if record.isFresh { revealKeys.insert(key) }
+            // A window that joins at the end can have the focus (it came back from somewhere): show it.
+            if record.id == focusedWindow { strips[key]!.focus(window: record.id) }
+            if record.isFresh || record.id == focusedWindow { revealKeys.insert(key) }
         }
 
         if let focused = focusedWindow, let key = key(containing: focused), !revealKeys.contains(key) {
