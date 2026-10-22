@@ -51,6 +51,23 @@ The release notes are generated from the `feat`, `fix` and `perf` commits since 
 
 Every release must be signed with the project's certificate in `.signing/` (created by the first build and never committed): installed copies only accept updates signed with the same certificate. Keep a private backup of that folder.
 
+## Translations
+
+The interface is written in Spanish in the code: those Spanish texts are the keys. The English text lives in
+`Packaging/en.lproj/Localizable.strings`, which is also what a Mac in any other language shows.
+
+- In SwiftUI, a string literal (`Text("…")`, `Button("…")`, `Toggle("…", …)`) is translated by itself. Anywhere else
+  (menus, alerts, `RamblaCore`), wrap visible text in `String(localized: "…")`. Data that is never translated
+  (names, paths) goes through `Text(verbatim:)`.
+- After adding or changing a visible text, add its English line and run:
+
+  ```sh
+  scripts/check-localization.sh   # lists the texts without an English translation; CI runs it too
+  ```
+
+- A new language is a new `Packaging/<code>.lproj/Localizable.strings` plus its code in `CFBundleLocalizations`
+  (`Packaging/Info.plist`).
+
 ## Code
 
 - Swift 6 toolchain, language mode 5, no third-party dependencies.

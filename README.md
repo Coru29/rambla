@@ -37,6 +37,7 @@ Every window is a column on one horizontal strip that keeps going past the edges
 - **Remembers the layout** across restarts; launch at login.
 - **Plays well with [Rectangle](https://rectangleapp.com)**: default shortcuts use ⌃⌘, so they never clash with Rectangle's ⌃⌥, and if Rectangle (or any other app) moves a window, that window leaves the strip and stays where it was put. The Mac page of the settings lists any shortcut that collides with your Rectangle setup.
 - **Automation**: `rambla://` URLs, a `rambla` command-line tool and Raycast script export.
+- **English and Spanish**: the interface follows your Mac's language.
 - **Light**: native Swift (AppKit + SwiftUI settings), no Electron, no polling — about 0 % CPU and ~12 MB of memory when idle.
 
 ## Privacy
@@ -83,7 +84,7 @@ All of them can be changed in **Settings → Atajos**.
 
 ## Trackpad
 
-macOS also receives every swipe and Rambla cannot stop it. And in **System Settings → Trackpad → More Gestures → Swipe between full-screen applications**, the three-finger option also keeps the four-finger swipe on. If you use the four-finger swipe (default), click **"Apagarlo en macOS"** (turn it off in macOS) in **Settings → Trackpad & Mouse**: Rambla turns off only the macOS four-finger swipe, and three fingers still switch desktops. Or pick three fingers in Rambla and set the system one to four. Rambla tells you if they collide.
+macOS also receives every swipe and Rambla cannot stop it. And in **System Settings → Trackpad → More Gestures → Swipe between full-screen applications**, the three-finger option also keeps the four-finger swipe on. If you use the four-finger swipe (default), click **Turn Off in macOS** in **Settings → Trackpad & Mouse**: Rambla turns off only the macOS four-finger swipe, and three fingers still switch desktops. Or pick three fingers in Rambla and set the system one to four. Rambla tells you if they collide.
 
 ## Recommended macOS settings
 

@@ -4,6 +4,8 @@
 
 Rambla ordena tus ventanas en una **tira horizontal**, como un paseo que sigue más allá de los bordes de la pantalla. Este manual explica cómo usarla, desde el primer día hasta los trucos.
 
+> Rambla se muestra en español si tu Mac está en español, y en inglés si no.
+
 **Contenido**
 
 1. [La idea en 30 segundos](#1-la-idea-en-30-segundos)

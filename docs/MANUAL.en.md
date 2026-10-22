@@ -4,7 +4,7 @@
 
 Rambla arranges your windows on a **horizontal strip**, like a promenade that keeps going past the edges of your screen. This manual explains how to use it, from day one to the tricks.
 
-> Rambla's interface is in Spanish for now. Menu items and settings appear below with their Spanish name followed by a translation, for example **Configuración** (Settings).
+> Rambla's interface follows your Mac's language: it is in Spanish on a Mac set to Spanish and in English otherwise. This manual uses the English names.
 
 **Contents**
 
@@ -45,8 +45,8 @@ On macOS, every new window lands on top of the others or makes you shrink them. 
 ## 2. Install and permission
 
 1. Open the `.dmg` and drag **Rambla** to the **Applications** folder.
-2. Open Rambla from Applications. An icon appears in the menu bar: three windows on the promenade. The first time, a short guide (**Bienvenida**, Welcome) also opens and walks you through the permission, the trackpad and the basic shortcuts; you can open it again from the menu at any time.
-3. macOS asks for the **Accessibility** permission, which is what lets Rambla move other apps' windows. Go to **System Settings → Privacy & Security → Accessibility** and turn **Rambla** on. If the prompt does not show up, Rambla's menu has "Abrir Ajustes de Accesibilidad…" (Open Accessibility Settings).
+2. Open Rambla from Applications. An icon appears in the menu bar: three windows on the promenade. The first time, a short guide (**Welcome**) also opens and walks you through the permission, the trackpad and the basic shortcuts; you can open it again from the menu at any time.
+3. macOS asks for the **Accessibility** permission, which is what lets Rambla move other apps' windows. Go to **System Settings → Privacy & Security → Accessibility** and turn **Rambla** on. If the prompt does not show up, Rambla's menu has **Open Accessibility Settings…**.
 4. That's it: Rambla notices the permission by itself and arranges your windows.
 
 > Rambla is not notarized by Apple. If macOS says it cannot verify the developer, right-click the app and choose **Open**.
@@ -55,7 +55,7 @@ Rambla does not need Screen Recording, Input Monitoring, or SIP disabled.
 
 ### Updates
 
-Once a day Rambla checks GitHub for a new version. When there is one, the menu shows **"Actualizar a Rambla X…"** (Update to Rambla X): it lists what is new and, if you accept, Rambla downloads itself, checks that the new version carries the same signature, replaces itself and reopens. The Accessibility permission is kept. You can also check by hand with **"Buscar actualizaciones…"** (Check for updates) in the menu, or turn the daily check off in Configuración → General.
+Once a day Rambla checks GitHub for a new version. When there is one, the menu shows **Update to Rambla X…**: it lists what is new and, if you accept, Rambla downloads itself, checks that the new version carries the same signature, replaces itself and reopens. The Accessibility permission is kept. You can also check by hand with **Check for Updates…** in the menu, or turn the daily check off in Settings → General.
 
 ## 3. First steps
 
@@ -66,7 +66,7 @@ When it starts, Rambla takes the windows on the current desktop and lines them u
 3. Open a new window in any app (for example ⌘N in Safari). It appears right after the one you had focused.
 4. Press **⌃⌘⇧→**. The focused column moves one place to the right.
 
-If you don't like something, everything can be changed in **Configuración** (Settings): Rambla's menu → Configuración…. To make Rambla stop arranging for a while, use **Pausar Rambla** (Pause Rambla) in the same menu.
+If you don't like something, everything can be changed in **Settings**: Rambla's menu → Settings…. To make Rambla stop arranging for a while, use **Pause Rambla** in the same menu.
 
 ## 4. Concepts
 
@@ -93,7 +93,7 @@ If you don't like something, everything can be changed in **Configuración** (Se
 
 You can also focus as usual: with a click, ⌘Tab, the Dock or Mission Control. The strip slides all the same.
 
-**Centering.** By default the strip moves just enough for the focused column to be fully visible. In Configuración → General you can make it center the column **always** or **only when the strip does not fit on the screen**. **⌃⌘C** centers the focused column at any time.
+**Centering.** By default the strip moves just enough for the focused column to be fully visible. In Settings → General you can make it center the column **always** or **only when the strip does not fit on the screen**. **⌃⌘C** centers the focused column at any time.
 
 ## 6. Widths and heights
 
@@ -106,7 +106,7 @@ You can also focus as usual: with a click, ⌘Tab, the Dock or Mission Control. 
 | ⌃⌘0 | Equalize the heights of the stack |
 
 - **With the mouse**: if you resize a window by dragging its edge, Rambla adopts that width for the column.
-- **New windows** keep their own width by default. In Configuración → General you can set a fixed one (33, 50 or 66 %).
+- **New windows** keep their own width by default. In Settings → General you can set a fixed one (33, 50 or 66 %).
 - **Keep original height**: turn it on in General if you prefer windows to keep the height they open with, aligned to the top, instead of taking the full height.
 - Some apps have a minimum width (Safari, for example). Rambla detects it by itself and fits the rest around it.
 
@@ -139,10 +139,10 @@ A column can hold several windows.
 
 - Rambla's shortcuts use **⌃⌘** and Rectangle's use **⌃⌥**, so they don't clash.
 - If you use Rectangle on a window of the strip (left half, maximize, center…), **that window leaves the strip and stays floating where Rectangle put it**. Rambla does not fight Rectangle.
-- To put it back on the strip: ⌃⌘T with that window focused, or **Reacomodar ventanas** (Rearrange windows) in the menu, which brings back every window that left this way. They also come back by themselves when Rambla restarts or updates; the ones you took out with ⌃⌘T stay floating.
+- To put it back on the strip: ⌃⌘T with that window focused, or **Rearrange Windows** in the menu, which brings back every window that left this way. They also come back by themselves when Rambla restarts or updates; the ones you took out with ⌃⌘T stay floating.
 - The same happens with Rectangle's snap areas (dragging a window to the edge of the screen).
-- Configuración → Mac warns you if any of Rambla's shortcuts matches one of your Rectangle's.
-- If you don't want this behavior, turn off "Si otra app mueve una ventana, sacarla de la tira" (If another app moves a window, take it off the strip) in Configuración → General.
+- Settings → Mac warns you if any of Rambla's shortcuts matches one of your Rectangle's.
+- If you don't want this behavior, turn off "When another app (like Rectangle) moves a window, take it out of the strip" in Settings → General.
 
 ## 10. Mouse and trackpad
 
@@ -152,59 +152,59 @@ A column can hold several windows.
 
 > macOS uses that gesture to switch desktops too, and Rambla cannot block it. Watch out for a trap in System Settings: for **"Swipe between full-screen applications"**, the **three-finger** option also keeps the four-finger swipe on, without showing it. Pick one of these setups:
 >
-> - **Four fingers for Rambla (recommended):** in Configuración → Trackpad y mouse (Trackpad & Mouse), click **"Apagarlo en macOS"** (turn it off in macOS). Rambla turns off only the macOS four-finger swipe, and three fingers still switch desktops. By hand, the closest you can get is setting "Swipe between full-screen applications" to **Off** in System Settings → Trackpad → More Gestures, and switching desktops with ⌃← / ⌃→.
-> - **Three fingers for Rambla:** in System Settings → Trackpad → More Gestures, set "Swipe between full-screen applications" to **four fingers** and "Swipe between pages" to **two fingers**. Then choose three fingers in Configuración → Trackpad y mouse. This option does not work if you use "three finger drag".
+> - **Four fingers for Rambla (recommended):** in Settings → Trackpad & Mouse, click **Turn Off in macOS**. Rambla turns off only the macOS four-finger swipe, and three fingers still switch desktops. By hand, the closest you can get is setting "Swipe between full-screen applications" to **Off** in System Settings → Trackpad → More Gestures, and switching desktops with ⌃← / ⌃→.
+> - **Three fingers for Rambla:** in System Settings → Trackpad → More Gestures, set "Swipe between full-screen applications" to **four fingers** and "Swipe between pages" to **two fingers**. Then choose three fingers in Settings → Trackpad & Mouse. This option does not work if you use "three finger drag".
 >
-> Configuración → Trackpad y mouse (and the Mac page) tells you if Rambla's gesture collides with the system's.
+> Settings → Trackpad & Mouse (and the Mac page) tells you if Rambla's gesture collides with the system's.
 
-**Move the strip with the mouse wheel.** Hold **⌃⌘** and turn the wheel: each notch focuses the next column. With a Magic Mouse, or two fingers on a trackpad, holding ⌃⌘ slides the strip like the gesture, and it settles when you let go. Without the keys, the wheel scrolls as usual. You can change the keys in Configuración → Trackpad y mouse.
+**Move the strip with the mouse wheel.** Hold **⌃⌘** and turn the wheel: each notch focuses the next column. With a Magic Mouse, or two fingers on a trackpad, holding ⌃⌘ slides the strip like the gesture, and it settles when you let go. Without the keys, the wheel scrolls as usual. You can change the keys in Settings → Trackpad & Mouse.
 
-**Mouse follows focus / focus follows mouse.** Two options in Configuración → Apariencia (Appearance), off by default. The first moves the pointer to the center of the window you focus with a shortcut. The second focuses the window under the pointer, without moving the strip.
+**Mouse follows focus / focus follows mouse.** Two options in Settings → Appearance, off by default. The first moves the pointer to the center of the window you focus with a shortcut. The second focuses the window under the pointer, without moving the strip.
 
 ## 11. Multiple displays and desktops
 
 - **Every display and every desktop has its own strip**, with its own focus and scroll. When you switch desktops, Rambla picks up that desktop's strip as you left it.
 - If you move a window to another desktop from Mission Control, Rambla moves it to that desktop's strip.
 - **⌃⌘N** sends the focused window to the next display.
-- You can turn Rambla off for a display in Configuración → Pantallas (Displays). Nothing is arranged there.
+- You can turn Rambla off for a display in Settings → Displays. Nothing is arranged there.
 - **Recommended**: keep "Displays have separate Spaces" on (the macOS default). With two monitors, ideally place the second one **above or below** the main one in System Settings → Displays → Arrange. Side by side works too, but windows can only peek halfway toward the other monitor before they are parked.
 - **Full-screen** windows (green button) leave the strip while they are full screen and come back to their place when you exit.
 - **Minimized** windows and windows of **hidden** apps (⌘H) leave their place without taking space and reappear in the same spot.
 
 ## 12. Visual aids
 
-- **Strip indicator**: when you navigate with shortcuts or swipe, a frosted bar appears at the bottom with one icon per column. It highlights the focused one and marks the visible ones. It stays while you hold ⌃⌘. Click an icon to go to that column or drag it to reorder. It can be turned off in Configuración → Apariencia.
-- **Focus border**: a colored border around the focused window. Off by default. Color and width are set in Apariencia.
-- **Dim inactive windows**: slightly darkens everything except the focused window. Off by default. The intensity is set in Apariencia.
+- **Strip indicator**: when you navigate with shortcuts or swipe, a frosted bar appears at the bottom with one icon per column. It highlights the focused one and marks the visible ones. It stays while you hold ⌃⌘. Click an icon to go to that column or drag it to reorder. It can be turned off in Settings → Appearance.
+- **Focus border**: a colored border around the focused window. Off by default. Color and width are set in Appearance.
+- **Dim inactive windows**: slightly darkens everything except the focused window. Off by default. The intensity is set in Appearance.
 
 ## 13. Settings
 
-Open them from the menu bar icon → **Configuración…**. While the window is open, Rambla shows up in the Dock.
+Open them from the menu bar icon → **Settings…**. While the window is open, Rambla shows up in the Dock.
 
 | Section | What it is for |
 |---|---|
 | **General** | Enable or pause, launch at login, animations and their speed, centering, width of new windows, keep original height, gaps between windows and margin, preset widths, adjustment step, what to do when another app moves a window |
-| **Atajos** (Shortcuts) | Change any shortcut (each action takes two). Click the shortcut and press the new combination: ⎋ cancels and ⌫ clears it. It warns you if it clashes with Rectangle or if macOS doesn't allow it. "Restaurar predeterminados" (Restore defaults) brings everything back. |
-| **Trackpad y mouse** (Trackpad & Mouse) | The trackpad gesture (fingers, sensitivity, natural direction), conflicts with macOS and the mouse wheel |
-| **Apariencia** (Appearance) | Strip indicator, focus border, dim inactive windows, mouse ↔ focus |
+| **Shortcuts** | Change any shortcut (each action takes two). Click the shortcut and press the new combination: ⎋ cancels and ⌫ clears it. It warns you if it clashes with Rectangle or if macOS doesn't allow it. **Restore Defaults** brings everything back. |
+| **Trackpad & Mouse** | The trackpad gesture (fingers, sensitivity, natural direction), conflicts with macOS and the mouse wheel |
+| **Appearance** | Strip indicator, focus border, dim inactive windows, mouse ↔ focus |
 | **Apps** | Per-app rules: always float (great for calculators, players or small chats), initial width, and where its windows open (next to the focused one, at the start or at the end) |
-| **Pantallas** (Displays) | Turn Rambla on or off for each monitor |
+| **Displays** | Turn Rambla on or off for each monitor |
 | **Mac** | Checks the macOS settings that affect Rambla (permission, Spaces, Stage Manager, gestures, Rectangle) and takes you to the right System Settings pane |
-| **Automatización** (Automation) | Install the `rambla` command and export Raycast scripts |
-| **Acerca de** (About) | Version, project link and log |
+| **Automation** | Install the `rambla` command and export Raycast scripts |
+| **About** | Version, project link and log |
 
 ### The menu bar menu
 
 | Item | What it does |
 |---|---|
-| Pausar / Reanudar Rambla (Pause / Resume) | Stops arranging and brings every window back on screen. When resumed, the strip is put back together. |
-| Reacomodar ventanas (Rearrange windows) | Re-checks every window, brings back to the strip the ones another app (like Rectangle) took out, and applies the order again |
-| Traer todas las ventanas a la pantalla (Bring all windows on screen) | Rescues any window parked at an edge |
-| Flotar / volver la ventana actual (Float / put back the current window) | Same as ⌃⌘T |
-| Configuración… (Settings…) | Opens the settings |
-| Bienvenida… (Welcome…) | Opens the first-run guide again: permission, trackpad and basic shortcuts |
-| Manual de uso (User manual) | Opens this manual |
-| Mostrar registro (Show log) | Opens the activity log, useful if something goes wrong |
+| Pause / Resume Rambla | Stops arranging and brings every window back on screen. When resumed, the strip is put back together. |
+| Rearrange Windows | Re-checks every window, brings back to the strip the ones another app (like Rectangle) took out, and applies the order again |
+| Bring All Windows on Screen | Rescues any window parked at an edge |
+| Float / Unfloat Current Window | Same as ⌃⌘T |
+| Settings… | Opens the settings |
+| Welcome… | Opens the first-run guide again: permission, trackpad and basic shortcuts |
+| User Manual | Opens this manual |
+| Show Log | Opens the activity log, useful if something goes wrong |
 
 ## 14. Automation
 
@@ -217,7 +217,7 @@ open -g "rambla://focus-left"
 open -g "rambla://cycle-width"
 ```
 
-**Terminal:** install the command in Configuración → Automatización → "Instalar comando rambla" (Install the rambla command).
+**Terminal:** install the command in Settings → Automation → **Install `rambla` Command**.
 
 ```sh
 rambla focus-right
@@ -225,7 +225,7 @@ rambla toggle-pause
 rambla list
 ```
 
-**Raycast:** in Configuración → Automatización → "Exportar scripts de Raycast…" (Export Raycast scripts) choose a folder and add it in Raycast (Settings → Extensions → Script Commands → Add Directories). You get one command per action, for example "Rambla: Rotar ancho" (cycle width).
+**Raycast:** in Settings → Automation → **Export Raycast Scripts…** choose a folder and add it in Raycast (Settings → Extensions → Script Commands → Add Directories). You get one command per action, for example "Rambla: Cycle width".
 
 The links also work in Apple Shortcuts, Alfred, Keyboard Maestro, BetterTouchTool or any tool that can open a URL.
 
@@ -233,23 +233,23 @@ The links also work in Apple Shortcuts, Alfred, Keyboard Maestro, BetterTouchToo
 
 **I see a thin line at the edge of the screen.** Those are parked windows: macOS does not let a window hide completely, so Rambla leaves 1 point visible. Click there and the strip slides to that window.
 
-**I lost a window.** Rambla's menu → **Traer todas las ventanas a la pantalla** (Bring all windows on screen). Rambla also brings them back when it quits or pauses.
+**I lost a window.** Rambla's menu → **Bring All Windows on Screen**. Rambla also brings them back when it quits or pauses.
 
-**A window is not on the strip.** Rambla leaves dialogs, panels and windows that cannot be resized floating. If it is a normal window, check whether you took it out with ⌃⌘T or with Rectangle (in that case, ⌃⌘T puts it back) and whether it has a "Flotante" (Floating) rule in Configuración → Apps.
+**A window is not on the strip.** Rambla leaves dialogs, panels and windows that cannot be resized floating. If it is a normal window, check whether you took it out with ⌃⌘T or with Rectangle (in that case, ⌃⌘T puts it back) and whether it has a **Float** rule in Settings → Apps.
 
 **A window left the strip by itself.** Another app moved it (Rectangle, a double-click on the title bar, the green button with ⌥). That is on purpose: Rambla does not fight other apps. Put it back with ⌃⌘T.
 
 **Swiping on the trackpad switches desktops.** macOS uses the same gesture, even when System Settings says three fingers: see [section 10](#10-mouse-and-trackpad).
 
-**A shortcut does nothing.** Another app may already use it. Check Configuración → Atajos, which flags the ones macOS did not let Rambla register, and pick another one.
+**A shortcut does nothing.** Another app may already use it. Check Settings → Shortcuts, which flags the ones macOS did not let Rambla register, and pick another one.
 
 **Rambla asks for the Accessibility permission again.** In System Settings → Privacy & Security → Accessibility, remove Rambla with "−" and add it again from Applications.
 
-**Something looks wrong.** Try **Reacomodar ventanas** (Rearrange windows). If it persists, **Mostrar registro** (Show log) shows what happened; that information helps when reporting the problem on [GitHub](https://github.com/Coru29/rambla/issues).
+**Something looks wrong.** Try **Rearrange Windows**. If it persists, **Show Log** shows what happened; that information helps when reporting the problem on [GitHub](https://github.com/Coru29/rambla/issues).
 
 ## 16. Uninstall
 
-1. Rambla's menu → **Salir de Rambla** (Quit Rambla). Every window comes back on screen.
+1. Rambla's menu → **Quit Rambla**. Every window comes back on screen.
 2. Delete **Rambla** from Applications.
 3. In System Settings → Privacy & Security → Accessibility, remove Rambla with "−".
 4. To leave nothing behind, also delete:

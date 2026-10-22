@@ -35,6 +35,7 @@ Cada ventana es una columna de una tira horizontal que sigue más allá de los b
 - **Recuerda el layout** al reiniciar y puede arrancar con la Mac.
 - **Convive con [Rectangle](https://rectangleapp.com)**: los atajos usan ⌃⌘, así que nunca chocan con los ⌃⌥ de Rectangle. Si Rectangle (u otra app) mueve una ventana, esa ventana sale de la tira y queda donde la pusieron. La página Mac de la configuración avisa si algún atajo choca con tu Rectangle.
 - **Automatización**: enlaces `rambla://`, comando de terminal `rambla` y exportación de scripts para Raycast.
+- **Español e inglés**: la interfaz sigue el idioma de tu Mac.
 - **Liviana**: Swift nativo (AppKit, con la configuración en SwiftUI), sin Electron y sin polling. En reposo usa cerca de 0 % de CPU y ~12 MB de memoria.
 
 ## Privacidad
