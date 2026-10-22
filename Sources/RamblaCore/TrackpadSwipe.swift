@@ -10,6 +10,10 @@ public enum TrackpadSwipe: Equatable, Sendable {
     public static let horizontalStart = 0.015
     /// Vertical movement that counts as a swipe up or down.
     public static let verticalStart = 0.1
+    /// Seconds without an event that has touches after which a swipe is over: macOS can report the fingers lifting
+    /// with an event that carries none, and the swipe would otherwise stay open (and the wheel blocked) until the next
+    /// touch.
+    public static let liftTimeout = 0.3
 
     /// What a gesture event means for a swipe with `fingers` fingers.
     public enum Frame: Equatable, Sendable {

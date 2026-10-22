@@ -29,6 +29,8 @@ final class GestureTracker {
     private var last: CGPoint?
     private var active = false
     private var velocity = VelocityTracker()
+    /// Ends a swipe whose lift came without touches (`TrackpadSwipe.liftTimeout`).
+    private var liftCheck: DispatchWorkItem?
 
     init(onBegin: @escaping () -> Void, onChange: @escaping (_ dx: Double) -> Void,
          onEnd: @escaping (_ velocity: Double) -> Void, onVertical: @escaping (_ up: Bool) -> Void) {
@@ -70,12 +72,25 @@ final class GestureTracker {
 
     /// Ends the swipe (if one was under way) at `time`, the moment the fingers lifted or changed in number.
     private func reset(at time: TimeInterval) {
+        liftCheck?.cancel()
+        liftCheck = nil
         if active { onEnd(velocity.velocity(at: time)) }
         active = false
         verticalDone = false
         start = nil
         last = nil
         velocity.reset()
+    }
+
+    private func scheduleLiftCheck() {
+        let check = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.liftCheck != nil else { return }
+                self.reset(at: ProcessInfo.processInfo.systemUptime)
+            }
+        }
+        liftCheck = check
+        DispatchQueue.main.asyncAfter(deadline: .now() + TrackpadSwipe.liftTimeout, execute: check)
     }
 
     /// `defaults write io.github.coru29.Rambla debugGestures -bool true` logs every touch event (read at launch).
@@ -112,12 +127,15 @@ final class GestureTracker {
         switch TrackpadSwipe.frame(touching: touching.count, total: nsEvent.touches(matching: .any, in: nil).count,
                                    fingers: fingers) {
         case .ignore:
+            // Between two real events, or the lift itself: if no touch follows soon, the fingers are gone.
+            if start != nil, liftCheck == nil { scheduleLiftCheck() }
             return
         case .end:
             reset(at: nsEvent.timestamp)
             return
         case .track:
-            break
+            liftCheck?.cancel()
+            liftCheck = nil
         }
         let count = Double(touching.count)
         let mean = CGPoint(x: touching.reduce(0) { $0 + $1.normalizedPosition.x } / count,
