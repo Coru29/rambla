@@ -14,6 +14,11 @@ if printf '%s\n' "$OUT" | grep -q "Test run with"; then
   printf '%s\n' "$OUT" | grep -E "✔|✘|Test run with|error:|recorded an issue" | tail -n 400
   exit $STATUS
 fi
+# Nothing ran because the build failed: show the compiler errors instead of hiding them behind the fallback.
+if printf '%s\n' "$OUT" | grep -q ": error:"; then
+  printf '%s\n' "$OUT" | grep -E ": error:|: warning:" | head -n 80 >&2
+  exit 1
+fi
 
 # Fallback: build the test product and load it with the custom runner.
 swift build --product RamblaPackageTests >/dev/null 2>&1 || { swift build --product RamblaPackageTests; exit 1; }
