@@ -22,3 +22,15 @@ import Testing
     // Mostly upward but too slanted to be sure: wait for more movement rather than guess.
     #expect(TrackpadSwipe.kind(dx: 0.08, dy: 0.12) == nil)
 }
+
+@Test func touchlessGestureEventsAreIgnored() {
+    // With macOS's own four-finger swipes off, a gesture event without touches comes between every two real ones.
+    #expect(TrackpadSwipe.frame(touching: 0, total: 0, fingers: 4) == .ignore)
+}
+
+@Test func aSwipeEndsWhenTheFingersChange() {
+    #expect(TrackpadSwipe.frame(touching: 4, total: 4, fingers: 4) == .track)
+    #expect(TrackpadSwipe.frame(touching: 3, total: 4, fingers: 4) == .end)     // one finger lifted
+    #expect(TrackpadSwipe.frame(touching: 0, total: 4, fingers: 4) == .end)     // all of them at once
+    #expect(TrackpadSwipe.frame(touching: 2, total: 2, fingers: 4) == .end)     // a two-finger scroll
+}

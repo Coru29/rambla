@@ -78,6 +78,29 @@ final class GestureTracker {
         velocity.reset()
     }
 
+    /// `defaults write io.github.coru29.Rambla debugGestures -bool true` logs every touch event (read at launch).
+    private static let debug = UserDefaults.standard.bool(forKey: "debugGestures")
+
+    private func logTouches(_ event: NSEvent, _ touching: Set<NSTouch>) {
+        let all = event.touches(matching: .any, in: nil)
+        let resting = all.filter(\.isResting).count
+        let phases = all.map { touch -> String in
+            switch touch.phase {
+            case .began: return "b"
+            case .moved: return "m"
+            case .stationary: return "s"
+            case .ended: return "e"
+            case .cancelled: return "c"
+            default: return "?"
+            }
+        }.sorted().joined()
+        let count = Double(max(touching.count, 1))
+        let x = touching.reduce(0) { $0 + $1.normalizedPosition.x } / count
+        let y = touching.reduce(0) { $0 + $1.normalizedPosition.y } / count
+        Log.info(String(format: "touches %d touching %d resting %d [%@] x %.3f y %.3f %@", all.count, touching.count,
+                        resting, phases, x, y, active ? "sliding" : (verticalDone ? "vertical-done" : "-")))
+    }
+
     fileprivate func handle(type: CGEventType, event: CGEvent) {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
@@ -85,9 +108,16 @@ final class GestureTracker {
         }
         guard let nsEvent = NSEvent(cgEvent: event), nsEvent.type == .gesture else { return }
         let touching = nsEvent.touches(matching: .touching, in: nil)
-        guard touching.count == fingers else {
+        if Self.debug { logTouches(nsEvent, touching) }
+        switch TrackpadSwipe.frame(touching: touching.count, total: nsEvent.touches(matching: .any, in: nil).count,
+                                   fingers: fingers) {
+        case .ignore:
+            return
+        case .end:
             reset(at: nsEvent.timestamp)
             return
+        case .track:
+            break
         }
         let count = Double(touching.count)
         let mean = CGPoint(x: touching.reduce(0) { $0 + $1.normalizedPosition.x } / count,
