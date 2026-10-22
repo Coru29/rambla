@@ -836,7 +836,15 @@ final class WindowManager {
             let display = displays.first(where: { $0.uuid == key.displayUUID })
             for id in strip.allWindows { gather(id, onto: display) }
         }
-        for id in floating { gather(id, onto: nil) }
+        // A floating window only when most of it is off every display: one the user left across two stays there.
+        for id in floating {
+            guard let frame = requested[id] ?? windows[id]?.frame else { continue }
+            let shown = displays.reduce(0.0) { sum, display in
+                let part = frame.intersection(display.frame)
+                return sum + (part.isNull ? 0 : part.width * part.height)
+            }
+            if shown < frame.width * frame.height / 2 { gather(id, onto: nil) }
+        }
         results.removeAll()
         overlayHook?()
     }
