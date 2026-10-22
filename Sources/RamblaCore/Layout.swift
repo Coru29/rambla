@@ -131,6 +131,9 @@ public enum Layout {
     static let flickGlide = 0.1
     /// Release speeds from this many scroll-area widths per second on count as a flick.
     static let flickSpeed = 0.3
+    /// The farthest a release glides, in scroll-area widths: a stalled main thread can deliver queued events at once
+    /// and spike the measured speed.
+    static let maxGlide = 1.5
 
     /// Like `settle(_:scroll:)` for a strip let go while moving at `velocity` (scroll units per second, positive
     /// toward later columns). The strip glides on for `flickGlide` before snapping, so a fast flick can pass
@@ -149,7 +152,7 @@ public enum Layout {
         let maxScroll = max(0, m.total - w)
         let stops = laidOut.map { min(max(m.xs[$0], 0), maxScroll) }
 
-        let glided = scroll + velocity * flickGlide
+        let glided = scroll + min(max(velocity * flickGlide, -maxGlide * w), maxGlide * w)
         var target = stops[0]
         for stop in stops where abs(stop - glided) < abs(target - glided) { target = stop }
         let epsilon = 0.5

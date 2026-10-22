@@ -297,6 +297,15 @@ import CoreGraphics
         #expect(r.column == 3)                                         // columns 3 and 4 tie: the lower index wins
     }
 
+    @Test func aFlickGlidesAtMostOneAndAHalfScreens() {
+        // A stalled main thread delivers queued events at once and the measured speed spikes: the glide is capped
+        // so the strip lands a few columns away instead of at the far end.
+        let strip = Strip(columns: (1...10).map { Column(windows: [WindowID($0)], width: .fraction(0.5)) }, focused: 0)
+        let m = Layout.metrics(input(strip))
+        #expect(Layout.settle(m, scroll: 0, velocity: 1_000_000).scroll == 1515)
+        #expect(Layout.settle(m, scroll: 4040, velocity: -1_000_000).scroll == 2525)
+    }
+
     @Test func aFlickStopsAtTheEndsOfTheStrip() {
         let m = Layout.metrics(input(fiveColumns()))
         let end = Layout.settle(m, scroll: 1515, velocity: 4000)
