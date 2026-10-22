@@ -10,12 +10,20 @@ public enum AutomationScripts {
 
     /// The `rambla` command: hands every argument to the app binary at `executable`.
     public static func cliScript(executable: String) -> String {
-        "#!/bin/sh\nexec \(shellQuoted(executable)) \"$@\"\n"
+        "#!/bin/sh\n" + appCommand(executable: executable, arguments: "\"$@\"", replacingShell: true) + "\n"
     }
 
-    /// `path` as one shell word, whatever it holds (a space, a quote, a `$`).
-    static func shellQuoted(_ path: String) -> String {
-        "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    /// Runs the app binary at `executable` with `arguments`, or the one in Applications when the app has moved there
+    /// since the script was written (from Downloads, say).
+    static func appCommand(executable: String, arguments: String, replacingShell: Bool = false) -> String {
+        let run = replacingShell ? "exec " : ""
+        guard executable != defaultAppExecutable else { return "\(run)\(shellQuoted(executable)) \(arguments)" }
+        return "app=\(shellQuoted(executable))\n[ -x \"$app\" ] || app=\(shellQuoted(defaultAppExecutable))\n\(run)\"$app\" \(arguments)"
+    }
+
+    /// `text` as one shell word, whatever it holds (a space, a quote, a `$`).
+    public static func shellQuoted(_ text: String) -> String {
+        "'" + text.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
     /// `rambla-<id>.sh`, the name of the Raycast script for an action.
@@ -46,7 +54,7 @@ public enum AutomationScripts {
     /// (`CommandPolicy`) goes to the app binary, which runs it like the `rambla` command without that command installed.
     static func raycastCommand(for action: Action, executable: String) -> String {
         CommandPolicy.commandLineOnly.contains(action)
-            ? "\(shellQuoted(executable)) \(action.rawValue)"
+            ? appCommand(executable: executable, arguments: action.rawValue)
             : "open -g \"rambla://\(action.rawValue)\""
     }
 }

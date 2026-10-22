@@ -13,8 +13,10 @@ import Foundation
     // An app kept in ~/Applications, or in a folder whose name has a space or a quote.
     let odd = "/Users/me/My Apps/Ram'bla.app/Contents/MacOS/Rambla"
     let quoted = #"'/Users/me/My Apps/Ram'\''bla.app/Contents/MacOS/Rambla'"#
-    #expect(AutomationScripts.cliScript(executable: odd) == "#!/bin/sh\nexec \(quoted) \"$@\"\n")
-    #expect(AutomationScripts.raycastScript(for: .closeWindow, executable: odd).hasSuffix("\n\(quoted) close-window\n"))
+    // If the app moves to Applications later, the scripts find it there.
+    let find = "app=\(quoted)\n[ -x \"$app\" ] || app='/Applications/Rambla.app/Contents/MacOS/Rambla'\n"
+    #expect(AutomationScripts.cliScript(executable: odd) == "#!/bin/sh\n\(find)exec \"$app\" \"$@\"\n")
+    #expect(AutomationScripts.raycastScript(for: .closeWindow, executable: odd).hasSuffix("\n\(find)\"$app\" close-window\n"))
     #expect(AutomationScripts.raycastScript(for: .focusLeft, executable: odd).hasSuffix("\nopen -g \"rambla://focus-left\"\n"))
 }
 

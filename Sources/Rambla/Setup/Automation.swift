@@ -101,17 +101,12 @@ enum Automation {
     /// alone) and copy the staged file there as an executable. `install` replaces an existing file or symlink.
     static func administratorInstallCommand(staged: String, destination: String) -> String {
         let directory = (destination as NSString).deletingLastPathComponent
-        return "/bin/mkdir -p \(shellQuoted(directory)) && /usr/bin/install -m 755 \(shellQuoted(staged)) \(shellQuoted(destination))"
+        return "/bin/mkdir -p \(AutomationScripts.shellQuoted(directory)) && /usr/bin/install -m 755 \(AutomationScripts.shellQuoted(staged)) \(AutomationScripts.shellQuoted(destination))"
     }
 
     /// AppleScript source that runs a shell command as administrator, which makes macOS ask for the password.
     static func administratorScript(running command: String) -> String {
         "do shell script \"\(appleScriptEscaped(command))\" with administrator privileges"
-    }
-
-    /// Single-quotes text for `sh`; a single quote inside becomes `'\''`.
-    static func shellQuoted(_ text: String) -> String {
-        "'" + text.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
     /// Escapes text for a double-quoted AppleScript string literal.
