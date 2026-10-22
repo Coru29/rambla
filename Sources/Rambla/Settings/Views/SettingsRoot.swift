@@ -10,7 +10,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general: return "General"
         case .shortcuts: return "Atajos"
-        case .trackpad: return "Trackpad"
+        case .trackpad: return "Trackpad y mouse"
         case .appearance: return "Apariencia"
         case .apps: return "Apps"
         case .displays: return "Pantallas"

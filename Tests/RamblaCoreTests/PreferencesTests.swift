@@ -39,6 +39,9 @@ private func decodePreferences(_ json: String) throws -> Preferences {
     #expect(p.trackpad.fingers == 4)
     #expect(p.trackpad.sensitivity == 1.0)
     #expect(p.trackpad.natural == true)
+    #expect(p.mouse == MousePrefs())
+    #expect(p.mouse.enabled == true)
+    #expect(p.mouse.modifiers == [.control, .command])
     #expect(p.appRules.isEmpty)
     #expect(p.disabledDisplays.isEmpty)
     #expect(p.shortcutOverrides.isEmpty)
@@ -47,7 +50,7 @@ private func decodePreferences(_ json: String) throws -> Preferences {
 @Test func preferencesPartialJSONKeepsOtherDefaults() throws {
     let p = try decodePreferences("""
     {"innerGap": 12, "centerMode": "always", "focusBorder": {"enabled": true},
-     "trackpad": {"fingers": 3}, "dimInactive": {"amount": 0.5}}
+     "trackpad": {"fingers": 3}, "dimInactive": {"amount": 0.5}, "mouse": {"enabled": false}}
     """)
     var expected = Preferences()
     expected.innerGap = 12
@@ -55,12 +58,14 @@ private func decodePreferences(_ json: String) throws -> Preferences {
     expected.focusBorder.enabled = true
     expected.trackpad.fingers = 3
     expected.dimInactive.amount = 0.5
+    expected.mouse.enabled = false
     #expect(p == expected)
     // Nested defaults survive a partial object.
     #expect(p.focusBorder.colorHex == "#0A84FF")
     #expect(p.focusBorder.width == 3)
     #expect(p.trackpad.sensitivity == 1.0)
     #expect(p.dimInactive.enabled == false)
+    #expect(p.mouse.modifiers == [.control, .command])
 }
 
 private func customizedPreferences() -> Preferences {
@@ -82,6 +87,7 @@ private func customizedPreferences() -> Preferences {
     p.focusFollowsMouse = true
     p.mouseFollowsFocus = true
     p.trackpad = TrackpadPrefs(enabled: false, fingers: 3, sensitivity: 1.5, natural: false)
+    p.mouse = MousePrefs(enabled: false, modifiers: [.option, .command])
     p.appRules = [
         AppRule(bundleID: "com.apple.finder", name: "Finder", behavior: .float),
         AppRule(bundleID: "com.apple.TextEdit", name: "TextEdit", behavior: .tile, width: 0.5, openAt: .end),
@@ -206,4 +212,14 @@ private func customizedPreferences() -> Preferences {
         #expect(decoded == value)
     }
     #expect(NewWindowWidth.natural != NewWindowWidth.fraction(0.5))
+}
+
+@Test func mouseKeyChoicesStartWithTheDefaultAndNeverUseASingleKey() {
+    #expect(MousePrefs.modifierChoices.first == MousePrefs().modifiers)
+    #expect(Set(MousePrefs.modifierChoices.map(\.rawValue)).count == MousePrefs.modifierChoices.count)
+    for keys in MousePrefs.modifierChoices {
+        // A lone key is taken: ⇧ scrolls sideways, ⌥ and ⌘ change how many apps scroll or zoom.
+        #expect(keys.rawValue.nonzeroBitCount >= 2, "\(keys.symbols)")
+        #expect(!keys.contains(.shift), "\(keys.symbols)")
+    }
 }

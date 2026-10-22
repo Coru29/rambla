@@ -15,6 +15,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         onBegin: { [weak self] in self?.engine.gestureBegan() },
         onChange: { [weak self] dx in self?.engine.gestureChanged(dx) },
         onEnd: { [weak self] velocity in self?.engine.gestureEnded(velocity: velocity) })
+    private lazy var wheel = ScrollWheelTracker(handlers: .init(
+        step: { [weak self] columns in self?.engine.wheelStep(columns) },
+        slideBegan: { [weak self] in self?.engine.gestureBegan() },
+        slide: { [weak self] points in self?.engine.slide(by: points) },
+        slideEnded: { [weak self] velocity in self?.engine.slideEnded(velocity: velocity) }))
     private lazy var mouseFocus = MouseFocus { [weak self] point in self?.engine.hover(at: point) }
     private var overlays: OverlayCoordinator?
     private let settingsBackend = AppSettingsBackend()
@@ -117,7 +122,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         engine.update(prefs: prefs)
         if prefs.enabled == engine.isPaused { engine.setPaused(!prefs.enabled) }
         if old?.allShortcuts != prefs.allShortcuts { applyHotkeys() }
-        if old?.trackpad != prefs.trackpad || old?.focusFollowsMouse != prefs.focusFollowsMouse { applyInputs() }
+        if old?.trackpad != prefs.trackpad || old?.mouse != prefs.mouse || old?.focusFollowsMouse != prefs.focusFollowsMouse {
+            applyInputs()
+        }
         refreshMenu()
     }
 
@@ -126,6 +133,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let prefs = store.prefs
         let active = !engine.isPaused && prefs.enabled
         gestures.configure(enabled: active && prefs.trackpad.enabled, fingers: prefs.trackpad.fingers)
+        wheel.configure(enabled: active && prefs.mouse.enabled, modifiers: prefs.mouse.modifiers)
         mouseFocus.setEnabled(active && prefs.focusFollowsMouse)
     }
 

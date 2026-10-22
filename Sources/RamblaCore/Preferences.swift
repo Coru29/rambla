@@ -72,6 +72,30 @@ public struct TrackpadPrefs: Codable, Equatable, Sendable {
     }
 }
 
+/// Sliding the strip with a mouse: while these keys are held, each notch of the wheel moves to the next column,
+/// and a Magic Mouse swipe (or two fingers on a trackpad) slides the strip like the trackpad gesture.
+public struct MousePrefs: Codable, Equatable, Sendable {
+    public var enabled: Bool
+    public var modifiers: Modifiers
+
+    /// The key combinations offered in the settings, the default first. A lone key is taken: ⇧ scrolls sideways
+    /// and ⌥ or ⌘ change how many apps scroll or zoom.
+    public static let modifierChoices: [Modifiers] = [[.control, .command], [.option, .command], [.control, .option],
+                                                      [.control, .option, .command]]
+
+    public init(enabled: Bool = true, modifiers: Modifiers = [.control, .command]) {
+        self.enabled = enabled
+        self.modifiers = modifiers
+    }
+
+    public init(from decoder: Decoder) throws {
+        let defaults = MousePrefs()
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? defaults.enabled
+        modifiers = try container.decodeIfPresent(Modifiers.self, forKey: .modifiers) ?? defaults.modifiers
+    }
+}
+
 /// A per-app override: always float it, give it an initial width, or choose where its windows open.
 public struct AppRule: Codable, Equatable, Identifiable, Sendable {
     public enum Behavior: String, Codable, CaseIterable, Sendable { case tile, float }
@@ -126,6 +150,7 @@ public struct Preferences: Codable, Equatable, Sendable {
     public var focusFollowsMouse = false
     public var mouseFollowsFocus = false
     public var trackpad = TrackpadPrefs()
+    public var mouse = MousePrefs()
     public var appRules: [AppRule] = []
     /// UUIDs of the displays Rambla does not manage.
     public var disabledDisplays: [String] = []
@@ -157,6 +182,7 @@ public struct Preferences: Codable, Equatable, Sendable {
         focusFollowsMouse = try container.decodeIfPresent(Bool.self, forKey: .focusFollowsMouse) ?? focusFollowsMouse
         mouseFollowsFocus = try container.decodeIfPresent(Bool.self, forKey: .mouseFollowsFocus) ?? mouseFollowsFocus
         trackpad = try container.decodeIfPresent(TrackpadPrefs.self, forKey: .trackpad) ?? trackpad
+        mouse = try container.decodeIfPresent(MousePrefs.self, forKey: .mouse) ?? mouse
         appRules = try container.decodeIfPresent([AppRule].self, forKey: .appRules) ?? appRules
         disabledDisplays = try container.decodeIfPresent([String].self, forKey: .disabledDisplays) ?? disabledDisplays
         checkForUpdates = try container.decodeIfPresent(Bool.self, forKey: .checkForUpdates) ?? checkForUpdates
