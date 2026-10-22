@@ -183,3 +183,17 @@ private func swipe(_ phase: Event.Phase, _ deltaY: Double = 0, deltaX: Double = 
     #expect(wheel.cancel() == .pass)
     #expect(wheel.handle(swipe(.changed, -10, at: 0.01, keys: false)) == .pass)  // what was left of it is the app's
 }
+
+@Test func aSlideAndItsGlideKeepTheWheelBusy() {
+    // The app restarts its tap only when no slide is under way: a new tap would hand the rest of it to the app.
+    var wheel = WheelGesture()
+    #expect(!wheel.isBusy)
+    _ = wheel.handle(swipe(.began, -10, at: 0))
+    #expect(wheel.isBusy)
+    _ = wheel.handle(swipe(.ended, at: 0.02))
+    #expect(wheel.isBusy)                                                         // the glide is still Rambla's
+    _ = wheel.handle(swipe(.none, at: 0.3, momentum: .ended))
+    #expect(!wheel.isBusy)
+    _ = wheel.handle(swipe(.began, -10, at: 1, keys: false))                    // someone else's swipe
+    #expect(!wheel.isBusy)
+}

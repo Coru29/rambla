@@ -146,6 +146,11 @@ Modificador base **⌃⌘** y **⌃⌘⇧** para la variante "mover". Ninguno ch
 
 ### Mouse
 
+- **Ruedita** (activada): con ⌃⌘ (configurable) cada paso de la ruedita enfoca la columna de al lado; con un Magic Mouse o dos dedos en el trackpad, la tira se desliza y se asienta al soltar.
+- **Botones del mouse** (apagado; combinación por defecto 4 + 5): con la combinación elegida apretada, mover el mouse hacia los costados desliza la tira (2 pt de tira por punto del puntero a sensibilidad 1×, con dirección natural configurable) y al soltar se asienta con la velocidad que llevaba; hacia arriba (40 pt, bien vertical) da el ancho completo y hacia abajo devuelve el ancho anterior, una vez por pulsación. Nunca intervienen el botón izquierdo ni el derecho.
+  - Se graba en Configuración apretando los botones juntos: queda la mayor cantidad que estuvo apretada a la vez.
+  - Para no quitarles los botones a otras apps (Mac Mouse Fix usa el 4 y el 5 por separado), la primera pulsación de una combinación de varios botones se retiene hasta 0,2 s esperando las demás. Si no llegan, si se suelta, si el puntero se mueve más de 6 pt, si se aprieta otro botón o si gira la ruedita, la pulsación se le devuelve a la app. Con un solo botón, soltarlo antes de que haya gesto devuelve el clic, y girar la ruedita con el botón apretado se lo pasa a la app.
+  - Los taps de la ruedita y de los botones están en el nivel HID con inserción al principio, para ver los eventos antes que Mac Mouse Fix (que si no convierte ⌘ + ruedita en zoom). Como el último tap creado queda primero, Rambla los vuelve a crear 3 s y 15 s después de que se abre cualquier app, salvo en medio de un gesto (reintenta cada 0,5 s).
 - **El mouse sigue al foco** (apagado): al enfocar con atajos, el puntero va al centro de la ventana.
 - **El foco sigue al mouse** (apagado): si el puntero se queda 120 ms sobre una ventana de la tira totalmente visible, se enfoca sin desplazar la tira.
 
@@ -189,7 +194,7 @@ Modificador base **⌃⌘** y **⌃⌘⇧** para la variante "mover". Ninguno ch
 |---|---|
 | General | activo, arrancar con la Mac, animaciones (con velocidad), centrado, ancho de ventanas nuevas, mantener altura original, gaps (interior y exterior), presets de ancho, paso de ajuste, sacar de la tira lo que mueva otra app |
 | Atajos | todas las acciones agrupadas (Navegar, Tamaño, Pilas, Otros), con hasta 2 grabadores cada una, "Restaurar predeterminados", aviso de conflicto con Rectangle y aviso si el registro del atajo falla |
-| Trackpad | activado, dedos (3/4), sensibilidad, dirección natural, aviso de conflicto con el gesto de macOS |
+| Trackpad y mouse | trackpad: activado, dedos (3/4), sensibilidad, dirección natural, hacia arriba para el ancho completo, aviso de conflicto con el gesto de macOS. Ruedita: activada y teclas. Botones del mouse: activados, botones (grabador), sensibilidad, dirección natural |
 | Apariencia | barra indicadora (sí/no), borde de foco (sí/no, color, grosor), atenuar inactivas (sí/no, intensidad), el mouse sigue al foco, el foco sigue al mouse |
 | Apps | lista de reglas: app, comportamiento, ancho inicial, posición al abrir. Para agregar, se elige entre las apps abiertas o con un selector de .app |
 | Pantallas | pantallas conectadas con un interruptor cada una |
@@ -217,7 +222,7 @@ Modificador base **⌃⌘** y **⌃⌘⇧** para la variante "mover". Ninguno ch
   - El timeout de mensajería AX es de 1 s.
   - El worker recuerda el último marco aplicado u observado de cada ventana y solo avisa al hilo principal lo relevante: marco distinto, ventana creada o destruida, cambio de foco, minimizada o restaurada, cambio de título.
 - **Animación**: un timer de 60 Hz que corre solo mientras hay algo animándose.
-- El gesto, el arrastre y el foco que sigue al mouse instalan monitores o taps solo si la función está activada.
+- El gesto, el arrastre, la ruedita, los botones del mouse y el foco que sigue al mouse instalan monitores o taps solo si la función está activada. Los taps activos de la ruedita y de los botones corren en un hilo propio cada uno; el de movimiento del puntero se habilita solo mientras está apretado un botón de la combinación, y los deslizamientos se juntan antes de llegar al hilo principal.
 
 ### Módulos
 
@@ -229,6 +234,7 @@ Modificador base **⌃⌘** y **⌃⌘⇧** para la variante "mover". Ninguno ch
   - todas las operaciones de la tira
   - cálculo del lugar de soltado
   - asentamiento del gesto
+  - qué eventos de la ruedita y de los botones del mouse son de Rambla (`WheelGesture`, `MouseButtonGesture`)
   - resorte
   - serialización de estado
   - acciones y atajos por defecto
@@ -240,6 +246,7 @@ Modificador base **⌃⌘** y **⌃⌘⇧** para la variante "mover". Ninguno ch
   - `Animator`
   - `Hotkeys`: Carbon `RegisterEventHotKey` y un grabador propio que nombra las teclas según el layout con `UCKeyTranslate` (AZERTY, QWERTZ, Dvorak)
   - `Gestures`: `CGEventTap` listen-only de eventos `gesture` con `NSTouch`
+  - `ScrollWheelTracker` y `MouseButtonTracker`: `CGEventTap` activos en el nivel HID
   - `DragTracker`: monitores globales de mouse
   - overlays: indicador, barras de pestañas, borde y atenuado
   - UI de configuración

@@ -43,6 +43,11 @@ private func decodePreferences(_ json: String) throws -> Preferences {
     #expect(p.mouse == MousePrefs())
     #expect(p.mouse.enabled == true)
     #expect(p.mouse.modifiers == [.control, .command])
+    #expect(p.mouseButtons == MouseButtonsPrefs())
+    #expect(p.mouseButtons.enabled == false)
+    #expect(p.mouseButtons.buttons == [4, 5])
+    #expect(p.mouseButtons.sensitivity == 1.0)
+    #expect(p.mouseButtons.natural == true)
     #expect(p.appRules.isEmpty)
     #expect(p.disabledDisplays.isEmpty)
     #expect(p.shortcutOverrides.isEmpty)
@@ -51,7 +56,8 @@ private func decodePreferences(_ json: String) throws -> Preferences {
 @Test func preferencesPartialJSONKeepsOtherDefaults() throws {
     let p = try decodePreferences("""
     {"innerGap": 12, "centerMode": "always", "focusBorder": {"enabled": true},
-     "trackpad": {"fingers": 3}, "dimInactive": {"amount": 0.5}, "mouse": {"enabled": false}}
+     "trackpad": {"fingers": 3}, "dimInactive": {"amount": 0.5}, "mouse": {"enabled": false},
+     "mouseButtons": {"buttons": [3]}}
     """)
     var expected = Preferences()
     expected.innerGap = 12
@@ -60,6 +66,7 @@ private func decodePreferences(_ json: String) throws -> Preferences {
     expected.trackpad.fingers = 3
     expected.dimInactive.amount = 0.5
     expected.mouse.enabled = false
+    expected.mouseButtons.buttons = [3]
     #expect(p == expected)
     // Nested defaults survive a partial object.
     #expect(p.focusBorder.colorHex == "#0A84FF")
@@ -68,6 +75,8 @@ private func decodePreferences(_ json: String) throws -> Preferences {
     #expect(p.trackpad.verticalSwipe == true)
     #expect(p.dimInactive.enabled == false)
     #expect(p.mouse.modifiers == [.control, .command])
+    #expect(p.mouseButtons.enabled == false)
+    #expect(p.mouseButtons.sensitivity == 1.0)
 }
 
 private func customizedPreferences() -> Preferences {
@@ -90,6 +99,7 @@ private func customizedPreferences() -> Preferences {
     p.mouseFollowsFocus = true
     p.trackpad = TrackpadPrefs(enabled: false, fingers: 3, sensitivity: 1.5, natural: false, verticalSwipe: false)
     p.mouse = MousePrefs(enabled: false, modifiers: [.option, .command])
+    p.mouseButtons = MouseButtonsPrefs(enabled: true, buttons: [3, 5], sensitivity: 2.5, natural: false)
     p.appRules = [
         AppRule(bundleID: "com.apple.finder", name: "Finder", behavior: .float),
         AppRule(bundleID: "com.apple.TextEdit", name: "TextEdit", behavior: .tile, width: 0.5, openAt: .end),
@@ -224,4 +234,16 @@ private func customizedPreferences() -> Preferences {
         #expect(keys.rawValue.nonzeroBitCount >= 2, "\(keys.symbols)")
         #expect(!keys.contains(.shift), "\(keys.symbols)")
     }
+}
+
+@Test func mouseButtonsKeepOnlyButtonsAChordCanUse() throws {
+    // The left and right buttons (1 and 2) never take part; repeats go and the order is the buttons' own.
+    #expect(MouseButtonsPrefs.normalized([5, 1, 4, 4, 2, 0, 33]) == [4, 5])
+    #expect(MouseButtonsPrefs(buttons: [8, 3]).buttons == [3, 8])
+    let stored = try decodePreferences(#"{"mouseButtons": {"enabled": true, "buttons": [5, 3, 5]}}"#)
+    #expect(stored.mouseButtons.buttons == [3, 5])
+    #expect(stored.mouseButtons.enabled == true)
+    // Nothing usable left: the default chord, rather than one that can never be pressed.
+    let unusable = try decodePreferences(#"{"mouseButtons": {"buttons": [1, 2]}}"#)
+    #expect(unusable.mouseButtons.buttons == MouseButtonsPrefs().buttons)
 }

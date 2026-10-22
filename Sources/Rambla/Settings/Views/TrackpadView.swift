@@ -2,8 +2,10 @@ import AppKit
 import RamblaCore
 import SwiftUI
 
-/// "Trackpad y mouse": the horizontal swipe, the macOS settings that would fight it, and the mouse wheel.
+/// "Trackpad y mouse": the horizontal swipe, the macOS settings that would fight it, the mouse wheel and the mouse
+/// buttons.
 struct TrackpadView: View {
+    let backend: SettingsBackend?
     @ObservedObject private var store = PreferencesStore.shared
     @StateObject private var checks = ChecksModel()
 
@@ -24,6 +26,7 @@ struct TrackpadView: View {
                 }
             }
             mouseSection
+            buttonsSection
         }
         .formStyle(.grouped)
         .toggleStyle(.switch)
@@ -73,6 +76,25 @@ struct TrackpadView: View {
             Text("Mouse")
         } footer: {
             Text("Con esas teclas apretadas, cada paso de la ruedita enfoca la columna de al lado. Con un Magic Mouse, o con dos dedos en el trackpad, la tira se desliza y se asienta al soltar. Sin las teclas, la ruedita funciona como siempre.")
+        }
+    }
+
+    private var buttonsSection: some View {
+        let enabled = store.prefs.mouseButtons.enabled
+        return Section {
+            Toggle("Gestos con botones del mouse", isOn: $store.prefs.mouseButtons.enabled)
+            LabeledContent("Botones") {
+                MouseButtonsRecorder(buttons: $store.prefs.mouseButtons.buttons, backend: backend)
+            }
+            SliderRow("Sensibilidad", value: $store.prefs.mouseButtons.sensitivity, in: 0.5...3.0, step: 0.1,
+                      display: SettingsFormat.multiplier)
+                .disabled(!enabled)
+            Toggle("Dirección natural", isOn: $store.prefs.mouseButtons.natural)
+                .disabled(!enabled)
+        } header: {
+            Text("Botones del mouse")
+        } footer: {
+            Text("Mantené apretados esos botones y mové el mouse: hacia los costados desliza la tira, hacia arriba la columna enfocada toma el ancho completo y hacia abajo vuelve al ancho que tenía. Con un solo botón, un clic sin mover sigue funcionando como siempre. Con varios, cada uno por separado sigue haciendo lo suyo: así conviven con Mac Mouse Fix y otras apps que usan los mismos botones.")
         }
     }
 

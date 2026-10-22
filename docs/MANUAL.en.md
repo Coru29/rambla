@@ -161,6 +161,15 @@ A column can hold several windows.
 
 **Move the strip with the mouse wheel.** Hold **⌃⌘** and turn the wheel: each notch focuses the next column. With a Magic Mouse, or two fingers on a trackpad, holding ⌃⌘ slides the strip like the gesture, and it settles when you let go. Without the keys, the wheel scrolls as usual. You can change the keys in Settings → Trackpad & Mouse.
 
+**Mouse button gestures.** In Settings → Trackpad & Mouse → Mouse buttons, turn on **Mouse button gestures** and choose the buttons: click the **Buttons** field, press the ones you want together (both side buttons, 4 and 5, for example) and let go. Then hold those buttons and move the mouse:
+
+- **Sideways**, the strip follows the pointer and settles on a column when you let go. A short quick move reaches the next one.
+- **Up**, the focused column takes the full width; **down**, it goes back to the width it had.
+
+With a single button (the middle one, say), a click without moving still works as usual. With several, each button on its own keeps doing its job too: Rambla waits a moment for the other one and, if it does not come, hands the click to the app. Sensitivity and direction are in the same section.
+
+> **With Mac Mouse Fix or another app that uses the mouse buttons:** pick a combination that app does not use, like 4 + 5 together. Rambla gets the buttons and the wheel before those apps, so ⌃⌘ + wheel works even though Mac Mouse Fix zooms with ⌘ + wheel. If one of those apps restarts, Rambla gets back in front within a few seconds.
+
 **Mouse follows focus / focus follows mouse.** Two options in Settings → Appearance, off by default. The first moves the pointer to the center of the window you focus with a shortcut. The second focuses the window under the pointer, without moving the strip.
 
 ## 11. Multiple displays and desktops
@@ -188,7 +197,7 @@ Open them from the menu bar icon → **Settings…**. While the window is open, 
 |---|---|
 | **General** | Enable or pause, launch at login, animations and their speed, centering, width of new windows, keep original height, gaps between windows and margin, preset widths, adjustment step, what to do when another app moves a window |
 | **Shortcuts** | Change any shortcut (each action takes two). Click the shortcut and press the new combination: ⎋ cancels and ⌫ clears it. It warns you if it clashes with Rectangle or if macOS doesn't allow it. **Restore Defaults** brings everything back. |
-| **Trackpad & Mouse** | The trackpad gesture (fingers, sensitivity, natural direction, swipe up for full width), conflicts with macOS and the mouse wheel |
+| **Trackpad & Mouse** | The trackpad gesture (fingers, sensitivity, natural direction, swipe up for full width), conflicts with macOS, the mouse wheel and the mouse buttons |
 | **Appearance** | Strip indicator, focus border, dim inactive windows, mouse ↔ focus |
 | **Apps** | Per-app rules: always float (great for calculators, players or small chats), initial width, and where its windows open (next to the focused one, at the start or at the end) |
 | **Displays** | Turn Rambla on or off for each monitor |

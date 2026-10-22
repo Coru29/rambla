@@ -101,6 +101,47 @@ public struct MousePrefs: Codable, Equatable, Sendable {
     }
 }
 
+/// Moving the mouse with a combination of its buttons held (see `MouseButtonGesture`): sideways slides the strip, up
+/// gives the focused column the full width and down gives back the width it had.
+public struct MouseButtonsPrefs: Codable, Equatable, Sendable {
+    public var enabled: Bool
+    /// The buttons to hold together, numbered the way mouse apps number them: 3 is the middle button, 4 and 5 the
+    /// side ones. Never the left or right button. Sorted, without repeats.
+    public var buttons: [Int] {
+        didSet { buttons = Self.normalized(buttons) }
+    }
+    public var sensitivity: Double
+    /// The strip follows the pointer; without it, it goes the other way.
+    public var natural: Bool
+
+    /// The side buttons together: on their own they keep going back and forward, in the browser or in Mac Mouse Fix.
+    public static let defaultButtons = [4, 5]
+
+    /// The buttons a chord can use, in order: the left and right ones (1 and 2) are left out, like numbers no mouse
+    /// button has (macOS counts 32).
+    public static func normalized(_ buttons: [Int]) -> [Int] {
+        Array(Set(buttons.filter { (3...32).contains($0) })).sorted()
+    }
+
+    public init(enabled: Bool = false, buttons: [Int] = MouseButtonsPrefs.defaultButtons, sensitivity: Double = 1.0,
+                natural: Bool = true) {
+        self.enabled = enabled
+        self.buttons = Self.normalized(buttons)
+        self.sensitivity = sensitivity
+        self.natural = natural
+    }
+
+    public init(from decoder: Decoder) throws {
+        let defaults = MouseButtonsPrefs()
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? defaults.enabled
+        let stored = Self.normalized(try container.decodeIfPresent([Int].self, forKey: .buttons) ?? [])
+        buttons = stored.isEmpty ? defaults.buttons : stored
+        sensitivity = try container.decodeIfPresent(Double.self, forKey: .sensitivity) ?? defaults.sensitivity
+        natural = try container.decodeIfPresent(Bool.self, forKey: .natural) ?? defaults.natural
+    }
+}
+
 /// A per-app override: always float it, give it an initial width, or choose where its windows open.
 public struct AppRule: Codable, Equatable, Identifiable, Sendable {
     public enum Behavior: String, Codable, CaseIterable, Sendable { case tile, float }
@@ -156,6 +197,7 @@ public struct Preferences: Codable, Equatable, Sendable {
     public var mouseFollowsFocus = false
     public var trackpad = TrackpadPrefs()
     public var mouse = MousePrefs()
+    public var mouseButtons = MouseButtonsPrefs()
     public var appRules: [AppRule] = []
     /// UUIDs of the displays Rambla does not manage.
     public var disabledDisplays: [String] = []
@@ -188,6 +230,7 @@ public struct Preferences: Codable, Equatable, Sendable {
         mouseFollowsFocus = try container.decodeIfPresent(Bool.self, forKey: .mouseFollowsFocus) ?? mouseFollowsFocus
         trackpad = try container.decodeIfPresent(TrackpadPrefs.self, forKey: .trackpad) ?? trackpad
         mouse = try container.decodeIfPresent(MousePrefs.self, forKey: .mouse) ?? mouse
+        mouseButtons = try container.decodeIfPresent(MouseButtonsPrefs.self, forKey: .mouseButtons) ?? mouseButtons
         appRules = try container.decodeIfPresent([AppRule].self, forKey: .appRules) ?? appRules
         disabledDisplays = try container.decodeIfPresent([String].self, forKey: .disabledDisplays) ?? disabledDisplays
         checkForUpdates = try container.decodeIfPresent(Bool.self, forKey: .checkForUpdates) ?? checkForUpdates

@@ -68,7 +68,7 @@ struct SettingsRoot: View {
         switch section {
         case .general: GeneralView(backend: backend)
         case .shortcuts: ShortcutsView(backend: backend)
-        case .trackpad: TrackpadView()
+        case .trackpad: TrackpadView(backend: backend)
         case .appearance: AppearanceView()
         case .apps: AppsView(backend: backend)
         case .displays: DisplaysView(backend: backend)

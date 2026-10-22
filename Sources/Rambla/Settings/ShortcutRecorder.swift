@@ -220,10 +220,11 @@ struct ShortcutRecorder: View {
     }
 }
 
-/// A rounded "field" look for the recorder, using only system colors.
-private struct RecorderPillStyle: ButtonStyle {
+/// A rounded "field" look for the recorders, using only system colors.
+struct RecorderPillStyle: ButtonStyle {
     let isRecording: Bool
     let isFlagged: Bool
+    var width: CGFloat = ShortcutRecorder.width
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
@@ -231,7 +232,7 @@ private struct RecorderPillStyle: ButtonStyle {
         configuration.label
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .frame(width: ShortcutRecorder.width)
+            .frame(width: width)
             .background(shape.fill(isRecording ? Color.accentColor.opacity(0.12) : Color(nsColor: .textBackgroundColor)))
             .overlay(shape.strokeBorder(border, lineWidth: isRecording ? 1.5 : 1))
             .contentShape(shape)

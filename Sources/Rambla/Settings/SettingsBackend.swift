@@ -16,4 +16,9 @@ protocol SettingsBackend: AnyObject {
     func installCLI() -> String?
     func exportRaycastScripts(to folder: URL) -> String?
     func openLog()
+    /// Listens to the mouse's buttons (all but the left and right ones) for the "Botones" recorder: `onChange` gets the
+    /// buttons down so far, `onDone` the most that were down at once, after all of them are released. Meanwhile those
+    /// presses reach no app.
+    func recordMouseButtons(onChange: @escaping ([Int]) -> Void, onDone: @escaping ([Int]) -> Void)
+    func stopRecordingMouseButtons()
 }

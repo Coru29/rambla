@@ -161,6 +161,15 @@ Una columna puede tener varias ventanas.
 
 **Mover la tira con la ruedita del mouse.** Mantené **⌃⌘** y girá la ruedita: cada paso enfoca la columna de al lado. Con un Magic Mouse, o con dos dedos en el trackpad, manteniendo ⌃⌘ la tira se desliza como con el gesto y se asienta al soltar. Sin las teclas, la ruedita funciona como siempre. Las teclas se cambian en Configuración → Trackpad y mouse.
 
+**Gestos con los botones del mouse.** En Configuración → Trackpad y mouse → Botones del mouse, activá **«Gestos con botones del mouse»** y elegí los botones: hacé clic en el campo **Botones**, apretá juntos los que quieras (por ejemplo, los dos laterales, 4 y 5) y soltalos. Después, con esos botones apretados, mové el mouse:
+
+- **Hacia los costados**, la tira sigue al puntero y al soltar se asienta en una columna. Un movimiento corto y rápido pasa a la siguiente.
+- **Hacia arriba**, la columna enfocada toma el ancho completo; **hacia abajo**, vuelve al ancho que tenía.
+
+Con un solo botón (el del medio, por ejemplo), un clic sin mover sigue funcionando como siempre. Con varios, cada botón por separado también sigue haciendo lo suyo: Rambla espera un instante a ver si llega el otro y, si no llega, le pasa el clic a la app. La sensibilidad y la dirección se cambian en la misma sección.
+
+> **Con Mac Mouse Fix u otra app que use los botones del mouse:** elegí una combinación que esa app no use, como 4 + 5 juntos. Rambla recibe los botones y la ruedita antes que esas apps, así que ⌃⌘ + ruedita también funciona aunque Mac Mouse Fix use ⌘ + ruedita para el zoom. Si una de esas apps se reinicia, Rambla vuelve a ponerse adelante a los pocos segundos.
+
 **El mouse sigue al foco / el foco sigue al mouse.** Son dos opciones de Configuración → Apariencia y vienen apagadas. La primera lleva el puntero al centro de la ventana que enfocás con un atajo. La segunda enfoca la ventana que tenga el puntero encima, sin mover la tira.
 
 ## 11. Varias pantallas y escritorios
@@ -188,7 +197,7 @@ Abrila desde el ícono de la barra de menú → **Configuración…**. Mientras 
 |---|---|
 | **General** | Activar o pausar, arrancar con la Mac, animaciones y su velocidad, centrado, ancho de ventanas nuevas, mantener altura original, separación entre ventanas y margen, anchos prefijados, paso de ajuste, qué hacer cuando otra app mueve una ventana |
 | **Atajos** | Cambiar cualquier atajo (cada acción admite dos). Hacé click en el atajo y apretá la combinación nueva: ⎋ cancela y ⌫ lo borra. Avisa si choca con Rectangle o si macOS no lo deja usar. "Restaurar predeterminados" vuelve todo a como venía. |
-| **Trackpad y mouse** | El gesto del trackpad (dedos, sensibilidad, dirección natural, hacia arriba para el ancho completo), los conflictos con macOS y la ruedita del mouse |
+| **Trackpad y mouse** | El gesto del trackpad (dedos, sensibilidad, dirección natural, hacia arriba para el ancho completo), los conflictos con macOS, la ruedita y los botones del mouse |
 | **Apariencia** | Barra indicadora, borde de foco, atenuar inactivas, mouse ↔ foco |
 | **Apps** | Reglas por app: que flote siempre (ideal para calculadoras, reproductores o chats chiquitos), ancho inicial y dónde se abren sus ventanas (al lado de la enfocada, al principio o al final) |
 | **Pantallas** | Activar o desactivar Rambla en cada monitor |

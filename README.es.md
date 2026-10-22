@@ -29,7 +29,7 @@ Cada ventana es una columna de una tira horizontal que sigue más allá de los b
 - **Pilas y pestañas**: varias ventanas en una columna, apiladas o en pestañas con una barra en la que se puede hacer click.
 - **Trackpad**: deslizar con tres o cuatro dedos mueve la tira; un deslizamiento corto y rápido pasa a la columna siguiente. Hacia arriba, ancho completo; hacia abajo, vuelve.
 - **Barra indicadora**: aparece al navegar con un ícono por columna; click para saltar, arrastrar para reordenar.
-- **Mouse**: con ⌃⌘ apretado, la ruedita recorre las columnas; arrastrá una ventana sobre otra columna para reordenar, o cambiale el tamaño para fijar el ancho de su columna.
+- **Mouse**: con ⌃⌘ apretado, la ruedita recorre las columnas. También podés mantener apretados los botones que elijas (el del medio, los laterales 4 + 5 juntos…) y mover el mouse: a los costados desliza la tira, hacia arriba da el ancho completo y hacia abajo vuelve. Arrastrá una ventana sobre otra columna para reordenar, o cambiale el tamaño para fijar el ancho de su columna. Convive con Mac Mouse Fix.
 - Opcionales: **borde en la ventana enfocada**, **atenuar las inactivas**, el foco sigue al mouse y el mouse sigue al foco.
 - **Reglas por app**: mosaico o flotante, ancho inicial y dónde se abren. Además, se puede activar o desactivar por pantalla.
 - **Recuerda el layout** al reiniciar y puede arrancar con la Mac.

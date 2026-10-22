@@ -5,6 +5,11 @@ import RamblaCore
 @MainActor
 final class AppSettingsBackend: SettingsBackend {
     private static let rectangleID = "com.knollsoft.Rectangle"
+    private let mouseButtons: MouseButtonTracker
+
+    init(mouseButtons: MouseButtonTracker) {
+        self.mouseButtons = mouseButtons
+    }
 
     var displays: [(uuid: String, name: String)] {
         Displays.current().map { ($0.uuid, $0.name) }
@@ -46,4 +51,10 @@ final class AppSettingsBackend: SettingsBackend {
     func exportRaycastScripts(to folder: URL) -> String? { Automation.exportRaycast(to: folder) }
 
     func openLog() { NSWorkspace.shared.open(Log.fileURL) }
+
+    func recordMouseButtons(onChange: @escaping ([Int]) -> Void, onDone: @escaping ([Int]) -> Void) {
+        mouseButtons.startRecording(.init(changed: onChange, finished: onDone))
+    }
+
+    func stopRecordingMouseButtons() { mouseButtons.stopRecording() }
 }

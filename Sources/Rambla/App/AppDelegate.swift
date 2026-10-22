@@ -21,9 +21,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         slideBegan: { [weak self] in self?.engine.gestureBegan() },
         slide: { [weak self] points in self?.engine.slide(by: points) },
         slideEnded: { [weak self] velocity in self?.engine.slideEnded(velocity: velocity) }))
+    private lazy var mouseButtons = MouseButtonTracker(handlers: .init(
+        slideBegan: { [weak self] in self?.engine.gestureBegan() },
+        slide: { [weak self] dx in self?.engine.mouseDragged(dx) },
+        slideEnded: { [weak self] velocity in self?.engine.mouseDragEnded(velocity: velocity) },
+        vertical: { [weak self] up in self?.engine.verticalSwipe(up: up) }))
     private lazy var mouseFocus = MouseFocus { [weak self] point in self?.engine.hover(at: point) }
     private var overlays: OverlayCoordinator?
-    private let settingsBackend = AppSettingsBackend()
+    private lazy var settingsBackend = AppSettingsBackend(mouseButtons: mouseButtons)
+    private var launchObserver: NSObjectProtocol?
+    private var renewTaps: [DispatchWorkItem] = []
 
     /// `--only-bundle <id>` (repeatable) limits management to those apps: used by the live tests.
     private lazy var onlyBundles: Set<String>? = {
@@ -108,6 +115,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Updater.shared.onChange = { [weak self] in self?.refreshMenu(force: true) }
         Updater.shared.configure(automatic: store.prefs.checkForUpdates)
         lastPrefs = store.prefs
+        keepInputTapsInFront()
         engine.start(prefs: store.prefs, onlyBundles: onlyBundles)
         if !store.prefs.enabled { engine.setPaused(true) }
         refreshMenu(force: true)
@@ -125,7 +133,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         engine.update(prefs: prefs)
         if prefs.enabled == engine.isPaused { engine.setPaused(!prefs.enabled) }
         if old?.allShortcuts != prefs.allShortcuts { applyHotkeys() }
-        if old?.trackpad != prefs.trackpad || old?.mouse != prefs.mouse || old?.focusFollowsMouse != prefs.focusFollowsMouse {
+        if old?.trackpad != prefs.trackpad || old?.mouse != prefs.mouse || old?.mouseButtons != prefs.mouseButtons
+            || old?.focusFollowsMouse != prefs.focusFollowsMouse {
             applyInputs()
         }
         refreshMenu()
@@ -138,7 +147,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         gestures.configure(enabled: active && prefs.trackpad.enabled, fingers: prefs.trackpad.fingers,
                            vertical: prefs.trackpad.verticalSwipe)
         wheel.configure(enabled: active && prefs.mouse.enabled, modifiers: prefs.mouse.modifiers)
+        mouseButtons.configure(enabled: active && prefs.mouseButtons.enabled, buttons: prefs.mouseButtons.buttons)
         mouseFocus.setEnabled(active && prefs.focusFollowsMouse)
+    }
+
+    /// The wheel's and the mouse buttons' taps must stay ahead of other apps' (Mac Mouse Fix's, for one), and a tap
+    /// created later goes first. So after any app starts, once it has had time to set up its own (3 s, and 15 s for a
+    /// slow start), Rambla makes its taps again. Cheap, and nothing happens while those features are off.
+    private func keepInputTapsInFront() {
+        launchObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didLaunchApplicationNotification, object: nil, queue: .main
+        ) { [weak self] notification in
+            let app = (notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.localizedName
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.renewTaps.forEach { $0.cancel() }
+                self.renewTaps = [3, 15].map { delay in
+                    let item = DispatchWorkItem { [weak self] in
+                        MainActor.assumeIsolated {
+                            guard let self else { return }
+                            if delay == 3, self.wheel.isOn || self.mouseButtons.isOn {
+                                Log.info("Input taps made again after \(app ?? "an app") started")
+                            }
+                            self.renew { self.wheel.renew() }
+                            self.renew { self.mouseButtons.renew() }
+                        }
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
+                    return item
+                }
+            }
+        }
+    }
+
+    /// Runs `renewal` again every half second while a gesture keeps it busy, for up to ten seconds.
+    private func renew(attempts: Int = 20, _ renewal: @escaping @MainActor () -> TapRenewal) {
+        guard renewal() == .busy, attempts > 1 else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            MainActor.assumeIsolated { self?.renew(attempts: attempts - 1, renewal) }
+        }
     }
 
     private func applyHotkeys() {

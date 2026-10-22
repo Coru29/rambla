@@ -21,6 +21,12 @@ enum KeyNames {
         combo.modifiers.symbols + label(for: combo.keyCode)
     }
 
+    /// "Botón del medio", "Botón 4 + Botón 5": mouse buttons, numbered the way mouse apps number them.
+    static func mouseButtons(_ buttons: [Int]) -> String {
+        buttons.map { $0 == 3 ? String(localized: "Botón del medio") : String(localized: "Botón \($0)") }
+            .joined(separator: " + ")
+    }
+
     private static func translate(_ keyCode: UInt16) -> String? {
         let source = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue()
         let fallback = TISCopyCurrentASCIICapableKeyboardLayoutInputSource()?.takeRetainedValue()

@@ -11,8 +11,10 @@ private let wheelCallback: CGEventTapCallBack = { _, type, event, userInfo in
 /// the strip instead of the app under the pointer (`WheelGesture` decides which events are Rambla's).
 ///
 /// Keeping those events from the app takes an active event tap, which every scroll of every app passes through.
-/// It runs on its own thread, so a busy main thread never makes anybody's scrolling stutter, and it exists only
-/// while the feature is on. The engine is driven on the main thread, in event order.
+/// It sits where the mouse's events enter the window server, ahead of other apps' taps: Mac Mouse Fix, for one, turns
+/// ⌘ + wheel into zoom there, and Rambla would never see the wheel. It runs on its own thread, so a busy main thread
+/// never makes anybody's scrolling stutter, and it exists only while the feature is on. The engine is driven on the
+/// main thread, in event order.
 final class ScrollWheelTracker: @unchecked Sendable {
     struct Handlers {
         /// A wheel notch: focus the column this many places to the right (negative: left).
@@ -42,11 +44,30 @@ final class ScrollWheelTracker: @unchecked Sendable {
             let session = Session(tracker: self)
             self.session = session
             session.start()
+            Log.info("Scroll wheel moves the strip while \(modifiers.symbols) is held")
         } else if !enabled, let session {
             self.session = nil
             session.stop()
         }
     }
+
+    /// Puts the tap back in front of the others': an app that started after Rambla (Mac Mouse Fix restarting, say)
+    /// put its own ahead.
+    /// Not while a slide or its glide is under way: the new tap would hand the rest of it to the app.
+    @MainActor
+    func renew() -> TapRenewal {
+        guard let session else { return .off }
+        guard !session.isBusy else { return .busy }
+        session.stop()
+        let fresh = Session(tracker: self)
+        self.session = fresh
+        fresh.start()
+        return .renewed
+    }
+
+    /// Whether the tap exists (the feature is on).
+    @MainActor
+    var isOn: Bool { session != nil }
 
     fileprivate var wantedModifiers: Modifiers { lock.withLock { modifiers } }
 
@@ -73,13 +94,15 @@ final class ScrollWheelTracker: @unchecked Sendable {
         DispatchQueue.main.async { MainActor.assumeIsolated(call) }
     }
 
-    /// One tap on its own thread and run loop. Everything but `start` and `stop` runs on that thread.
+    /// One tap on its own thread and run loop. Everything but `start`, `stop` and `isBusy` runs on that thread.
     final class Session: @unchecked Sendable {
         private unowned let tracker: ScrollWheelTracker
         private let lock = NSLock()
         /// Guarded by `lock`: `stop` can come before the thread has its run loop.
         private var loop: CFRunLoop?
         private var stopped = false
+        /// Guarded by `lock`: a slide or its glide is under way (`WheelGesture.isBusy`).
+        private var busy = false
         // Tap thread only.
         private var tap: CFMachPort?
         private var gesture = WheelGesture()
@@ -88,6 +111,8 @@ final class ScrollWheelTracker: @unchecked Sendable {
         init(tracker: ScrollWheelTracker) {
             self.tracker = tracker
         }
+
+        var isBusy: Bool { lock.withLock { busy } }
 
         func start() {
             let thread = Thread { [self] in run() }
@@ -109,7 +134,7 @@ final class ScrollWheelTracker: @unchecked Sendable {
 
         private func run() {
             let mask = CGEventMask(1) << CGEventType.scrollWheel.rawValue
-            guard let tap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
+            guard let tap = CGEvent.tapCreate(tap: .cghidEventTap, place: .headInsertEventTap, options: .defaultTap,
                                               eventsOfInterest: mask, callback: wheelCallback,
                                               userInfo: Unmanaged.passUnretained(self).toOpaque()) else {
                 Log.error("Scroll wheel tap could not be created")
@@ -131,7 +156,6 @@ final class ScrollWheelTracker: @unchecked Sendable {
             }
             if proceed {
                 CGEvent.tapEnable(tap: tap, enable: true)
-                Log.info("Scroll wheel moves the strip while \(tracker.wantedModifiers.symbols) is held")
                 CFRunLoopRun()
             }
             CGEvent.tapEnable(tap: tap, enable: false)
@@ -146,6 +170,7 @@ final class ScrollWheelTracker: @unchecked Sendable {
             if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
                 // Events went by while the tap was off, maybe the end of a swipe: start clean.
                 tracker.perform(gesture.cancel())
+                armIdleTimer()
                 if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
                 return Unmanaged.passUnretained(event)
             }
@@ -169,8 +194,11 @@ final class ScrollWheelTracker: @unchecked Sendable {
             return output.passesEvent ? Unmanaged.passUnretained(event) : nil
         }
 
-        /// While a slide is under way, wakes up when it would time out (see `WheelGesture.nextIdleCheck`).
+        /// Publishes whether a slide is under way and, while one is, wakes up when it would time out (see
+        /// `WheelGesture.nextIdleCheck`).
         private func armIdleTimer() {
+            let busy = gesture.isBusy
+            lock.withLock { self.busy = busy }
             guard let idleTimer, let deadline = gesture.nextIdleCheck else { return }
             let delay = max(0, deadline - ProcessInfo.processInfo.systemUptime) + 0.01
             CFRunLoopTimerSetNextFireDate(idleTimer, CFAbsoluteTimeGetCurrent() + delay)

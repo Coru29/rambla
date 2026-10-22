@@ -1,11 +1,14 @@
 import AppKit
 import RamblaCore
 
-/// Trackpad swipes, the mouse wheel and focus-follows-mouse.
+/// Trackpad swipes, the mouse wheel, mouse button drags and focus-follows-mouse.
 extension WindowManager {
     /// Scroll-area widths the strip travels when the fingers cross the whole trackpad, at sensitivity 1×:
     /// a comfortable four-finger swipe (about a quarter of the trackpad) moves a bit more than half a screen.
     static let trackpadGain = 2.5
+    /// Strip points per point the pointer moves with the mouse buttons held, at sensitivity 1×: a short drag (or a
+    /// flick, which carries its speed) reaches the next column.
+    static let mouseDragGain = 2.0
 
     /// A slide starts on the strip under the pointer (the trackpad and the mouse wheel both act where you look).
     func gestureBegan() {
@@ -24,6 +27,16 @@ extension WindowManager {
     func gestureEnded(velocity: Double) {
         let width = gestureKey.flatMap { results[$0]?.metrics.area.width } ?? 0
         slideEnded(velocity: -velocity * width * trackpadScale)
+    }
+
+    /// The pointer moved `dx` points sideways (positive: right) with the mouse buttons held.
+    func mouseDragged(_ dx: Double) {
+        slide(by: -dx * mouseDragScale)
+    }
+
+    /// The mouse buttons were released, the pointer moving at `velocity` points per second.
+    func mouseDragEnded(velocity: Double) {
+        slideEnded(velocity: -velocity * mouseDragScale)
     }
 
     /// Moves the strip being slid by `points` toward later columns.
@@ -58,11 +71,11 @@ extension WindowManager {
         onStateChanged?()
     }
 
-    /// Swipe up: the focused column takes the full width of the screen (without macOS's full screen); swipe down:
-    /// back to the width it had.
+    /// Swipe up (on the trackpad, or dragging with the mouse buttons): the focused column takes the full width of the
+    /// screen (without macOS's full screen); swipe down: back to the width it had.
     func verticalSwipe(up: Bool) {
         guard isRunning, !isPaused, gestureKey == nil, let key = activeStripKey(), var strip = strips[key] else { return }
-        Log.info("Trackpad swipe \(up ? "up: full width" : "down: previous width")")
+        Log.info("Swipe \(up ? "up: full width" : "down: previous width")")
         strip.setFullWidth(up)
         strips[key] = strip
         reveal(key)
@@ -140,6 +153,11 @@ extension WindowManager {
     /// follows the fingers, so fingers moving left scroll toward later columns).
     private var trackpadScale: Double {
         Self.trackpadGain * prefs.trackpad.sensitivity * (prefs.trackpad.natural ? 1 : -1)
+    }
+
+    /// Strip points per pointer point, the same way: natural, the strip follows the pointer.
+    private var mouseDragScale: Double {
+        Self.mouseDragGain * prefs.mouseButtons.sensitivity * (prefs.mouseButtons.natural ? 1 : -1)
     }
 
     /// The strip of the display under the pointer, or the active one when the pointer is on no managed display.

@@ -111,6 +111,15 @@ public struct WheelGesture: Sendable {
         }
     }
 
+    /// A slide or the glide after it is under way: the app must not replace its tap now, or the rest would go to the
+    /// app under the pointer.
+    public var isBusy: Bool {
+        switch state {
+        case .sliding, .gliding: return true
+        case .idle, .foreign: return false
+        }
+    }
+
     /// When the app should call `idle(at:)` next: while a slide is under way, the moment it would time out.
     public var nextIdleCheck: Double? {
         guard case .sliding(let phased) = state else { return nil }

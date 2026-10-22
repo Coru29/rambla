@@ -292,6 +292,15 @@
 "Manteniendo apretado" = "While holding";
 "Mouse" = "Mouse";
 "Con esas teclas apretadas, cada paso de la ruedita enfoca la columna de al lado. Con un Magic Mouse, o con dos dedos en el trackpad, la tira se desliza y se asienta al soltar. Sin las teclas, la ruedita funciona como siempre." = "With those keys held, each notch of the wheel focuses the next column. With a Magic Mouse, or two fingers on the trackpad, the strip slides and settles when you let go. Without the keys, the wheel works as usual.";
+"Gestos con botones del mouse" = "Mouse button gestures";
+"Botones" = "Buttons";
+"Botones del mouse" = "Mouse buttons";
+"Mantené apretados esos botones y mové el mouse: hacia los costados desliza la tira, hacia arriba la columna enfocada toma el ancho completo y hacia abajo vuelve al ancho que tenía. Con un solo botón, un clic sin mover sigue funcionando como siempre. Con varios, cada uno por separado sigue haciendo lo suyo: así conviven con Mac Mouse Fix y otras apps que usan los mismos botones." = "Hold those buttons and move the mouse: sideways slides the strip, up gives the focused column the full width and down gives back the width it had. With a single button, a click without moving still works as usual. With several, each one on its own keeps doing its job, so they get along with Mac Mouse Fix and other apps that use the same buttons.";
+"Botón del medio" = "Middle button";
+"Botón %lld" = "Button %lld";
+"Apretá los botones…" = "Press the buttons…";
+"Hacé clic y apretá los botones del mouse" = "Click, then press the mouse buttons";
+"Apretá juntos los botones que quieras usar y soltalos; un clic acá cancela" = "Press the buttons you want together, then let go; clicking here cancels";
 
 /* Rambla/Setup/Automation.swift */
 "No se pudo crear la carpeta «%@»: %@" = "Could not create the folder “%@”: %@";
