@@ -49,6 +49,11 @@ final class WindowManager {
     /// Last frame Rambla asked for, per window (the final target, not animation frames).
     private(set) var requested: [WindowID: CGRect] = [:]
     private var hiddenSince: [WindowID: CFAbsoluteTime] = [:]
+    /// Displays that have strips but are not connected, and since when (a resolution change or a wake can drop a
+    /// display for a moment).
+    private var displayGoneSince: [String: CFAbsoluteTime] = [:]
+    /// How long a display must stay disconnected before its windows join the strips where they are now.
+    private static let goneDisplayDelay: CFAbsoluteTime = 3
     private var graceUntil: CFAbsoluteTime = 0
     private var reconcileScheduled = false
     var pendingReveal: StripKey?
@@ -425,6 +430,7 @@ final class WindowManager {
             worker(for: id)?.forgetWindow(id)
             removeWindow(id)
         }
+        dropStripsOfDisconnectedDisplays(now: now)
 
         let keys = currentKeys
         for display in enabledDisplays {
@@ -494,6 +500,30 @@ final class WindowManager {
             if revealKeys.contains(key) { reveal(key) } else { apply(key, animate: true) }
         }
         onStateChanged?()
+    }
+
+    /// macOS moves the windows of an unplugged display to the remaining ones, but they stayed in that display's strips,
+    /// which no longer lay anything out: untiled and out of reach of the shortcuts. Once the display has been gone for
+    /// `goneDisplayDelay`, its strips are dropped and the windows join the strips of the displays they are on now.
+    private func dropStripsOfDisconnectedDisplays(now: CFAbsoluteTime) {
+        let connected = Set(displays.map(\.uuid))
+        for uuid in connected { displayGoneSince[uuid] = nil }
+        for uuid in Set(strips.keys.map(\.displayUUID)) where !connected.contains(uuid) {
+            let since = displayGoneSince[uuid] ?? now
+            displayGoneSince[uuid] = since
+            guard now - since >= Self.goneDisplayDelay else {
+                scheduleReconcile(after: Self.goneDisplayDelay - (now - since) + 0.1)
+                continue
+            }
+            for key in Array(strips.keys) where key.displayUUID == uuid {
+                strips[key] = nil
+                results[key] = nil
+                hidden[key] = nil
+                spaceKeys[key] = nil
+            }
+            displayGoneSince[uuid] = nil
+            Log.info("Display \(uuid.prefix(8)) disconnected: its windows join the strips of the displays they are on")
+        }
     }
 
     private func insert(_ record: WindowRecord, into key: StripKey) {
