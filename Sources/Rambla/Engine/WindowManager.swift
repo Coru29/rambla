@@ -86,6 +86,8 @@ final class WindowManager {
     var indicatorHook: ((StripKey, NSEvent.ModifierFlags?) -> Void)?
     /// Called to show (or hide, when it is on screen) the overview of a strip.
     var overviewHook: ((StripKey) -> Void)?
+    /// Offered every shortcut first while the overview is on screen; true when the overview used it.
+    var overviewAction: ((Action) -> Bool)?
     /// Saved layout from the previous run (its floating windows; the strips go to `archive`).
     var restoreState: SavedState?
     /// Strips not in view: those of the previous run not seen yet, and those of unplugged displays. Each is rebuilt

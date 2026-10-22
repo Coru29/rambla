@@ -13,15 +13,59 @@ struct OverviewItem {
     let hidden: Bool
 }
 
+extension OverviewItem {
+    static let neutralTint = NSColor(calibratedHue: 0.6, saturation: 0.14, brightness: 0.3, alpha: 1)
+
+    /// An icon's color, weighted by saturation so its color counts more than its white or gray parts, then made dark
+    /// and calm enough for white text. A gray icon (a terminal, say) gets a neutral slate.
+    static func tint(of image: NSImage?) -> NSColor {
+        guard let image, let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return neutralTint }
+        let side = 16
+        var pixels = [UInt8](repeating: 0, count: side * side * 4)
+        let drawn = pixels.withUnsafeMutableBytes { buffer -> Bool in
+            guard let context = CGContext(data: buffer.baseAddress, width: side, height: side, bitsPerComponent: 8,
+                                          bytesPerRow: side * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            context.draw(cgImage, in: CGRect(x: 0, y: 0, width: side, height: side))
+            return true
+        }
+        guard drawn else { return neutralTint }
+        var red = 0.0, green = 0.0, blue = 0.0, weight = 0.0
+        for index in stride(from: 0, to: pixels.count, by: 4) {
+            let alpha = Double(pixels[index + 3]) / 255
+            guard alpha > 0.5 else { continue }
+            let r = Double(pixels[index]) / 255 / alpha, g = Double(pixels[index + 1]) / 255 / alpha
+            let b = Double(pixels[index + 2]) / 255 / alpha
+            let w = 0.1 + max(r, g, b) - min(r, g, b)
+            red += r * w
+            green += g * w
+            blue += b * w
+            weight += w
+        }
+        guard weight > 0 else { return neutralTint }
+        let average = NSColor(calibratedRed: red / weight, green: green / weight, blue: blue / weight, alpha: 1)
+        var hue: CGFloat = 0, saturation: CGFloat = 0, brightness: CGFloat = 0, alpha: CGFloat = 0
+        average.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        guard saturation > 0.15 else { return neutralTint }
+        return NSColor(calibratedHue: hue, saturation: min(max(saturation, 0.3), 0.62), brightness: 0.4, alpha: 1)
+    }
+}
+
 /// Everything the overview draws: the strip's cards (strip points) and how big to draw them.
 struct OverviewContent {
     var overview: Overview
     var items: [WindowID: OverviewItem]
     /// Overview points per strip point.
     var scale: CGFloat
-    /// Strip points between two cards.
-    var gap: Double
     var cardHeight: CGFloat
+
+    /// The narrowest card and the smallest gap between two: a long strip still shows each window's icon.
+    static let minimumCardWidth = 44.0
+    static let minimumGap = 10.0
+
+    var drawn: Overview.Drawn {
+        overview.drawn(scale: Double(scale), minimumWidth: Self.minimumCardWidth, minimumGap: Self.minimumGap)
+    }
 }
 
 @MainActor
@@ -31,7 +75,7 @@ final class OverviewState: ObservableObject {
 
 /// The overview ("Vista general"): the whole strip of one display at once, over a blurred screen, to see every window
 /// and jump to one. A click on a window (or ↩ on the chosen one, or its number) focuses it and closes the overview;
-/// esc, a click elsewhere, the shortcut again, another app or another desktop close it as it was.
+/// esc, ⌘W, a click elsewhere, the shortcut again, another app or another desktop close it as it was.
 ///
 /// The panel takes the keyboard without activating Rambla, so whatever app was in front stays in front until a
 /// window is chosen. It exists only while shown.
@@ -81,32 +125,60 @@ final class OverviewController {
         })
     }
 
-    private func choose(_ id: WindowID) {
-        guard let key = shownKey, let item = state.content?.items[id], !item.hidden else { return }
+    /// A window that is not on screen (minimized, its app hidden) cannot be chosen.
+    private func choose(_ id: WindowID?) {
+        guard let id, let key = shownKey, let item = state.content?.items[id], !item.hidden else {
+            NSSound.beep()
+            return
+        }
         hide()
         onChoose(id, key)
+    }
+
+    private func move(_ move: Overview.Move) {
+        guard shownKey != nil, var content = state.content else { return }
+        content.overview.move(move)
+        state.content = content
     }
 
     // MARK: - Keyboard
 
     /// Returns true when the overview used the key.
     private func handle(_ event: NSEvent) -> Bool {
-        guard var content = state.content else { return false }
+        guard let overview = state.content?.overview else { return false }
         switch event.keyCode {
-        case 53: hide()                                         // esc
-        case 123: content.overview.move(.left)
-        case 124: content.overview.move(.right)
-        case 125: content.overview.move(.down)
-        case 126: content.overview.move(.up)
-        case 36, 76, 49:                                        // return, enter, space
-            if let id = content.overview.window(at: content.overview.selection) { choose(id) }
-            return true
+        case KeyCode.escape: hide()
+        case KeyCode.left: move(.left)
+        case KeyCode.right: move(.right)
+        case KeyCode.down: move(.down)
+        case KeyCode.up: move(.up)
+        case KeyCode.returnKey, KeyCode.keypadEnter, KeyCode.space: choose(overview.window(at: overview.selection))
         default:
             guard let number = Int(event.charactersIgnoringModifiers ?? ""), (1...9).contains(number) else { return false }
-            if let id = content.overview.window(atCard: number) { choose(id) }
-            return true
+            choose(overview.window(atCard: number))
         }
-        if shownKey != nil { state.content = content }
+        return true
+    }
+
+    /// A Rambla shortcut while the overview is on screen. Its hot keys reach Rambla before the panel sees them, so the
+    /// ones that move the focus move the selection instead, ⌃⌘1…9 choose, and the overview's own closes it. Any other
+    /// closes it and then acts on the strip as usual. Returns true when the overview used the shortcut.
+    func perform(_ action: Action) -> Bool {
+        guard let overview = state.content?.overview, isShown else { return false }
+        switch action {
+        case .focusLeft: move(.left)
+        case .focusRight: move(.right)
+        case .focusUp: move(.up)
+        case .focusDown: move(.down)
+        case .focusFirst: move(.first)
+        case .focusLast: move(.last)
+        case .focus1, .focus2, .focus3, .focus4, .focus5, .focus6, .focus7, .focus8, .focus9:
+            choose(Int(action.rawValue.split(separator: "-").last!).flatMap(overview.window(atCard:)))
+        case .overview: hide()
+        default:
+            hide()
+            return false
+        }
         return true
     }
 
@@ -115,6 +187,7 @@ final class OverviewController {
     private func makePanel() -> OverviewPanel {
         let panel = OverviewPanel()
         panel.onKey = { [weak self] event in self?.handle(event) ?? false }
+        panel.onClose = { [weak self] in self?.hide() }
         let blur = NSVisualEffectView()
         blur.material = .hudWindow
         blur.blendingMode = .behindWindow
@@ -151,33 +224,31 @@ final class OverviewController {
     }
 }
 
-/// A full-screen panel above the menu bar and the Dock that takes the keyboard without activating Rambla.
-final class OverviewPanel: NSPanel {
+/// A full-screen overlay panel above the menu bar and the Dock that, unlike the others, takes the keyboard (still
+/// without activating Rambla).
+final class OverviewPanel: OverlayPanel {
     var onKey: ((NSEvent) -> Bool)?
+    var onClose: (() -> Void)?
 
     override var canBecomeKey: Bool { true }
-    override var canBecomeMain: Bool { false }
 
     init() {
-        // `.nonactivatingPanel` only takes effect when it is part of the style mask at creation.
-        super.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
-        level = .popUpMenu
-        collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary, .transient, .ignoresCycle]
+        super.init(level: .popUpMenu, collectionBehavior: [.moveToActiveSpace, .fullScreenAuxiliary, .transient, .ignoresCycle])
         appearance = NSAppearance(named: .darkAqua)
         acceptsMouseMovedEvents = true
-        isOpaque = false
-        backgroundColor = .clear
-        hasShadow = false
-        hidesOnDeactivate = false
-        isReleasedWhenClosed = false
-        isExcludedFromWindowsMenu = true
-        animationBehavior = .none
     }
 
     /// Keys go to the overview before any view: SwiftUI's scroll view would take the arrows.
     override func sendEvent(_ event: NSEvent) {
         if event.type == .keyDown, onKey?(event) == true { return }
         super.sendEvent(event)
+    }
+
+    /// ⌘-keys would otherwise reach Rambla's own menu, where ⌘Q quits it and ⌘H hides its overlays. ⌘W closes the
+    /// overview; the rest do nothing.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if event.keyCode == KeyCode.w { onClose?() }
+        return true
     }
 }
 
@@ -191,7 +262,7 @@ final class OverviewHostingView<Content: View>: NSHostingView<Content> {
 /// Like Mission Control: the desktop blurred and darkened, the strip as a row of miniature windows.
 struct OverviewView: View {
     @ObservedObject var state: OverviewState
-    let choose: (WindowID) -> Void
+    let choose: (WindowID?) -> Void
     let dismiss: () -> Void
     @State private var hovered: WindowID?
 
@@ -214,35 +285,44 @@ struct OverviewView: View {
     }
 
     private func strip(_ content: OverviewContent) -> some View {
-        let scale = content.scale
-        return ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(alignment: .top, spacing: max(CGFloat(content.gap) * scale, 10)) {
-                    ForEach(Array(content.overview.cards.enumerated()), id: \.offset) { index, card in
-                        OverviewCard(card: card, index: index, content: content, hovered: $hovered, choose: choose)
-                            .frame(width: max(CGFloat(card.width) * scale, 44), height: content.cardHeight)
-                            .id(index)
+        let drawn = content.drawn
+        let gap = drawn.cards.count > 1 ? drawn.cards[1].lowerBound - drawn.cards[0].upperBound : 0
+        return GeometryReader { geometry in
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: CGFloat(gap)) {
+                        ForEach(Array(content.overview.cards.enumerated()), id: \.offset) { index, card in
+                            OverviewCard(card: card, index: index, content: content, hovered: $hovered, choose: choose)
+                                .frame(width: CGFloat(drawn.cards[index].upperBound - drawn.cards[index].lowerBound),
+                                       height: content.cardHeight)
+                                .id(index)
+                        }
                     }
+                    .overlay(alignment: .topLeading) { viewport(drawn) }
+                    .padding(.horizontal, 70)
+                    .padding(.vertical, 28)
+                    // Centered when the strip is shorter than the screen, and a click beside the cards closes too.
+                    .frame(minWidth: geometry.size.width)
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: dismiss)
                 }
-                .overlay(alignment: .topLeading) { viewport(content) }
-                .padding(.horizontal, 70)
-                .padding(.vertical, 28)
-            }
-            .onAppear { proxy.scrollTo(content.overview.selection.card, anchor: .center) }
-            .onChange(of: content.overview.selection) { _, selection in
-                withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(selection.card, anchor: .center) }
+                .onAppear { proxy.scrollTo(content.overview.selection.card, anchor: .center) }
+                .onChange(of: content.overview.selection) { _, selection in
+                    withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(selection.card, anchor: .center) }
+                }
             }
         }
+        .frame(height: content.cardHeight + 56)
     }
 
     /// The part of the strip that is on screen now: a bar above the windows, like a scroll bar's thumb.
     @ViewBuilder
-    private func viewport(_ content: OverviewContent) -> some View {
-        if let range = content.overview.viewport {
+    private func viewport(_ drawn: Overview.Drawn) -> some View {
+        if let range = drawn.viewport {
             Capsule()
                 .fill(.white.opacity(0.45))
-                .frame(width: max(CGFloat(range.upperBound - range.lowerBound) * content.scale, 8), height: 3)
-                .offset(x: CGFloat(range.lowerBound) * content.scale, y: -16)
+                .frame(width: max(CGFloat(range.upperBound - range.lowerBound), 8), height: 3)
+                .offset(x: CGFloat(range.lowerBound), y: -16)
                 .allowsHitTesting(false)
         }
     }
@@ -254,7 +334,7 @@ private struct OverviewCard: View {
     let index: Int
     let content: OverviewContent
     @Binding var hovered: WindowID?
-    let choose: (WindowID) -> Void
+    let choose: (WindowID?) -> Void
 
     private var selectedRow: Int? {
         content.overview.selection.card == index ? content.overview.selection.row : nil
@@ -285,6 +365,8 @@ private struct OverviewCard: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(RoundedRectangle(cornerRadius: 10).fill(.white.opacity(0.08)))
         .opacity(0.6)
+        .contentShape(Rectangle())
+        .onTapGesture { choose(card.windows.first) }
     }
 
     private func miniature(_ id: WindowID, selected: Bool, tabs: [WindowID], shownTab: Int) -> some View {

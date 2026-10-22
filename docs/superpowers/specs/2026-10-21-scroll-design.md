@@ -91,6 +91,7 @@ Modificador base **⌃⌘** y **⌃⌘⇧** para la variante "mover". Ninguno ch
 | `move-left` / `move-right` | Mueve la columna | ⌃⌘⇧← / ⌃⌘⇧→, ⌃⌘⇧H / ⌃⌘⇧L |
 | `move-up` / `move-down` | Mueve la ventana dentro de la pila | ⌃⌘⇧↑ / ⌃⌘⇧↓, ⌃⌘⇧K / ⌃⌘⇧J |
 | `send-next-display` | Manda la ventana a la siguiente pantalla | ⌃⌘N |
+| `overview` | Abre o cierra la vista general de la tira | ⌃⌘O |
 | `cycle-width` | Rota el ancho entre los presets | ⌃⌘R |
 | `full-width` | Ancho completo, alternando con el anterior | ⌃⌘M |
 | `center` | Centra la columna enfocada | ⌃⌘C |
@@ -151,9 +152,15 @@ Modificador base **⌃⌘** y **⌃⌘⇧** para la variante "mover". Ninguno ch
   - Se graba en Configuración apretando los botones juntos: queda la mayor cantidad que estuvo apretada a la vez.
   - Para no quitarles los botones a otras apps (Mac Mouse Fix usa el 4 y el 5 por separado), la primera pulsación de una combinación de varios botones se retiene hasta 0,2 s esperando las demás. Si no llegan, si se suelta, si el puntero se mueve más de 6 pt, si se aprieta otro botón o si gira la ruedita, la pulsación se le devuelve a la app. Con un solo botón, soltarlo antes de que haya gesto devuelve el clic, y girar la ruedita con el botón apretado se lo pasa a la app.
   - Los taps de la ruedita y de los botones están en el nivel HID con inserción al principio, para ver los eventos antes que Mac Mouse Fix (que si no convierte ⌘ + ruedita en zoom). Como el último tap creado queda primero, Rambla los vuelve a crear 3 s y 15 s después de que se abre cualquier app, salvo en medio de un gesto (reintenta cada 0,5 s).
-- **Vista general** (⌃⌘O, `overview`): un panel a pantalla completa sobre la pantalla de la tira activa (o la del puntero, con el gesto del mouse) que muestra toda la tira en una fila de ventanas en miniatura a escala: barra de título con el título real, ícono y color de la app, pilas, pestañas, columnas fijadas y una barra con la parte que está en pantalla. Click o ↩ enfoca, flechas y 1–9 eligen, esc / click afuera / el atajo de nuevo / otra app / otro escritorio la cierran. No usa capturas reales de las ventanas (pedirían el permiso de grabación de pantalla). El panel recibe el teclado sin activar Rambla.
 - **El mouse sigue al foco** (apagado): al enfocar con atajos, el puntero va al centro de la ventana.
 - **El foco sigue al mouse** (apagado): si el puntero se queda 120 ms sobre una ventana de la tira totalmente visible, se enfoca sin desplazar la tira.
+
+### Vista general
+
+- ⌃⌘O (`overview`), o el gesto de los botones del mouse, abre un panel a pantalla completa sobre la pantalla de la tira activa (o la del puntero, con el gesto) que muestra toda la tira en una fila de ventanas en miniatura a escala: barra de título con el título real, ícono y color de la app, pilas, pestañas, columnas fijadas y una barra con la parte que está en pantalla. Las tarjetas angostas y los espacios chicos se dibujan más anchos que su proporción, y la barra se ubica sobre las tarjetas que cubre.
+- Las flechas mueven la selección (saltando ventanas minimizadas u ocultas) y ↩ la enfoca; 1–9 enfocan directo esa columna, contando como ⌃⌘1…9 solo las que están en pantalla. Mientras está abierta, los atajos de Rambla para moverse (⌃⌘ + flechas, ⌃⌘A/E, ⌃⌘1…9) mueven la selección o eligen; cualquier otro la cierra y actúa sobre la tira. Elegir una ventana que no se puede (minimizada, o que se cerró mientras tanto) suena.
+- Esc, ⌘W, un click afuera de las ventanas, el atajo de nuevo, otra app u otro escritorio la cierran; ⌘Q y ⌘H no llegan al menú de Rambla.
+- No usa capturas reales de las ventanas (pedirían el permiso de grabación de pantalla). El panel recibe el teclado sin activar Rambla.
 
 ### Pantallas, escritorios y estados especiales
 

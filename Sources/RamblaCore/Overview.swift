@@ -28,7 +28,16 @@ public struct Overview: Equatable, Sendable {
         }
     }
 
-    public enum Move: Sendable { case left, right, up, down }
+    public enum Move: Sendable { case left, right, up, down, first, last }
+
+    /// Where the cards and the viewport are drawn.
+    public struct Drawn: Equatable, Sendable {
+        /// Each card's left and right edges.
+        public var cards: [ClosedRange<Double>]
+        public var viewport: ClosedRange<Double>?
+        /// Right edge of the last card.
+        public var width: Double
+    }
 
     /// Width of the card of a collapsed column, which takes no room on screen.
     public static let collapsedWidth = 120.0
@@ -40,11 +49,17 @@ public struct Overview: Equatable, Sendable {
     /// nil when no scrolling column is.
     public private(set) var viewport: ClosedRange<Double>?
     public private(set) var selection = Selection(card: 0, row: 0)
+    /// Strip points between two cards.
+    public let gap: Double
+    /// Windows that are minimized or whose app is hidden: never chosen.
+    private let hidden: Set<WindowID>
 
     /// `metrics` is the strip's layout and `pinnedWidths` the on-screen width of its pinned columns (which the scroll
     /// area does not hold). The selection starts on `focused`, or on the focused column's active window.
     public init(strip: Strip, metrics: StripMetrics, pinnedWidths: [UUID: Double], gap: Double, hidden: Set<WindowID>,
                 focused: WindowID?) {
+        self.gap = gap
+        self.hidden = hidden
         let order = strip.columns.indices.filter { strip.columns[$0].pinned == .left }
             + strip.columns.indices.filter { strip.columns[$0].pinned == nil }
             + strip.columns.indices.filter { strip.columns[$0].pinned == .right }
@@ -82,10 +97,38 @@ public struct Overview: Equatable, Sendable {
            let row = cards[card].windows.firstIndex(of: focused) {
             selection = Selection(card: card, row: row)
         } else if let column = strip.focused, let card = cards.firstIndex(where: { $0.column == column }) {
-            selection = Selection(card: card, row: cards[card].active)
+            selection = Selection(card: card, row: entryRow(card))
         } else if let card = cards.firstIndex(where: { !$0.collapsed }) {
-            selection = Selection(card: card, row: cards[card].active)
+            selection = Selection(card: card, row: entryRow(card))
         }
+    }
+
+    /// The cards and the viewport at `scale` (drawn points per strip point), with every card at least `minimumWidth`
+    /// wide and at least `minimumGap` from the next. Small cards take more room than their share, so the viewport is
+    /// mapped card by card: the bar starts and ends on the cards it covers.
+    public func drawn(scale: Double, minimumWidth: Double, minimumGap: Double) -> Drawn {
+        let drawnGap = max(gap * scale, minimumGap)
+        var spans: [ClosedRange<Double>] = []
+        var x = 0.0
+        for card in cards {
+            let width = max(card.width * scale, minimumWidth)
+            spans.append(x...(x + width))
+            x += width + drawnGap
+        }
+        func place(_ point: Double) -> Double {
+            for (index, card) in cards.enumerated() {
+                let span = spans[index], right = card.x + card.width
+                if point <= right {
+                    let share = card.width > 0 ? (max(point, card.x) - card.x) / card.width : 0
+                    return span.lowerBound + share * (span.upperBound - span.lowerBound)
+                }
+                let next = cards.indices.contains(index + 1) ? cards[index + 1].x : right
+                if point < next { return span.upperBound + (point - right) / (next - right) * drawnGap }
+            }
+            return spans.last?.upperBound ?? 0
+        }
+        return Drawn(cards: spans, viewport: viewport.map { place($0.lowerBound)...place($0.upperBound) },
+                     width: max(0, x - drawnGap))
     }
 
     public func window(at selection: Selection) -> WindowID? {
@@ -94,14 +137,17 @@ public struct Overview: Equatable, Sendable {
         return windows.indices.contains(selection.row) ? windows[selection.row] : nil
     }
 
-    /// The window of the `number`th card (from 1, as ⌃⌘1…9 count columns), the one the column shows.
+    /// The window of the `number`th card from 1, the one its column shows. Like ⌃⌘1…9, it counts only the columns
+    /// with a window on screen.
     public func window(atCard number: Int) -> WindowID? {
-        guard cards.indices.contains(number - 1) else { return nil }
-        return window(at: Selection(card: number - 1, row: cards[number - 1].active))
+        let open = cards.indices.filter { !cards[$0].collapsed }
+        guard open.indices.contains(number - 1) else { return nil }
+        let card = open[number - 1]
+        return window(at: Selection(card: card, row: entryRow(card)))
     }
 
-    /// Moves the selection to the next card that has a window on screen, or to the next window of the card; it stops
-    /// at the ends. A new card is entered on the window its column shows.
+    /// Moves the selection to the next card that has a window on screen, or to the next window of the card that is on
+    /// screen; it stops at the ends. A new card is entered on the window its column shows.
     public mutating func move(_ move: Move) {
         switch move {
         case .left, .right:
@@ -109,13 +155,29 @@ public struct Overview: Equatable, Sendable {
             var card = selection.card + step
             while cards.indices.contains(card), cards[card].collapsed { card += step }
             guard cards.indices.contains(card) else { return }
-            selection = Selection(card: card, row: cards[card].active)
+            selection = Selection(card: card, row: entryRow(card))
+        case .first, .last:
+            let open = cards.indices.filter { !cards[$0].collapsed }
+            guard let card = move == .first ? open.first : open.last else { return }
+            selection = Selection(card: card, row: entryRow(card))
         case .up, .down:
             guard cards.indices.contains(selection.card) else { return }
-            let row = selection.row + (move == .up ? -1 : 1)
-            guard cards[selection.card].windows.indices.contains(row) else { return }
+            let windows = cards[selection.card].windows
+            let step = move == .up ? -1 : 1
+            var row = selection.row + step
+            while windows.indices.contains(row), hidden.contains(windows[row]) { row += step }
+            guard windows.indices.contains(row) else { return }
             selection.row = row
         }
+    }
+
+    /// The row a card is entered on: the window its column shows, or its first window on screen when that one is not.
+    private func entryRow(_ card: Int) -> Int {
+        let windows = cards[card].windows
+        guard windows.indices.contains(cards[card].active), hidden.contains(windows[cards[card].active]) else {
+            return cards[card].active
+        }
+        return windows.firstIndex { !hidden.contains($0) } ?? cards[card].active
     }
 
     public mutating func select(_ selection: Selection) {

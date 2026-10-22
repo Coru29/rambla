@@ -41,7 +41,7 @@ extension WindowManager {
     }
 
     func perform(_ action: Action, holding modifiers: NSEvent.ModifierFlags? = nil) {
-        guard isRunning else { return }
+        guard isRunning, overviewAction?(action) != true else { return }
         if action == .togglePause {
             setPaused(!isPaused)
             return
@@ -78,8 +78,6 @@ extension WindowManager {
         case .sendNextDisplay:
             sendFocusedToNextDisplay(from: key)
             return
-        case .overview:
-            return   // handled above
         case .cycleWidth: strip.cycleWidth(presets: prefs.presetWidths, available: available, gap: gap)
         case .fullWidth: strip.toggleFullWidth()
         case .center:
@@ -102,7 +100,7 @@ extension WindowManager {
         case .closeWindow:
             if let id = strip.focusedWindow ?? focusedWindow { worker(for: id)?.close(id) }
             return
-        case .toggleFloat, .togglePause:
+        case .overview, .toggleFloat, .togglePause:
             return
         }
 

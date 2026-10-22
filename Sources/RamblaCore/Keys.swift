@@ -73,9 +73,11 @@ public enum KeyCode {
     public static let z: UInt16 = 0x06
     public static let c: UInt16 = 0x08
     public static let b: UInt16 = 0x0B
+    public static let w: UInt16 = 0x0D
     public static let e: UInt16 = 0x0E
     public static let r: UInt16 = 0x0F
     public static let t: UInt16 = 0x11
+    public static let o: UInt16 = 0x1F
     public static let u: UInt16 = 0x20
     public static let i: UInt16 = 0x22
     public static let p: UInt16 = 0x23
@@ -83,7 +85,6 @@ public enum KeyCode {
     public static let j: UInt16 = 0x26
     public static let k: UInt16 = 0x28
     public static let n: UInt16 = 0x2D
-    public static let o: UInt16 = 0x1F
     public static let m: UInt16 = 0x2E
 
     public static let digit1: UInt16 = 0x12
@@ -105,7 +106,10 @@ public enum KeyCode {
     public static let rightBracket: UInt16 = 0x1E
 
     public static let returnKey: UInt16 = 0x24
+    public static let space: UInt16 = 0x31
     public static let delete: UInt16 = 0x33
+    public static let escape: UInt16 = 0x35
+    public static let keypadEnter: UInt16 = 0x4C
 
     public static let left: UInt16 = 0x7B
     public static let right: UInt16 = 0x7C

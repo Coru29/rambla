@@ -9,7 +9,7 @@ final class OverlayCoordinator {
         onSelect: { [weak self] id in self?.selectColumn(id) },
         onMove: { [weak self] from, to in self?.moveColumn(from: from, to: to) })
     private lazy var tabBars = TabBarController { [weak self] id in self?.engine.focusTab(id) }
-    private lazy var overview = OverviewController { [weak self] id, key in self?.engine.focus(window: id, in: key) }
+    private lazy var overview = OverviewController { [weak self] id, key in self?.focusFromOverview(id, in: key) }
     private let border = FocusBorderController()
     private let dimmer = DimmerController()
     private var indicatorKey: StripKey?
@@ -21,6 +21,7 @@ final class OverlayCoordinator {
         engine.overlayHook = { [weak self] in self?.refresh() }
         engine.indicatorHook = { [weak self] key, modifiers in self?.showIndicator(key, holding: modifiers) }
         engine.overviewHook = { [weak self] key in self?.toggleOverview(key) }
+        engine.overviewAction = { [weak self] action in self?.overview.perform(action) ?? false }
     }
 
     func refresh() {
@@ -127,9 +128,8 @@ final class OverlayCoordinator {
         for column in strip.columns where column.pinned != nil {
             if let frame = result.columnFrames[column.id] { pinned[column.id] = Double(frame.width) }
         }
-        let gap = engine.prefs.innerGap
-        let overview = Overview(strip: strip, metrics: result.metrics, pinnedWidths: pinned, gap: gap, hidden: hidden,
-                                focused: engine.focusedWindow)
+        let overview = Overview(strip: strip, metrics: result.metrics, pinnedWidths: pinned, gap: engine.prefs.innerGap,
+                                hidden: hidden, focused: engine.focusedWindow)
         var items: [WindowID: OverviewItem] = [:]
         for column in strip.columns {
             for id in column.windows {
@@ -139,55 +139,37 @@ final class OverlayCoordinator {
                                          hidden: hidden.contains(id))
             }
         }
-        // Cards keep the windows' proportions: as tall as a share of the screen, narrower when the strip is long.
+        // Cards keep the windows' proportions: as tall as a share of the screen, narrower when the strip is long. Small
+        // cards and gaps are drawn wider than their share, so it shrinks a few times until the row fits.
         let screen = display.screen.frame
-        var scale = screen.height * Self.overviewHeight / max(display.visible.height, 1)
+        var content = OverviewContent(overview: overview, items: items,
+                                      scale: screen.height * Self.overviewHeight / max(display.visible.height, 1),
+                                      cardHeight: 0)
         let room = screen.width - 160
-        if CGFloat(overview.total) * scale > room {
-            scale = max(room / CGFloat(max(overview.total, 1)), Self.overviewMinScale)
+        for _ in 0..<3 {
+            let width = CGFloat(content.drawn.width)
+            guard width > room, content.scale > Self.overviewMinScale else { break }
+            content.scale = max(content.scale * room / width, Self.overviewMinScale)
         }
-        return OverviewContent(overview: overview, items: items, scale: scale, gap: gap,
-                               cardHeight: display.visible.height * scale)
+        content.cardHeight = display.visible.height * content.scale
+        return content
+    }
+
+    /// A window chosen in the overview, unless it closed meanwhile.
+    private func focusFromOverview(_ id: WindowID, in key: StripKey) {
+        guard engine.windows[id] != nil, engine.strips[key]?.contains(id) == true else {
+            NSSound.beep()
+            return
+        }
+        engine.focus(window: id, in: key)
     }
 
     /// The app's color for its miniature in the overview.
     private func tint(for id: WindowID) -> NSColor {
-        guard let pid = engine.windows[id]?.pid else { return Self.neutralTint }
+        guard let pid = engine.windows[id]?.pid else { return OverviewItem.neutralTint }
         if let cached = tints[pid] { return cached }
-        let color = Self.tint(of: icon(for: id))
+        let color = OverviewItem.tint(of: icon(for: id))
         tints[pid] = color
         return color
-    }
-
-    private static let neutralTint = NSColor(calibratedHue: 0.6, saturation: 0.14, brightness: 0.3, alpha: 1)
-
-    /// An icon's color, weighted by saturation so its color counts more than its white or gray parts, then made dark
-    /// and calm enough for white text. A gray icon (a terminal, say) gets a neutral slate.
-    static func tint(of image: NSImage?) -> NSColor {
-        guard let image, let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return neutralTint }
-        let side = 16
-        var pixels = [UInt8](repeating: 0, count: side * side * 4)
-        guard let context = CGContext(data: &pixels, width: side, height: side, bitsPerComponent: 8, bytesPerRow: side * 4,
-                                      space: CGColorSpaceCreateDeviceRGB(),
-                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return neutralTint }
-        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: side, height: side))
-        var red = 0.0, green = 0.0, blue = 0.0, weight = 0.0
-        for index in stride(from: 0, to: pixels.count, by: 4) {
-            let alpha = Double(pixels[index + 3]) / 255
-            guard alpha > 0.5 else { continue }
-            let r = Double(pixels[index]) / 255 / alpha, g = Double(pixels[index + 1]) / 255 / alpha
-            let b = Double(pixels[index + 2]) / 255 / alpha
-            let w = 0.1 + max(r, g, b) - min(r, g, b)
-            red += r * w
-            green += g * w
-            blue += b * w
-            weight += w
-        }
-        guard weight > 0 else { return neutralTint }
-        let average = NSColor(calibratedRed: red / weight, green: green / weight, blue: blue / weight, alpha: 1)
-        var hue: CGFloat = 0, saturation: CGFloat = 0, brightness: CGFloat = 0, alpha: CGFloat = 0
-        average.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
-        guard saturation > 0.15 else { return neutralTint }
-        return NSColor(calibratedHue: hue, saturation: min(max(saturation, 0.3), 0.62), brightness: 0.4, alpha: 1)
     }
 }

@@ -1,11 +1,12 @@
 import AppKit
 import SwiftUI
 
-/// A borderless panel for the overlays that take clicks (strip indicator, tab bars).
+/// A borderless panel for the overlays that take clicks (strip indicator, tab bars, overview).
 ///
 /// It never activates Rambla and never becomes key or main, so showing it or clicking it leaves keyboard
-/// focus exactly where it was. Click-through overlays (focus border, dimming) are plain borderless windows.
-final class OverlayPanel: NSPanel {
+/// focus exactly where it was (only the overview's panel takes the keyboard). Click-through overlays (focus border,
+/// dimming) are plain borderless windows.
+class OverlayPanel: NSPanel {
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 

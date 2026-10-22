@@ -108,10 +108,71 @@ private func overview(_ strip: Strip, hidden: Set<WindowID> = [], area: Double =
     #expect(o.window(atCard: 1) == 4)                                             // the pinned column comes first
     #expect(o.window(atCard: 2) == 1)
     #expect(o.window(atCard: 9) == nil)
+    #expect(o.window(atCard: 0) == nil)
+}
+
+@Test func numbersCountTheColumnsOnScreenLikeTheShortcuts() {
+    // ⌃⌘2 skips a column whose windows are all minimized: the overview's 2 picks the same column.
+    let s = strip([300, 500, 400])
+    let o = overview(s, hidden: [2])
+    var focused = s
+    focused.focusNth(2, hidden: [2])
+    #expect(o.window(atCard: 2) == 3)
+    #expect(focused.focused == 2)
+    #expect(o.window(atCard: 3) == nil)
+}
+
+@Test func hiddenWindowsOfAStackAreSkipped() {
+    var s = strip([300, 500, 400], focused: 0)
+    s.columns[1].windows = [2, 7, 8]
+    s.columns[1].heightWeights = [1, 1, 1]
+    s.columns[1].active = 1                                                       // the active one is minimized
+    var o = overview(s, hidden: [7], focused: 1)
+    o.move(.right)
+    #expect(o.window(at: o.selection) == 2)                                       // entered on a window on screen
+    o.move(.down)
+    #expect(o.window(at: o.selection) == 8)                                       // over the minimized one
+    o.move(.up)
+    #expect(o.window(at: o.selection) == 2)
+    #expect(o.window(atCard: 2) == 2)
 }
 
 @Test func aCollapsedCardIsSkippedByTheArrows() {
     var o = overview(strip([300, 500, 400]), hidden: [2], focused: 1)
     o.move(.right)
     #expect(o.window(at: o.selection) == 3)
+}
+
+@Test func theSelectionJumpsToTheEnds() {
+    var o = overview(strip([300, 500, 400, 200]), hidden: [4], focused: 2)
+    o.move(.last)
+    #expect(o.window(at: o.selection) == 3)                                       // the last card on screen
+    o.move(.first)
+    #expect(o.window(at: o.selection) == 1)
+}
+
+// MARK: - Drawn
+
+@Test func theViewportMarksTheCardsItCovers() {
+    // Six columns of 740 points; the screen (1490 wide) shows the fourth and fifth exactly. Drawn at 0.3 the gaps
+    // are 3 points, wider than that on screen: the bar must still start and end with those two cards.
+    let o = overview(strip(Array(repeating: 740, count: 6), scroll: 3 * 750), area: 1490)
+    #expect(o.viewport == 2250...3740)
+    let drawn = o.drawn(scale: 0.3, minimumWidth: 44, minimumGap: 10)
+    #expect(drawn.cards[3] == 696...918)
+    #expect(drawn.cards[4] == 928...1150)
+    #expect(drawn.viewport == 696...1150)
+    #expect(drawn.width == 1382)
+}
+
+@Test func smallCardsAreDrawnWiderAndTheViewportFollowsThem() {
+    // A collapsed card is 120 points: at 0.16 it would be 19 points wide, so it is drawn 44 wide. The screen shows
+    // the second half of the first column and half of the third.
+    // Cards at 0…400, 410…530 (collapsed) and 540…940; the third shows its first 200 points.
+    let o = overview(strip([400, 300, 400], scroll: 200), hidden: [2], area: 410)
+    #expect(o.viewport == 200.0...740.0)
+    // Drawn: 64 wide, 44 wide (not 19), 64 wide, 10 apart.
+    let drawn = o.drawn(scale: 0.16, minimumWidth: 44, minimumGap: 10)
+    #expect(drawn.cards.map(\.lowerBound) == [0, 74, 128])
+    #expect(drawn.viewport == 32.0...160.0)
 }
