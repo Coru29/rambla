@@ -69,6 +69,9 @@ final class WindowManager {
     var restoreState: SavedState?
     var restoredKeys: Set<StripKey> = []
     var floatingRestored: Set<WindowID> = []
+    /// Floating windows that Rambla floated by itself because another app moved them (Rectangle, a snap after a
+    /// drag). Unlike the ones the user floats, they are not saved, and "Reacomodar ventanas" puts them back.
+    var autoFloated: Set<WindowID> = []
     var saveWorkItem: DispatchWorkItem?
     /// Strip being moved by a trackpad swipe.
     var gestureKey: StripKey?
@@ -289,6 +292,7 @@ final class WindowManager {
     func removeWindow(_ id: WindowID) {
         guard windows.removeValue(forKey: id) != nil || floating.contains(id) else { return }
         floating.remove(id)
+        autoFloated.remove(id)
         requested[id] = nil
         hiddenSince[id] = nil
         animator.cancel(id)
@@ -586,8 +590,11 @@ final class WindowManager {
         for (pid, group) in byPID { workers[pid]?.setFrames(group, verify: verify) }
     }
 
+    /// "Reacomodar ventanas": reads every window again and puts back in the strip the ones Rambla floated by itself.
     func relayoutAll() {
         guard isRunning, !isPaused else { return }
+        floating.subtract(autoFloated)
+        autoFloated.removeAll()
         requested.removeAll()
         workers.values.forEach { $0.rescan() }
         scheduleReconcile()
@@ -621,6 +628,11 @@ final class WindowManager {
 
     // MARK: - External changes (Rectangle, the app itself, the user's mouse)
 
+    /// "x,y w×h", for the log.
+    static func describe(_ r: CGRect) -> String {
+        "\(Int(r.minX.rounded())),\(Int(r.minY.rounded())) \(Int(r.width.rounded()))×\(Int(r.height.rounded()))"
+    }
+
     private func externalFrameChange(_ id: WindowID, _ frame: CGRect, mouseDown: Bool) {
         let previous = windows[id]?.frame
         windows[id]?.frame = frame
@@ -637,8 +649,9 @@ final class WindowManager {
             // The app resized itself (terminals snap to their character grid keeping a corner fixed).
             adoptSize(id, frame: frame, in: key)
         } else if prefs.floatOnExternalMove {
-            Log.info("Window \(id) moved by another app: floating it")
-            makeFloating(id, from: key, center: false)
+            Log.info("Window \(id) (\(windows[id]?.bundleID ?? "?")) moved by another app from \(Self.describe(reference)) "
+                     + "to \(Self.describe(frame)): floating it")
+            makeFloating(id, from: key, center: false, automatic: true)
         } else {
             apply(key, animate: true)
         }
@@ -666,9 +679,12 @@ final class WindowManager {
         requested[id] = nil
     }
 
-    func makeFloating(_ id: WindowID, from key: StripKey, center: Bool) {
+    /// Takes a window out of its strip. `automatic` when Rambla decides it (another app moved the window),
+    /// rather than the user.
+    func makeFloating(_ id: WindowID, from key: StripKey, center: Bool, automatic: Bool = false) {
         strips[key]?.remove(window: id)
         floating.insert(id)
+        if automatic { autoFloated.insert(id) } else { autoFloated.remove(id) }
         requested[id] = nil
         animator.cancel(id)
         if center, let display = display(for: key), let frame = windows[id]?.frame {
@@ -712,8 +728,9 @@ final class WindowManager {
         windows[id]?.frame = frame
         guard let key = key(containing: id) else { return }
         if !frame.approximatelyEquals(frameAtRelease, tolerance: 2) {
-            Log.info("Window \(id) snapped by another app after a drag: floating it")
-            makeFloating(id, from: key, center: false)
+            Log.info("Window \(id) (\(windows[id]?.bundleID ?? "?")) snapped by another app after a drag "
+                     + "to \(Self.describe(frame)): floating it")
+            makeFloating(id, from: key, center: false, automatic: true)
             return
         }
         if !frame.size.approximatelyEquals(drag.startFrame.size, tolerance: 2) {

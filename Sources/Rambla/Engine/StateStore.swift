@@ -17,7 +17,7 @@ enum StateStore {
 
     static func load() -> SavedState? {
         guard let data = try? Data(contentsOf: url),
-              var state = try? JSONDecoder().decode(SavedState.self, from: data) else { return nil }
+              var state = try? JSONDecoder().decode(SavedState.self, from: data).upgraded() else { return nil }
         // A hand-edited or corrupt file must not break the strip invariants the operations rely on.
         for index in state.strips.indices {
             state.strips[index].strip.columns = state.strips[index].strip.columns.compactMap { column in
@@ -58,10 +58,12 @@ extension WindowManager {
                 if let record = windows[id] { refs.append(RamblaCore.WindowRef(id: id, bundleID: record.bundleID ?? "", title: record.title)) }
             }
         }
-        for id in floating {
+        // Only the windows the user floated: the ones Rambla floated by itself go back to the strip after a restart.
+        let chosen = floating.subtracting(autoFloated)
+        for id in chosen {
             if let record = windows[id] { refs.append(RamblaCore.WindowRef(id: id, bundleID: record.bundleID ?? "", title: record.title)) }
         }
-        StateStore.save(SavedState(refs: refs, strips: saved, floating: Array(floating)))
+        StateStore.save(SavedState(refs: refs, strips: saved, floating: Array(chosen)))
     }
 
     /// The first time a strip is seen this session, rebuild it from the saved layout (matching windows by

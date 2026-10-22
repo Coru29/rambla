@@ -173,6 +173,7 @@ extension WindowManager {
         guard floating.contains(id) || windows[id]?.kind == .float, let frame = windows[id]?.frame,
               let display = Displays.best(for: frame, in: enabledDisplays), let key = currentKey(of: display) else { return }
         floating.remove(id)
+        autoFloated.remove(id)
         var strip = strips[key] ?? Strip()
         let available = display.visible.width - 2 * prefs.outerGap
         strip.insert(window: id, width: .points(min(max(frame.width, available * 0.25), available)), at: .afterFocused)
@@ -233,7 +234,9 @@ extension WindowManager {
         let list = windows.values.map { record -> [String: Any] in
             ["id": record.id, "pid": record.pid, "bundle": record.bundleID as Any, "title": record.title,
              "role": record.traits.role as Any, "subrole": record.traits.subrole as Any,
-             "resizable": record.traits.isResizable, "kind": "\(record.kind)", "frame": rectJSON(record.frame)]
+             "resizable": record.traits.isResizable, "closeButton": record.traits.hasCloseButton,
+             "fullscreenButton": record.traits.hasFullscreenButton, "kind": "\(record.kind)",
+             "autoFloated": autoFloated.contains(record.id), "frame": rectJSON(record.frame)]
         }
         return (try? JSONSerialization.data(withJSONObject: list, options: [.prettyPrinted, .sortedKeys])) ?? Data()
     }

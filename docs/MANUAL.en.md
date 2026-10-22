@@ -139,7 +139,7 @@ A column can hold several windows.
 
 - Rambla's shortcuts use **⌃⌘** and Rectangle's use **⌃⌥**, so they don't clash.
 - If you use Rectangle on a window of the strip (left half, maximize, center…), **that window leaves the strip and stays floating where Rectangle put it**. Rambla does not fight Rectangle.
-- To put it back on the strip: ⌃⌘T with that window focused.
+- To put it back on the strip: ⌃⌘T with that window focused, or **Reacomodar ventanas** (Rearrange windows) in the menu, which brings back every window that left this way. They also come back by themselves when Rambla restarts or updates; the ones you took out with ⌃⌘T stay floating.
 - The same happens with Rectangle's snap areas (dragging a window to the edge of the screen).
 - Configuración → Mac warns you if any of Rambla's shortcuts matches one of your Rectangle's.
 - If you don't want this behavior, turn off "Si otra app mueve una ventana, sacarla de la tira" (If another app moves a window, take it off the strip) in Configuración → General.
@@ -198,7 +198,7 @@ Open them from the menu bar icon → **Configuración…**. While the window is 
 | Item | What it does |
 |---|---|
 | Pausar / Reanudar Rambla (Pause / Resume) | Stops arranging and brings every window back on screen. When resumed, the strip is put back together. |
-| Reacomodar ventanas (Rearrange windows) | Re-checks every window and applies the order again |
+| Reacomodar ventanas (Rearrange windows) | Re-checks every window, brings back to the strip the ones another app (like Rectangle) took out, and applies the order again |
 | Traer todas las ventanas a la pantalla (Bring all windows on screen) | Rescues any window parked at an edge |
 | Flotar / volver la ventana actual (Float / put back the current window) | Same as ⌃⌘T |
 | Configuración… (Settings…) | Opens the settings |

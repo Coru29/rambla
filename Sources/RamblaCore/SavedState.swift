@@ -29,17 +29,32 @@ public struct SavedStrip: Codable, Equatable, Sendable {
 
 /// The contents of `state.json`.
 public struct SavedState: Codable, Equatable, Sendable {
+    /// 2: `floating` holds only the windows the user floated. Version 1 also held the ones Rambla floated by itself
+    /// (moved by another app), which kept them out of the strip after every restart.
+    public static let currentVersion = 2
+
     public var version: Int
     /// Every window that appears in `strips` or `floating`, for matching after a restart.
     public var refs: [WindowRef]
     public var strips: [SavedStrip]
+    /// Windows the user took out of the strip.
     public var floating: [WindowID]
 
-    public init(version: Int = 1, refs: [WindowRef] = [], strips: [SavedStrip] = [], floating: [WindowID] = []) {
+    public init(version: Int = SavedState.currentVersion, refs: [WindowRef] = [], strips: [SavedStrip] = [],
+                floating: [WindowID] = []) {
         self.version = version
         self.refs = refs
         self.strips = strips
         self.floating = floating
+    }
+
+    /// The same state with today's meaning. Version 1's floating list cannot tell the user's floating windows from
+    /// the ones Rambla floated by itself, so it is dropped: those windows go back to their strips.
+    public func upgraded() -> SavedState {
+        var state = self
+        if version < 2 { state.floating = [] }
+        state.version = Self.currentVersion
+        return state
     }
 }
 

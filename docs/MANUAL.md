@@ -137,7 +137,7 @@ Una columna puede tener varias ventanas.
 
 - Los atajos de Rambla usan **⌃⌘** y los de Rectangle **⌃⌥**, así que no chocan.
 - Si usás Rectangle sobre una ventana de la tira (mitad izquierda, maximizar, centrar…), **esa ventana sale de la tira y queda flotando donde la puso Rectangle**. Rambla no se pelea con Rectangle.
-- Para devolverla a la tira: ⌃⌘T con esa ventana enfocada.
+- Para devolverla a la tira: ⌃⌘T con esa ventana enfocada, o **Reacomodar ventanas** en el menú (devuelve todas las que salieron así). También vuelven solas cuando Rambla se reinicia o se actualiza; las que sacaste vos con ⌃⌘T siguen flotando.
 - Lo mismo pasa con las snap areas de Rectangle (arrastrar una ventana al borde de la pantalla).
 - Configuración → Mac te avisa si algún atajo de Rambla coincide con uno de tu Rectangle.
 - Si no querés este comportamiento, desactivá "Si otra app mueve una ventana, sacarla de la tira" en Configuración → General.
@@ -196,7 +196,7 @@ Abrila desde el ícono de la barra de menú → **Configuración…**. Mientras 
 | Opción | Qué hace |
 |---|---|
 | Pausar / Reanudar Rambla | Deja de ordenar y trae todas las ventanas a la pantalla. Al reanudar, vuelve a armar la tira. |
-| Reacomodar ventanas | Vuelve a revisar todas las ventanas y a aplicar el orden |
+| Reacomodar ventanas | Vuelve a revisar todas las ventanas, devuelve a la tira las que sacó otra app (como Rectangle) y aplica el orden |
 | Traer todas las ventanas a la pantalla | Rescata cualquier ventana estacionada en un borde |
 | Flotar / volver la ventana actual | Lo mismo que ⌃⌘T |
 | Configuración… | Abre la configuración |

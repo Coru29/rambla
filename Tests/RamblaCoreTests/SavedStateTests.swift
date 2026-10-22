@@ -184,9 +184,27 @@ private func savedColumn(_ windows: [WindowID], _ width: ColumnWidth = .fraction
         strips: [SavedStrip(displayUUID: "37D8832A-2D66-02CA-B9F7-8F30A301B230", spaceKey: "1",
                             strip: Strip(columns: [column, savedColumn([3])], focused: 1, scroll: 12.5))],
         floating: [7, 8])
-    #expect(state.version == 1)
+    #expect(state.version == 2)
     let decoded = try JSONDecoder().decode(SavedState.self, from: JSONEncoder().encode(state))
     #expect(decoded == state)
-    #expect(SavedState().version == 1)
+    #expect(SavedState().version == SavedState.currentVersion)
     #expect(SavedState().strips.isEmpty)
+}
+
+@Test func savedStateFromVersionOneForgetsItsFloatingWindows() throws {
+    // Version 1 also saved the windows Rambla floated by itself (moved by another app), which kept them out of the
+    // strip after every restart. Its floating list cannot tell them apart, so it is dropped.
+    let json = """
+    {"version": 1, "refs": [{"id": 7, "bundleID": "net.kovidgoyal.kitty", "title": "zsh"}], "strips": [], "floating": [7]}
+    """
+    let old = try JSONDecoder().decode(SavedState.self, from: Data(json.utf8))
+    let upgraded = old.upgraded()
+    #expect(upgraded.version == SavedState.currentVersion)
+    #expect(upgraded.floating.isEmpty)
+    #expect(upgraded.refs == old.refs)
+}
+
+@Test func savedStateFromThisVersionKeepsItsFloatingWindows() {
+    let state = SavedState(floating: [7, 8])
+    #expect(state.upgraded() == state)
 }
