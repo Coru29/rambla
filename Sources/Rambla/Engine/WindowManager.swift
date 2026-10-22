@@ -727,25 +727,31 @@ final class WindowManager {
     /// Moves every window that is parked or sticking out of its display back into the visible area.
     func gatherAll(synchronously: Bool) {
         animator.cancelAll()
-        for (key, strip) in strips {
-            guard let display = displays.first(where: { $0.uuid == key.displayUUID }) else { continue }
+        // Every window Rambla knows a place for: the strips' (an unplugged display's too, whose display is gone) and the
+        // floating ones (a strip window Rambla parked and another app then moved stays half off screen).
+        var gathered = Set<WindowID>()
+        func gather(_ id: WindowID, onto display: DisplayInfo?) {
+            guard gathered.insert(id).inserted, let frame = requested[id] ?? windows[id]?.frame, let pid = windows[id]?.pid,
+                  let display = display ?? Displays.best(for: frame, in: displays) ?? displays.first else { return }
             let area = display.visible
-            for id in strip.allWindows {
-                guard let frame = requested[id] ?? windows[id]?.frame, let pid = windows[id]?.pid else { continue }
-                guard !area.insetBy(dx: -1, dy: -1).contains(frame) else { continue }
-                var target = frame
-                let visibleWidth = frame.intersection(area).isNull ? 0 : frame.intersection(area).width
-                if visibleWidth < frame.width / 2 { target.origin.x = area.midX - frame.width / 2 }
-                target.origin.x = min(max(target.minX, area.minX), max(area.minX, area.maxX - target.width))
-                target.origin.y = min(max(target.minY, area.minY), max(area.minY, area.maxY - target.height))
-                if synchronously {
-                    workers[pid]?.setFrameSynchronously(id, target)
-                } else {
-                    write([id: target], verify: true)
-                }
-                requested[id] = nil
+            guard !area.insetBy(dx: -1, dy: -1).contains(frame) else { return }
+            var target = frame
+            let visibleWidth = frame.intersection(area).isNull ? 0 : frame.intersection(area).width
+            if visibleWidth < frame.width / 2 { target.origin.x = area.midX - frame.width / 2 }
+            target.origin.x = min(max(target.minX, area.minX), max(area.minX, area.maxX - target.width))
+            target.origin.y = min(max(target.minY, area.minY), max(area.minY, area.maxY - target.height))
+            if synchronously {
+                workers[pid]?.setFrameSynchronously(id, target)
+            } else {
+                write([id: target], verify: true)
             }
+            requested[id] = nil
         }
+        for (key, strip) in strips {
+            let display = displays.first(where: { $0.uuid == key.displayUUID })
+            for id in strip.allWindows { gather(id, onto: display) }
+        }
+        for id in floating { gather(id, onto: nil) }
         results.removeAll()
         overlayHook?()
     }
