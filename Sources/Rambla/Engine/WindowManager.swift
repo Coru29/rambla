@@ -1,4 +1,5 @@
 import AppKit
+import IOKit
 import RamblaCore
 
 struct StripKey: Hashable, Codable {
@@ -78,6 +79,11 @@ final class WindowManager {
     /// How long a display must stay disconnected before its windows join the strips where they are now: long enough
     /// for a dock or a monitor that is slow to come back after a wake.
     private static let goneDisplayDelay: TimeInterval = 15
+    /// The Mac's own screen with the lid closed is gone until the lid opens: its windows, which macOS has moved to the
+    /// monitor, join the strips there at once instead of sitting on top of them.
+    private static let closedLidDelay: TimeInterval = 2
+    /// Displays seen as the Mac's own screen.
+    private var builtinDisplays: Set<String> = []
     /// The reconcile that checks again once a display's time is up (gone long enough, or done coming back), and when.
     /// Separate from `scheduleReconcile`, which would otherwise hold every other reconcile until then.
     private var displayCheck: DispatchWorkItem?
@@ -305,6 +311,15 @@ final class WindowManager {
     private func screensAreAsleep() -> Bool {
         if screensAsleep, Self.anyDisplayAwake() { screensAsleep = false }
         return screensAsleep
+    }
+
+    /// The lid of a laptop is closed (`AppleClamshellState`); false on a desktop Mac.
+    private static func lidIsClosed() -> Bool {
+        let root = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOPMrootDomain"))
+        guard root != 0 else { return false }
+        defer { IOObjectRelease(root) }
+        let state = IORegistryEntryCreateCFProperty(root, "AppleClamshellState" as CFString, kCFAllocatorDefault, 0)
+        return state?.takeRetainedValue() as? Bool ?? false
     }
 
     private static func anyDisplayAwake() -> Bool {
@@ -616,6 +631,7 @@ final class WindowManager {
         let visible = Set(onScreenFrames.keys)
         let now = CFAbsoluteTimeGetCurrent()
         presence.update(connected: Set(displays.map(\.uuid)), now: now)
+        builtinDisplays.formUnion(displays.filter { CGDisplayIsBuiltin($0.id) != 0 }.map(\.uuid))
         let settled = displays.filter { presence.isSettled($0.uuid, now: now) }
         for display in displays {
             if let at = presence.settles(display.uuid, now: now) { checkDisplaysAgain(after: at - now + 0.1) }
@@ -756,8 +772,9 @@ final class WindowManager {
         for uuid in Set(strips.keys.map(\.displayUUID)) where !connected.contains(uuid) {
             let since = displayGoneSince[uuid] ?? now
             displayGoneSince[uuid] = since
-            guard now - since >= Self.goneDisplayDelay else {
-                checkDisplaysAgain(after: Self.goneDisplayDelay - (now - since) + 0.1)
+            let delay = builtinDisplays.contains(uuid) && Self.lidIsClosed() ? Self.closedLidDelay : Self.goneDisplayDelay
+            guard now - since >= delay else {
+                checkDisplaysAgain(after: delay - (now - since) + 0.1)
                 continue
             }
             for key in Array(strips.keys) where key.displayUUID == uuid { archiveStrip(key, unplugged: true) }
