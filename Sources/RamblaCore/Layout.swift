@@ -252,22 +252,30 @@ public enum Layout {
     }
 
     /// How window `id`, now at `current` (nil when unknown), gets to its placement in `result`, the layout that
-    /// replaces `previous` on `display`. A window out of sight (at most a sliver of it on the display) that stays out
-    /// of sight jumps: it would otherwise cross the display when it changes edges. A window parked on the edge away
-    /// from its side leaves and comes back through its own side (`LayoutResult.exits`).
+    /// replaces `previous` on `display` (`others` are the other displays). A window out of sight (at most a sliver of
+    /// it on the display) that stays out of sight jumps: it would otherwise cross the display when it changes edges. A
+    /// window parked on the edge away from its side leaves and comes back through its own side (`LayoutResult.exits`).
+    /// One that comes from another display where it was out of sight too (parked there, or taken back by a display
+    /// that returns) comes in through the edge on its side, instead of crossing the displays in between.
     public static func transition(of id: WindowID, at current: CGRect?, to result: LayoutResult, from previous: LayoutResult?,
-                                  display: CGRect, sliver: Double) -> Transition {
+                                  display: CGRect, others: [CGRect] = [], sliver: Double) -> Transition {
         guard let placement = result.placements[id], let current else { return .animate(from: nil) }
-        let shown = current.intersects(display) ? Double(current.intersection(display).width) : 0
-        let outOfSight = shown <= sliver + 1
+        func shown(on d: CGRect) -> Double { current.intersects(d) ? Double(current.intersection(d).width) : 0 }
+        let outOfSight = shown(on: display) <= sliver + 1
         switch placement {
         case .parked:
             if outOfSight { return .jump }
             if let exit = result.exits[id] { return .exit(through: exit) }
         case .visible(let frame):
-            if outOfSight, let exit = previous?.exits[id] {
+            guard outOfSight else { break }
+            if let exit = previous?.exits[id] {
                 // Its size may have changed meanwhile: centered where it left.
                 return .animate(from: CGRect(x: exit.midX - frame.width / 2, y: frame.minY, width: frame.width, height: frame.height))
+            }
+            if shown(on: display) < 0.5, others.allSatisfy({ shown(on: $0) <= sliver + 1 }) {
+                let x = current.midX > display.midX ? Double(display.maxX) - frame.width / 2 - 1
+                                                     : Double(display.minX) - frame.width / 2 + 1
+                return .animate(from: CGRect(x: x, y: Double(frame.minY), width: frame.width, height: frame.height))
             }
         }
         return .animate(from: nil)

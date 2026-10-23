@@ -593,6 +593,23 @@ import CoreGraphics
         #expect(transition(3, at: nil, to: shown, from: gone) == .animate(from: nil))
     }
 
+    @Test func windowFromAnotherDisplayOutOfSightComesInThroughTheEdgeOnItsSide() {
+        // A monitor sits left of the strip's display. Window 1 joins this strip from the monitor's left edge, where it
+        // was parked: it comes in through this display's left edge (just under half out) instead of crossing the monitor.
+        let monitor = CGRect(x: -1920, y: 0, width: 1920, height: 1080)
+        let shown = Layout.compute(input(threeColumns(scroll: 0), others: [monitor]))
+        #expect(shown.placements[1] == visible(0, 0, 495, 800))
+        func transition(at current: CGRect) -> Layout.Transition {
+            Layout.transition(of: 1, at: current, to: shown, from: nil, display: vp, others: [monitor], sliver: 1)
+        }
+        #expect(transition(at: CGRect(x: -2414, y: 0, width: 495, height: 800))
+                == .animate(from: CGRect(x: -246.5, y: 0, width: 495, height: 800)))
+        // Showing on the monitor, it goes over from where it is.
+        #expect(transition(at: CGRect(x: -1500, y: 0, width: 495, height: 800)) == .animate(from: nil))
+        // Parked on this display's own edge, it slides in from there.
+        #expect(transition(at: CGRect(x: -494, y: 0, width: 495, height: 800)) == .animate(from: nil))
+    }
+
     @Test func parkedColumnKeepsEachWindowsOwnYAndSize() {
         let stack = Column(windows: [1, 2], width: .fraction(0.5))
         let strip = Strip(columns: [stack,

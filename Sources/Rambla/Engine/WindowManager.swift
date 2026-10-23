@@ -95,6 +95,9 @@ final class WindowManager {
     private(set) var returningDisplays: [String: CFAbsoluteTime] = [:]
     /// When each display appeared: one that has not stayed a moment takes and gets no windows.
     private(set) var presence = DisplayPresence()
+    /// Windows that macOS put back on a display that has just returned, which takes them back once it settles: left
+    /// there meanwhile, instead of pulled into the strips they joined while it was away and then flown back.
+    private var heldForReturn: Set<WindowID> = []
     private var graceUntil: CFAbsoluteTime = 0
     private var reconcileScheduled = false
     var pendingReveal: StripKey?
@@ -642,6 +645,7 @@ final class WindowManager {
             removeWindow(id)
         }
         followReturningDisplays(connectedBefore: connectedBefore, now: now)
+        heldForReturn = windowsHeldForReturn(now: now)
         dropStripsOfDisconnectedDisplays(now: ProcessInfo.processInfo.systemUptime)
         archiveStripsOfGoneSpaces()
 
@@ -730,6 +734,20 @@ final class WindowManager {
         // Strips that wait for the apps' window lists need a reconcile once the wait is over, whichever came first.
         if waitingForWindowLists { checkDisplaysAgain(after: awaitingUntil - CFAbsoluteTimeGetCurrent() + 0.05) }
         onStateChanged?()
+    }
+
+    private func windowsHeldForReturn(now: CFAbsoluteTime) -> Set<WindowID> {
+        var held: Set<WindowID> = []
+        for display in displays where returningDisplays[display.uuid] != nil && !presence.isSettled(display.uuid, now: now) {
+            for saved in archive.strips where saved.displayUUID == display.uuid && saved.unplugged && saved.session == StateStore.session {
+                for ref in saved.refs {
+                    guard let record = windows[ref.id],
+                          Displays.best(for: whereShown(record), in: displays)?.uuid == display.uuid else { continue }
+                    held.insert(ref.id)
+                }
+            }
+        }
+        return held
     }
 
     /// Minimized, or its app hidden: the user cannot take it to another Space.
@@ -904,7 +922,7 @@ final class WindowManager {
         let result = Layout.compute(input)
         results[key] = result
         var targets: [WindowID: CGRect] = [:]
-        for (id, placement) in result.placements where !dragTracker.isFrozen(id) {
+        for (id, placement) in result.placements where !dragTracker.isFrozen(id) && !heldForReturn.contains(id) {
             targets[id] = placement.frame.integral(keepingSize: true)
         }
         let changed = targets.filter { id, frame in
@@ -923,7 +941,7 @@ final class WindowManager {
             for (id, frame) in changed {
                 let now = animator.current[id] ?? windows[id]?.frame
                 switch Layout.transition(of: id, at: now, to: result, from: previous, display: input.display,
-                                         sliver: input.config.sliver) {
+                                         others: input.otherDisplays, sliver: input.config.sliver) {
                 case .jump:
                     jumps[id] = frame
                 case .animate(let start):

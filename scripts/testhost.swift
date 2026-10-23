@@ -1,10 +1,11 @@
 // A tiny regular app with plain resizable windows, so live tests never touch the user's real apps.
 // Commands (distributed notification "TestHost.command"): "add", "quit", "hide", "unhide", "minimize N", "restore N"
-// (N counts the windows in the order they were made, from 1).
+// (N counts the windows in the order they were made, from 1), "label TEXT" (every window shows TEXT).
 import AppKit
 
 final class Host: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var windows: [NSWindow] = []
+    var labels: [NSTextField] = []
     func applicationDidFinishLaunching(_ notification: Notification) {
         let count = Int(CommandLine.arguments.dropFirst().first ?? "3") ?? 3
         for _ in 0..<count { add() }
@@ -19,6 +20,7 @@ final class Host: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 case "unhide": NSApp.unhide(nil)
                 case "minimize": window?.miniaturize(nil)
                 case "restore": window?.deminiaturize(nil)
+                case "label": self?.labels.forEach { $0.stringValue = words.dropFirst().joined(separator: " ") }
                 default: break
                 }
             }
@@ -36,6 +38,7 @@ final class Host: NSObject, NSApplicationDelegate, NSWindowDelegate {
         label.font = .systemFont(ofSize: 28, weight: .semibold)
         label.frame = NSRect(x: 30, y: 180, width: 480, height: 40)
         w.contentView?.addSubview(label)
+        labels.append(label)
         w.makeKeyAndOrderFront(nil)
         windows.append(w)
     }

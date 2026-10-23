@@ -79,6 +79,12 @@ func samples(_ id: UInt32, running command: [String]) -> [CGRect] {
     return result
 }
 
+func activeDisplays() -> Int {
+    var count: UInt32 = 0
+    CGGetActiveDisplayList(0, nil, &count)
+    return Int(count)
+}
+
 /// How much of `r` shows on `display`, in points across.
 func shown(_ r: CGRect, on display: CGRect) -> Double {
     r.intersects(display) ? r.intersection(display).width : 0
@@ -186,9 +192,13 @@ case "window-at":
     guard cols.indices.contains(n), let id = (cols[n]["windows"] as? [NSNumber])?.first else { fail("no column \(n)") }
     print(id.uint32Value)
 case "check-placed":
-    // Every window of the current strip is exactly where the strip puts it (visible or parked).
+    // Every window of the current strips (one per display) is exactly where its strip puts it (visible or parked).
     let d = dump()
-    guard let s = currentStrip(d), let placements = s["placements"] as? [String: [String: Any]] else { fail("no strip") }
+    let current = (d["strips"] as? [[String: Any]] ?? []).filter { ($0["current"] as? Bool) == true }
+    let placements = current.reduce(into: [String: [String: Any]]()) { all, s in
+        all.merge(s["placements"] as? [String: [String: Any]] ?? [:]) { a, _ in a }
+    }
+    if placements.isEmpty { fail("no windows in the strips") }
     var misplaced: [String] = []
     for (key, p) in placements {
         guard let id = UInt32(key), let real = bounds(id), let f = p["frame"] as? [String: Double] else { continue }
@@ -198,6 +208,56 @@ case "check-placed":
         }
     }
     if misplaced.isEmpty { pass("\(placements.count) windows where the strip puts them") } else { fail("misplaced: \(misplaced.joined(separator: "; "))") }
+case "wait-displays":
+    // N [SECONDS]: waits until N displays are on (the lid opened or closed by hand).
+    let n = Int(args[1])!, timeout = Double(args.count > 2 ? args[2] : "120")!
+    if waitUntil(timeout, { activeDisplays() == n }) { pass("\(n) displays") } else { fail("still \(activeDisplays()) displays") }
+case "other-display":
+    // The display that is not the one the test windows open on.
+    let ids = ((dump()["displays"] as? [[String: Any]]) ?? []).compactMap { $0["uuid"] as? String }
+    guard ids.count > 1 else { fail("one display only") }
+    print(ids[1])
+case "wait-columns-on":
+    // UUID N [SECONDS]: the current strip of that display has N columns.
+    let uuid = args[1], n = Int(args[2])!, timeout = Double(args.count > 3 ? args[3] : "15")!
+    func count() -> Int {
+        let strips = (dump()["strips"] as? [[String: Any]] ?? []).filter { ($0["display"] as? String) == uuid && ($0["current"] as? Bool) == true }
+        return strips.first.map { columns($0).count } ?? 0
+    }
+    if waitUntil(timeout, { count() == n }) { pass("display \(uuid.prefix(8)) has \(n) columns") } else { fail("display \(uuid.prefix(8)) has \(count()) columns, expected \(n)") }
+case "watch-until-displays":
+    // N sliver|half ID: samples the window until N displays are on (the lid opened or closed by hand), and 8 s more.
+    // On the display it started on it never shows more than its sliver, or than half of it (it never crosses it).
+    // macOS itself may push a parked window onto that display as the other one appears: a flash shorter than 0.15 s
+    // is that, not Rambla moving it across.
+    let n = Int(args[1])!, half = args[2] == "half", id = UInt32(args[3])!
+    let disp = display(dump()).frame
+    var samples: [(at: Date, frame: CGRect)] = []
+    var end: Date?
+    let deadline = Date().addingTimeInterval(120)
+    while Date() < (end ?? deadline) {
+        if let b = bounds(id) { samples.append((Date(), b)) }
+        if end == nil, activeDisplays() == n { end = Date().addingTimeInterval(8) }
+        usleep(4_000)
+    }
+    if end == nil { fail("the displays did not change") }
+    let frames = samples.map(\.frame)
+    let limit = half ? (frames.first?.width ?? 0) / 2 : 3
+    var longest = 0.0, since: Date?
+    for sample in samples {
+        if shown(sample.frame, on: disp) > limit {
+            since = since ?? sample.at
+            longest = max(longest, sample.at.timeIntervalSince(since!))
+        } else {
+            since = nil
+        }
+    }
+    let most = frames.map { shown($0, on: disp) }.max() ?? 0
+    if longest < 0.15 {
+        pass("window \(id) showed at most \(Int(most)) pt, over its limit for \(Int(longest * 1000)) ms (\(frames.count) samples)")
+    } else {
+        fail("window \(id) showed \(Int(most)) pt for \(Int(longest * 1000)) ms at x: \(trace(frames, on: disp))")
+    }
 case "neighbor-right":
     // Arguments for `rambla debug-neighbor`: a laptop-sized display right of the strip's one.
     let f = display(dump()).frame
@@ -227,6 +287,6 @@ case "watch-enters", "watch-leaves":
         fail("window \(id) crossed the display at x: \(trace(frames, on: disp)) (\(entering ? "ends" : "starts") at \(Int(reference.minX)))")
     }
 default:
-    print("usage: e2e-check wait-columns N | settle | check-tiles | check-parked | check-focused-visible | check-focused-index N | check-gathered | check-floating ID | check-frame ID X Y | column-order | check-order IDS | check-columns IDS | window-at N | neighbor-right | watch-hidden ID COMMAND... | watch-enters ID right|left COMMAND... | watch-leaves ID right|left COMMAND...")
+    print("usage: e2e-check wait-columns N | settle | check-tiles | check-parked | check-focused-visible | check-focused-index N | check-gathered | check-floating ID | check-frame ID X Y | column-order | check-order IDS | check-columns IDS | window-at N | neighbor-right | watch-hidden ID COMMAND... | watch-enters ID right|left COMMAND... | watch-leaves ID right|left COMMAND... | wait-displays N [S] | other-display | wait-columns-on UUID N [S] | watch-until-displays N sliver|half ID")
     exit(2)
 }
