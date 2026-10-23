@@ -105,6 +105,11 @@
 /* Rambla/Onboarding/WelcomeWindowController.swift */
 "Bienvenida a Rambla" = "Welcome to Rambla";
 
+/* Rambla/Overlay/OverlayCoordinator.swift */
+"Arrastrá una ventana hasta acá desde otra pantalla." = "Drag a window here from another display.";
+"Con %@ mandás acá la ventana enfocada, o arrastrá una desde otra pantalla." = "Press %@ to send the focused window here, or drag one from another display.";
+"Esta pantalla no tiene ventanas" = "This display has no windows";
+
 /* Rambla/Settings/SettingsWindowController.swift */
 "Configuración de Rambla" = "Rambla Settings";
 

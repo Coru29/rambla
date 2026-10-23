@@ -15,6 +15,7 @@ final class OverlayCoordinator {
             self?.moveFromOverview(column, toPlaceOf: target, in: key, selecting: window)
         })
     private let border = FocusBorderController()
+    private let hint = HintController()
     private let dimmer = DimmerController()
     private var indicatorKey: StripKey?
     private var icons: [pid_t: NSImage] = [:]
@@ -120,9 +121,21 @@ final class OverlayCoordinator {
             overview.hide()
             return
         }
-        guard let display = engine.display(for: key), let content = overviewContent(for: key, display: display) else { return }
+        guard let display = engine.display(for: key) else { return }
+        guard let content = overviewContent(for: key, display: display) else {
+            // A display without windows has nothing to show: say how to bring one.
+            if engine.strips[key]?.columns.isEmpty ?? true { showEmptyHint(on: display.screen) }
+            return
+        }
         indicator.hide()
         overview.show(content, key: key, on: display.screen)
+    }
+
+    private func showEmptyHint(on screen: NSScreen) {
+        let detail = engine.prefs.shortcuts(for: .sendNextDisplay).first.map {
+            String(localized: "Con \(KeyNames.display($0)) mandás acá la ventana enfocada, o arrastrá una desde otra pantalla.")
+        } ?? String(localized: "Arrastrá una ventana hasta acá desde otra pantalla.")
+        hint.show(String(localized: "Esta pantalla no tiene ventanas"), detail: detail, on: screen)
     }
 
     /// `selecting` is the window the overview starts on (the focused one when nil).

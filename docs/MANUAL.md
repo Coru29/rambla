@@ -180,7 +180,7 @@ Con un solo botón (el del medio, por ejemplo), un clic sin mover sigue funciona
 
 - **Cada pantalla y cada escritorio tiene su propia tira**, con su foco y su scroll. Al cambiar de escritorio, Rambla retoma la tira de ese escritorio tal como la dejaste.
 - Si pasás una ventana a otro escritorio desde Mission Control, Rambla la mueve a la tira de ese escritorio.
-- **⌃⌘N** manda la ventana enfocada a la siguiente pantalla.
+- **⌃⌘N** manda la ventana enfocada a la siguiente pantalla. Si abrís la vista general en una pantalla sin ventanas, te recuerda cómo traer una.
 - Podés desactivar Rambla en una pantalla en Configuración → Pantallas. Ahí no ordena nada.
 - **Recomendado**: dejá activado "Las pantallas tienen Spaces separados" (viene así en macOS). Con dos monitores, lo ideal es poner el segundo **arriba o abajo** del principal en Configuración del Sistema → Pantallas → Organizar. Lado a lado también funciona: las ventanas se asoman como mucho hasta la mitad hacia el otro monitor, y las que quedan fuera de ese lado se estacionan en el borde opuesto (igual entran y salen por su lado).
 - Las ventanas en **pantalla completa** (botón verde) salen de la tira mientras están así y vuelven a su lugar cuando salís.

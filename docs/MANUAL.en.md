@@ -180,7 +180,7 @@ With a single button (the middle one, say), a click without moving still works a
 
 - **Every display and every desktop has its own strip**, with its own focus and scroll. When you switch desktops, Rambla picks up that desktop's strip as you left it.
 - If you move a window to another desktop from Mission Control, Rambla moves it to that desktop's strip.
-- **⌃⌘N** sends the focused window to the next display.
+- **⌃⌘N** sends the focused window to the next display. If you open the overview on a display without windows, it reminds you how to bring one.
 - You can turn Rambla off for a display in Settings → Displays. Nothing is arranged there.
 - **Recommended**: keep "Displays have separate Spaces" on (the macOS default). With two monitors, ideally place the second one **above or below** the main one in System Settings → Displays → Arrange. Side by side works too: windows peek at most halfway toward the other monitor, and those beyond that side are parked on the opposite edge (they still come and go through their own side).
 - **Full-screen** windows (green button) leave the strip while they are full screen and come back to their place when you exit.
