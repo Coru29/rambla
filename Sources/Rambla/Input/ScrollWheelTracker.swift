@@ -10,11 +10,16 @@ private let wheelCallback: CGEventTapCallBack = { _, type, event, userInfo in
 /// The mouse half of "Trackpad y mouse": while the chosen keys are held, wheel notches and Magic Mouse swipes move
 /// the strip instead of the app under the pointer (`WheelGesture` decides which events are Rambla's).
 ///
+/// It also keeps the trackpad swipe's scrolling from the apps. With macOS's own swipes off for the gesture's fingers,
+/// macOS sends their movement to the app under the pointer as scrolling, and a glide after they lift: reading an
+/// article, a swipe down would scroll it. `GestureTracker` reports every touch here, and `SwipeScroll` decides which
+/// scroll events belong to a swipe; those reach neither the app nor `WheelGesture`.
+///
 /// Keeping those events from the app takes an active event tap, which every scroll of every app passes through.
 /// It sits where the mouse's events enter the window server, ahead of other apps' taps: Mac Mouse Fix, for one, turns
 /// ⌘ + wheel into zoom there, and Rambla would never see the wheel. It runs on its own thread, so a busy main thread
-/// never makes anybody's scrolling stutter, and it exists only while the feature is on. The engine is driven on the
-/// main thread, in event order.
+/// never makes anybody's scrolling stutter, and it exists only while the wheel or the trackpad gesture is on. The
+/// engine is driven on the main thread, in event order.
 final class ScrollWheelTracker: @unchecked Sendable {
     struct Handlers {
         /// A wheel notch: focus the column this many places to the right (negative: left).
@@ -30,51 +35,93 @@ final class ScrollWheelTracker: @unchecked Sendable {
     private let lock = NSLock()
     /// The keys that must be held, exactly. Guarded by `lock`: the tap thread reads it on every event.
     private var modifiers: Modifiers = []
+    /// Which scroll events belong to a trackpad swipe, while the trackpad gesture is on. Guarded by `lock`: the main
+    /// thread reports the touches, and the tap thread asks about every continuous scroll event.
+    private var swipe: SwipeScroll?
     /// The running tap, if any. Main thread only.
     private var session: Session?
     // Main thread only.
     private var enabled = false
+    private var wheel = false
+    private var swipeFingers: Int?
     private let retry = TapRetry(name: "Scroll wheel tap")
 
     init(handlers: Handlers) {
         self.handlers = handlers
     }
 
+    /// The tap exists while either feature needs it: `wheel`, the chosen keys and the wheel move the strip; or the
+    /// trackpad gesture, on with `swipeFingers` fingers (nil while it is off), whose scrolling the apps must not get.
     @MainActor
-    func configure(enabled: Bool, modifiers: Modifiers) {
-        lock.withLock { self.modifiers = modifiers }
-        self.enabled = enabled
+    func configure(wheel: Bool, modifiers: Modifiers, swipeFingers: Int?) {
+        lock.withLock {
+            self.modifiers = modifiers
+            // Settings change many times a second: the same finger count keeps a swipe under way.
+            if swipeFingers != self.swipeFingers { swipe = swipeFingers.map { SwipeScroll(fingers: $0) } }
+        }
+        // A session reads the wheel or leaves it alone for good: a change takes a new one (the old one lets go of
+        // its slide, if any).
+        let restart = wheel != self.wheel
+        if wheel, restart { Log.info("Scroll wheel moves the strip while \(modifiers.symbols) is held") }
+        if let swipeFingers, swipeFingers != self.swipeFingers {
+            Log.info("Trackpad swipes with \(swipeFingers) fingers do not scroll the apps")
+        }
+        self.wheel = wheel
+        self.swipeFingers = swipeFingers
+        enabled = wheel || swipeFingers != nil
         if !enabled { retry.reset() }
-        if enabled, session == nil, !retry.isWaiting {
-            let session = Session(tracker: self)
-            self.session = session
-            session.start()
-            Log.info("Scroll wheel moves the strip while \(modifiers.symbols) is held")
-        } else if !enabled, let session {
+        if let session, restart || !enabled {
             self.session = nil
             session.stop()
         }
+        if enabled, session == nil, !retry.isWaiting { startSession() }
+    }
+
+    /// A report of the fingers on the trackpad, sent by `GestureTracker` for every gesture event that carries
+    /// touches: `touching` of them at `time` (the event's, seconds since startup like `ProcessInfo.systemUptime`).
+    func touched(_ touching: Int, at time: TimeInterval) {
+        lock.withLock { swipe?.touched(touching, at: time) }
     }
 
     /// Puts the tap back in front of the others': an app that started after Rambla (Mac Mouse Fix restarting, say)
     /// put its own ahead.
-    /// Not while a slide or its glide is under way: the new tap would hand the rest of it to the app.
+    /// Not while a slide or its glide is under way: the new tap would hand the rest of it to the app. Nor while a
+    /// trackpad swipe or its glide is: its events would slip through between the old tap and the new one.
     @MainActor
     func renew() -> TapRenewal {
         guard let session else { return .off }
-        guard !session.isBusy else { return .busy }
+        guard !session.isBusy, !swipeIsBusy else { return .busy }
         session.stop()
-        let fresh = Session(tracker: self)
-        self.session = fresh
-        fresh.start()
+        startSession()
         return .renewed
     }
 
-    /// Whether the tap exists (the feature is on).
+    /// A trackpad swipe or its glide is under way (`SwipeScroll.isBusy`).
+    @MainActor
+    private var swipeIsBusy: Bool {
+        lock.withLock { swipe?.isBusy(at: ProcessInfo.processInfo.systemUptime) ?? false }
+    }
+
+    /// Whether the tap exists (the wheel or the trackpad gesture is on).
     @MainActor
     var isOn: Bool { session != nil }
 
+    @MainActor
+    private func startSession() {
+        let session = Session(tracker: self, wheel: wheel)
+        self.session = session
+        session.start()
+    }
+
     fileprivate var wantedModifiers: Modifiers { lock.withLock { modifiers } }
+
+    /// Whether a continuous scroll event belongs to a trackpad swipe (`SwipeScroll`). Tap thread.
+    fileprivate func swipeSwallows(phase: WheelGesture.Event.Phase, momentum: WheelGesture.Event.Momentum,
+                                   fromHardware: Bool, at time: TimeInterval) -> Bool {
+        lock.withLock {
+            swipe?.swallows(phase: phase, momentum: momentum, fromHardware: fromHardware, at: time) ?? false
+        }
+    }
 
     /// Reported by a session's thread: whether its tap could be created.
     fileprivate func sessionStarted(_ started: Session, ok: Bool) {
@@ -88,9 +135,7 @@ final class ScrollWheelTracker: @unchecked Sendable {
                 self.session = nil
                 self.retry.failed { [weak self] in
                     guard let self, self.enabled, self.session == nil else { return }
-                    let session = Session(tracker: self)
-                    self.session = session
-                    session.start()
+                    self.startSession()
                 }
             }
         }
@@ -122,6 +167,9 @@ final class ScrollWheelTracker: @unchecked Sendable {
     /// One tap on its own thread and run loop. Everything but `start`, `stop` and `isBusy` runs on that thread.
     final class Session: @unchecked Sendable {
         private unowned let tracker: ScrollWheelTracker
+        /// The wheel moves the strip. Without it the tap is there for the trackpad swipe, and every event it does not
+        /// swallow passes untouched.
+        private let wheel: Bool
         private let lock = NSLock()
         /// Guarded by `lock`: `stop` can come before the thread has its run loop.
         private var loop: CFRunLoop?
@@ -133,8 +181,9 @@ final class ScrollWheelTracker: @unchecked Sendable {
         private var gesture = WheelGesture()
         private var idleTimer: CFRunLoopTimer?
 
-        init(tracker: ScrollWheelTracker) {
+        init(tracker: ScrollWheelTracker, wheel: Bool) {
             self.tracker = tracker
+            self.wheel = wheel
         }
 
         var isBusy: Bool { lock.withLock { busy } }
@@ -201,15 +250,28 @@ final class ScrollWheelTracker: @unchecked Sendable {
                 return Unmanaged.passUnretained(event)
             }
             guard type == .scrollWheel else { return Unmanaged.passUnretained(event) }
+            let time = ProcessInfo.processInfo.systemUptime
+            let continuous = event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0
+            let phase = Self.phase(event.getIntegerValueField(.scrollWheelEventScrollPhase))
+            let momentum = Self.momentum(event.getIntegerValueField(.scrollWheelEventMomentumPhase))
+            // A trackpad swipe's scrolling is nobody's: not the app's, and not the wheel's to slide the strip with
+            // (the gesture already moves it). An event another app posted (Mac Mouse Fix's smooth scrolling, say)
+            // names that app's process; the hardware's name none.
+            if continuous {
+                let fromHardware = event.getIntegerValueField(.eventSourceUnixProcessID) == 0
+                if tracker.swipeSwallows(phase: phase, momentum: momentum, fromHardware: fromHardware, at: time) {
+                    return nil
+                }
+            }
+            guard wheel else { return Unmanaged.passUnretained(event) }
             let wanted = tracker.wantedModifiers
             let held = Modifiers(cocoa: UInt(event.flags.rawValue))
-            let continuous = event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0
             let input = WheelGesture.Event(
-                time: ProcessInfo.processInfo.systemUptime,
+                time: time,
                 modifiers: !wanted.isEmpty && held == wanted,
                 continuous: continuous,
-                phase: Self.phase(event.getIntegerValueField(.scrollWheelEventScrollPhase)),
-                momentum: Self.momentum(event.getIntegerValueField(.scrollWheelEventMomentumPhase)),
+                phase: phase,
+                momentum: momentum,
                 deltaX: continuous ? event.getDoubleValueField(.scrollWheelEventPointDeltaAxis2)
                                    : Double(event.getIntegerValueField(.scrollWheelEventDeltaAxis2)),
                 deltaY: continuous ? event.getDoubleValueField(.scrollWheelEventPointDeltaAxis1)

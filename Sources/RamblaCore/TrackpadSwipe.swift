@@ -34,6 +34,12 @@ public enum TrackpadSwipe: Equatable, Sendable {
         return touching == fingers ? .track : .end
     }
 
+    /// Whether the fingers touching now (by `NSTouch.identity`, which a finger keeps while it touches) are all new
+    /// since the last report that had some: those lifted in between, and macOS never reported the lift.
+    public static func liftWentUnreported<Finger: Hashable>(before: Set<Finger>, now: Set<Finger>) -> Bool {
+        !before.isEmpty && !now.isEmpty && before.isDisjoint(with: now)
+    }
+
     /// Nil while the movement is too small or too slanted to tell.
     public static func kind(dx: Double, dy: Double) -> TrackpadSwipe? {
         if abs(dx) > horizontalStart, abs(dx) > abs(dy) { return .horizontal }

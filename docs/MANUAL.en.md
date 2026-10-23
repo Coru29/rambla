@@ -151,7 +151,7 @@ A column can hold several windows.
 
 **Reorder with the mouse.** Grab a window by its title bar and drop it on another column. It moves to that place, before or after depending on which side of the column you drop it. If you drop it on another display, it moves to that display's strip.
 
-**Swipe with the trackpad.** Swipe left or right with **four fingers** (you can change it to three): the strip follows your fingers and settles on a column when you let go. A short quick swipe is enough to reach the next one. On a Force Touch trackpad you feel a gentle tap each time the strip is about to pass a column (in a quick swipe, as soon as it starts), and another with the swipes up and down; if you would rather not, turn off **Haptic feedback** in Settings → Trackpad & Mouse.
+**Swipe with the trackpad.** Swipe left or right with **four fingers** (you can change it to three): the strip follows your fingers and settles on a column when you let go. A short quick swipe is enough to reach the next one. While those fingers are on the trackpad, the app under the pointer does not scroll. On a Force Touch trackpad you feel a gentle tap each time the strip is about to pass a column (in a quick swipe, as soon as it starts), and another with the swipes up and down; if you would rather not, turn off **Haptic feedback** in Settings → Trackpad & Mouse.
 
 > macOS uses that gesture to switch desktops too, and Rambla cannot block it. Watch out for a trap in System Settings: for **"Swipe between full-screen applications"**, the **three-finger** option also keeps the four-finger swipe on, without showing it. Pick one of these setups:
 >
