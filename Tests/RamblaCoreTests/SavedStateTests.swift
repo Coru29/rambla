@@ -209,6 +209,37 @@ private func savedColumn(_ windows: [WindowID], _ width: ColumnWidth = .fraction
     #expect(state.upgraded() == state)
 }
 
+@Test func oldSavedStripDecodesAsLevelZero() throws {
+    // Before stacked strips a file held one strip per display and Space and said nothing of levels: that strip is the
+    // bottom one of its stack, and the file does not say which strip of the stack was in view.
+    let body = try #require(String(data: JSONEncoder().encode(Strip(columns: [savedColumn([1, 2])], focused: 0)),
+                                   encoding: .utf8))
+    let strip = #"{"displayUUID":"A","spaceKey":"s1","strip":\#(body)}"#
+    let old = try JSONDecoder().decode(SavedStrip.self, from: Data(strip.utf8))
+    #expect(old.level == 0)
+    #expect(old.activeLevel == nil)
+    #expect(old.strip.allWindows == [1, 2])
+    // The same inside a whole file, the way `StateStore` reads it.
+    let file = #"{"version":2,"refs":[],"strips":[\#(strip)],"floating":[]}"#
+    let state = try JSONDecoder().decode(SavedState.self, from: Data(file.utf8))
+    #expect(state.strips.map(\.level) == [0])
+    #expect(state.strips.map(\.activeLevel) == [nil])
+}
+
+@Test func levelRoundTrips() throws {
+    let stacked = SavedStrip(displayUUID: "A", spaceKey: "s1", strip: Strip(columns: [savedColumn([3])], focused: 0),
+                             level: 2, activeLevel: 1)
+    let decoded = try JSONDecoder().decode(SavedStrip.self, from: JSONEncoder().encode(stacked))
+    #expect(decoded == stacked)
+    #expect(decoded.level == 2)
+    #expect(decoded.activeLevel == 1)
+    // A strip saved without knowing which level of its stack was in view stays that way.
+    let unsure = SavedStrip(displayUUID: "A", spaceKey: "s1", strip: Strip(), level: 1)
+    let again = try JSONDecoder().decode(SavedStrip.self, from: JSONEncoder().encode(unsure))
+    #expect(again.level == 1)
+    #expect(again.activeLevel == nil)
+}
+
 @Test func matcherCanLeaveTitlesOut() {
     // After the first moments of a session, a new window that happens to share a saved title must not inherit its
     // place (a floating "zsh" would make every new Terminal window float).

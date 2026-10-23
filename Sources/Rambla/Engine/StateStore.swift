@@ -70,7 +70,7 @@ extension WindowManager {
             guard let spaceKey = spaceKeys[key] else { continue }
             // A desktop not rebuilt yet keeps its saved arrangement in the file: a window that went there meanwhile
             // (moved to it from Mission Control, say) joins it when the desktop is rebuilt.
-            if !restoredKeys.contains(key), archive.strip(displayUUID: key.displayUUID, spaceKey: spaceKey) != nil { continue }
+            if !restoredKeys.contains(key), !archive.stack(displayUUID: key.displayUUID, spaceKey: spaceKey).isEmpty { continue }
             let mine = strip.allWindows.compactMap(ref)
             saved.append(SavedStrip(displayUUID: key.displayUUID, spaceKey: spaceKey, strip: strip, session: StateStore.session,
                                     refs: mine))
@@ -100,9 +100,9 @@ extension WindowManager {
             guard presence.isSettled(key.displayUUID, now: now), let spaceKey = spaceKeys[key],
                   let display = displays.first(where: { $0.uuid == key.displayUUID }) else { continue }
             let returning = returningDisplays[key.displayUUID] != nil
-            guard let saved = archive.strip(displayUUID: key.displayUUID, spaceKey: spaceKey)
+            guard let saved = archive.stack(displayUUID: key.displayUUID, spaceKey: spaceKey).first
                 ?? (returning && !display.spaceKeys.isEmpty
-                    ? archive.strayStrip(displayUUID: key.displayUUID, spaces: display.spaceKeys) : nil) else {
+                    ? archive.strayStack(displayUUID: key.displayUUID, spaces: display.spaceKeys).first : nil) else {
                 // Nothing saved for it, unless macOS has not listed a returning display's desktops yet: its strip may
                 // be under another key, so look again with the next change.
                 if !returning || !display.spaceKeys.isEmpty { restoredKeys.insert(key) }
@@ -137,7 +137,7 @@ extension WindowManager {
                 continue
             }
             restoredKeys.insert(key)
-            _ = archive.take(displayUUID: saved.displayUUID, spaceKey: saved.spaceKey)
+            _ = archive.takeStack(displayUUID: saved.displayUUID, spaceKey: saved.spaceKey)
             for id in restored.allWindows {
                 for other in Array(strips.keys) where other != key && strips[other]!.contains(id) {
                     strips[other]!.remove(window: id)

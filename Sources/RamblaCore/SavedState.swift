@@ -14,7 +14,7 @@ public struct WindowRef: Codable, Hashable, Sendable {
     }
 }
 
-/// One strip, keyed by the display (UUID) and the Space (key) it belongs to.
+/// One strip, keyed by the display (UUID) and the Space (key) it belongs to, and by its level in their stack.
 public struct SavedStrip: Codable, Equatable, Sendable {
     public var displayUUID: String
     public var spaceKey: String
@@ -29,9 +29,15 @@ public struct SavedStrip: Codable, Equatable, Sendable {
     /// Archived because its display was unplugged: when the display comes back, the strip takes its windows back from
     /// the strips they joined meanwhile.
     public var unplugged: Bool
+    /// Its place in the stack of its display and Space, counted from the bottom (0 is the first). Files from before
+    /// stacked strips hold one strip per display and Space: level 0.
+    public var level: Int
+    /// The level of its stack that was in view when it was saved, so a restart leaves the same strip in view. Files
+    /// from before stacked strips do not say.
+    public var activeLevel: Int?
 
     public init(displayUUID: String, spaceKey: String, strip: Strip, lastSeen: Date? = nil, session: String? = nil,
-                refs: [WindowRef] = [], unplugged: Bool = false) {
+                refs: [WindowRef] = [], unplugged: Bool = false, level: Int = 0, activeLevel: Int? = nil) {
         self.displayUUID = displayUUID
         self.spaceKey = spaceKey
         self.strip = strip
@@ -39,6 +45,8 @@ public struct SavedStrip: Codable, Equatable, Sendable {
         self.session = session
         self.refs = refs
         self.unplugged = unplugged
+        self.level = level
+        self.activeLevel = activeLevel
     }
 
     public init(from decoder: Decoder) throws {
@@ -50,16 +58,24 @@ public struct SavedStrip: Codable, Equatable, Sendable {
         session = try container.decodeIfPresent(String.self, forKey: .session)
         refs = try container.decodeIfPresent([WindowRef].self, forKey: .refs) ?? []
         unplugged = try container.decodeIfPresent(Bool.self, forKey: .unplugged) ?? false
+        level = try container.decodeIfPresent(Int.self, forKey: .level) ?? 0
+        activeLevel = try container.decodeIfPresent(Int.self, forKey: .activeLevel)
     }
 
+    /// Whether it belongs to the stack of that display and Space, at any level.
     func isFor(displayUUID: String, spaceKey: String) -> Bool {
         self.displayUUID == displayUUID && self.spaceKey == spaceKey
+    }
+
+    /// Whether it is the strip of that display, Space and level.
+    func isFor(displayUUID: String, spaceKey: String, level: Int) -> Bool {
+        isFor(displayUUID: displayUUID, spaceKey: spaceKey) && self.level == level
     }
 }
 
 /// The strips that are not in view: those saved for a Space not visited since Rambla started, and those of a display
-/// that was unplugged. Each is taken back when its display and Space are in view again, and until then it is saved
-/// with the live strips, so its arrangement survives restarts.
+/// that was unplugged. Each is taken back, with the rest of its stack, when its display and Space are in view again,
+/// and until then it is saved with the live strips, so its arrangement survives restarts.
 public struct StripArchive: Equatable, Sendable {
     /// How long an archived strip is kept: a month away from the office monitor still finds it as it was, while the
     /// strip of a Space deleted long ago stops being carried.
@@ -83,34 +99,47 @@ public struct StripArchive: Equatable, Sendable {
         }
     }
 
-    /// Archives `strip` (the one of an unplugged display, seen until `now`), replacing any of the same display and Space.
+    /// Archives `strip` (the one of an unplugged display, seen until `now`), replacing any of the same display, Space
+    /// and level: the other levels of its stack stay.
     public mutating func store(_ strip: SavedStrip, at now: Date) {
         var strip = strip
         strip.lastSeen = now
-        strips.removeAll { $0.isFor(displayUUID: strip.displayUUID, spaceKey: strip.spaceKey) }
+        strips.removeAll { $0.isFor(displayUUID: strip.displayUUID, spaceKey: strip.spaceKey, level: strip.level) }
         strips.append(strip)
     }
 
-    /// Takes the strip of that display and Space out of the archive, to restore it.
-    public mutating func take(displayUUID: String, spaceKey: String) -> SavedStrip? {
-        guard let index = strips.firstIndex(where: { $0.isFor(displayUUID: displayUUID, spaceKey: spaceKey) }) else {
-            return nil
+    /// Takes the stack of that display and Space out of the archive, to restore it: every level, from the bottom.
+    /// Empty when there is none.
+    public mutating func takeStack(displayUUID: String, spaceKey: String) -> [SavedStrip] {
+        let taken = stack(displayUUID: displayUUID, spaceKey: spaceKey)
+        strips.removeAll { $0.isFor(displayUUID: displayUUID, spaceKey: spaceKey) }
+        return taken
+    }
+
+    /// The archived strips of that display and Space, one per level and from the bottom, left in the archive.
+    public func stack(displayUUID: String, spaceKey: String) -> [SavedStrip] {
+        strips.filter { $0.isFor(displayUUID: displayUUID, spaceKey: spaceKey) }.sorted { $0.level < $1.level }
+    }
+
+    /// For a display that is back with its desktop under a new key: the levels of the one Space archived when it was
+    /// unplugged, as long as that Space's desktop is gone from the display (`spaces`, the keys the display has now);
+    /// while it is still there, its own key will find it. With several Spaces, nothing: only exact keys can tell them
+    /// apart.
+    public func strayStack(displayUUID: String, spaces: Set<String>) -> [SavedStrip] {
+        let unplugged = strips.filter { $0.displayUUID == displayUUID && $0.unplugged }
+        guard let only = unplugged.first?.spaceKey, unplugged.allSatisfy({ $0.spaceKey == only }),
+              !spaces.contains(only) else { return [] }
+        return stack(displayUUID: displayUUID, spaceKey: only)
+    }
+
+    /// The level of the unplugged strip saved in `session` that holds `id`, so a window of an unplugged display joins
+    /// the same level on the display it is on now. Ids name the same window only within their session. A window that
+    /// went through two unplugged displays is in two strips, and the one seen last knows where it was.
+    public func unpluggedLevel(of id: WindowID, session: String) -> Int? {
+        let holding = strips.filter { strip in
+            strip.unplugged && strip.session == session && strip.refs.contains { $0.id == id }
         }
-        return strips.remove(at: index)
-    }
-
-    /// The archived strip of that display and Space, left in the archive.
-    public func strip(displayUUID: String, spaceKey: String) -> SavedStrip? {
-        strips.first { $0.isFor(displayUUID: displayUUID, spaceKey: spaceKey) }
-    }
-
-    /// For a display that is back with its desktop under a new key: the one strip archived when it was unplugged, as
-    /// long as that strip's desktop is gone from the display (`spaces`, the keys the display has now); while it is
-    /// still there, its own key will find it. With several, nothing: only exact keys can tell them apart.
-    public func strayStrip(displayUUID: String, spaces: Set<String>) -> SavedStrip? {
-        let mine = strips.filter { $0.displayUUID == displayUUID && $0.unplugged }
-        guard mine.count == 1, let only = mine.first, !spaces.contains(only.spaceKey) else { return nil }
-        return only
+        return holding.max { ($0.lastSeen ?? .distantPast) < ($1.lastSeen ?? .distantPast) }?.level
     }
 
     /// The display is back and had its chance to take its windows back: from now on its strips are matched like any
@@ -119,9 +148,10 @@ public struct StripArchive: Equatable, Sendable {
         for index in strips.indices where strips[index].displayUUID == displayUUID { strips[index].unplugged = false }
     }
 
-    /// What to save: the live strips, seen `now`, then the archived ones that no live strip replaces and that are not
-    /// older than `maxAge`. Each strip keeps its own refs; `refs` also lists every window once, the live ones first,
-    /// for the floating windows and for older versions of Rambla.
+    /// What to save: the live strips, seen `now`, then the archived ones that no live strip replaces (a live strip
+    /// replaces only the one of its display, Space and level) and that are not older than `maxAge`. Each strip keeps
+    /// its own refs; `refs` also lists every window once, the live ones first, for the floating windows and for older
+    /// versions of Rambla.
     public func merged(into live: SavedState, at now: Date) -> SavedState {
         var state = live
         state.strips = live.strips.map { strip in
@@ -131,8 +161,10 @@ public struct StripArchive: Equatable, Sendable {
         }
         var known = Set(state.refs.map(\.id))
         for strip in strips {
-            guard !live.strips.contains(where: { $0.isFor(displayUUID: strip.displayUUID, spaceKey: strip.spaceKey) }),
-                  let seen = strip.lastSeen, now.timeIntervalSince(seen) <= Self.maxAge else { continue }
+            let replaced = live.strips.contains {
+                $0.isFor(displayUUID: strip.displayUUID, spaceKey: strip.spaceKey, level: strip.level)
+            }
+            guard !replaced, let seen = strip.lastSeen, now.timeIntervalSince(seen) <= Self.maxAge else { continue }
             state.strips.append(strip)
             for ref in strip.refs where known.insert(ref.id).inserted { state.refs.append(ref) }
         }
