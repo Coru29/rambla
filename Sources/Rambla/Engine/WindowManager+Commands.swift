@@ -30,6 +30,15 @@ extension WindowManager {
             let values = (argument ?? "").split(separator: " ").compactMap { Double($0) }
             guard values.count == 5, let id = WindowID(exactly: values[0]) else { return false }
             worker(for: id)?.debugExternalMove(id, CGRect(x: values[1], y: values[2], width: values[3], height: values[4]))
+        case "debug-neighbor":
+            // "x y w h" plugs a display there; no arguments unplug it.
+            let values = (argument ?? "").split(separator: " ").compactMap { Double($0) }
+            guard values.isEmpty || values.count == 4 else { return false }
+            let frame = values.isEmpty ? nil : CGRect(x: values[0], y: values[1], width: values[2], height: values[3])
+            guard setTestNeighbor(frame) else {
+                Log.error("debug-neighbor works only in test mode")
+                return false
+            }
         default:
             guard let action = Action.parse(word) else {
                 Log.error("Unknown command: \(command)")

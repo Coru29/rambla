@@ -63,6 +63,31 @@ func windowIDs(_ s: [String: Any]) -> [UInt32] {
     columns(s).flatMap { ($0["windows"] as? [NSNumber] ?? []).map(\.uint32Value) }
 }
 
+/// Runs `rambla <command>` and samples window `id`'s real frame every 4 ms for 1.5 s.
+func samples(_ id: UInt32, running command: [String]) -> [CGRect] {
+    let p = Process()
+    p.executableURL = URL(fileURLWithPath: cli)
+    p.arguments = command
+    try? p.run()
+    var result: [CGRect] = []
+    let end = Date().addingTimeInterval(1.5)
+    while Date() < end {
+        if let b = bounds(id) { result.append(b) }
+        usleep(4_000)
+    }
+    p.waitUntilExit()
+    return result
+}
+
+/// How much of `r` shows on `display`, in points across.
+func shown(_ r: CGRect, on display: CGRect) -> Double {
+    r.intersects(display) ? r.intersection(display).width : 0
+}
+
+func trace(_ frames: [CGRect], on display: CGRect) -> String {
+    frames.filter { shown($0, on: display) > 3 }.map { "\(Int($0.minX))" }.joined(separator: " ")
+}
+
 let args = Array(CommandLine.arguments.dropFirst())
 switch args.first {
 case "wait-columns":
@@ -155,7 +180,35 @@ case "window-at":
     let cols = columns(s)
     guard cols.indices.contains(n), let id = (cols[n]["windows"] as? [NSNumber])?.first else { fail("no column \(n)") }
     print(id.uint32Value)
+case "neighbor-right":
+    // Arguments for `rambla debug-neighbor`: a laptop-sized display right of the strip's one.
+    let f = display(dump()).frame
+    print("\(Int(f.maxX)) \(Int(f.minY)) 1512 \(Int(f.height))")
+case "watch-hidden":
+    // ID COMMAND...: while the command runs, the window never shows more than its sliver.
+    let id = UInt32(args[1])!
+    let disp = display(dump()).frame
+    let frames = samples(id, running: Array(args.dropFirst(2)))
+    let most = frames.map { shown($0, on: disp) }.max() ?? 0
+    if frames.count < 50 { fail("only \(frames.count) samples of window \(id)") }
+    if most <= 3 { pass("window \(id) stayed out of sight") } else { fail("window \(id) showed \(most) pt at x: \(trace(frames, on: disp))") }
+case "watch-enters", "watch-leaves":
+    // ID right|left COMMAND...: the window comes into view (or goes out of it) through that side only, so every frame
+    // that shows lies on that side of where it ends (or starts): it never crosses the display on the way.
+    let id = UInt32(args[1])!, right = args[2] == "right", entering = args[0] == "watch-enters"
+    let disp = display(dump()).frame
+    guard let before = bounds(id) else { fail("no window \(id)") }
+    let frames = samples(id, running: Array(args.dropFirst(3)))
+    guard let after = frames.last else { fail("no samples of window \(id)") }
+    let reference = entering ? after : before
+    if entering != (shown(after, on: disp) > 3) { fail("window \(id) did not \(entering ? "come into" : "leave") view: \(after)") }
+    let wrong = frames.filter { shown($0, on: disp) > 3 && (right ? $0.minX < reference.minX - 2 : $0.minX > reference.minX + 2) }
+    if wrong.isEmpty {
+        pass("window \(id) \(entering ? "came in" : "went out") through the \(args[2]) side")
+    } else {
+        fail("window \(id) crossed the display at x: \(trace(frames, on: disp)) (\(entering ? "ends" : "starts") at \(Int(reference.minX)))")
+    }
 default:
-    print("usage: e2e-check wait-columns N | settle | check-tiles | check-parked | check-focused-visible | check-focused-index N | check-gathered | check-floating ID | check-frame ID X Y | column-order | check-order IDS | window-at N")
+    print("usage: e2e-check wait-columns N | settle | check-tiles | check-parked | check-focused-visible | check-focused-index N | check-gathered | check-floating ID | check-frame ID X Y | column-order | check-order IDS | window-at N | neighbor-right | watch-hidden ID COMMAND... | watch-enters ID right|left COMMAND... | watch-leaves ID right|left COMMAND...")
     exit(2)
 }

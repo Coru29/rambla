@@ -512,6 +512,87 @@ import CoreGraphics
         #expect(r.placements[3] == visible(810, 0, 495, 800))
     }
 
+    @Test func windowParkedAwayFromItsSideExitsThroughItsOwnSide() {
+        // Window 3 is parked on the left edge because a display sits on the right: it leaves and comes back through
+        // the right edge, with just under half of it out (246.5 pt).
+        let neighbor = [CGRect(x: 1000, y: 0, width: 800, height: 600)]
+        let r = Layout.compute(input(threeColumns(scroll: 252.5), others: neighbor))
+        #expect(r.placements[3] == parked(-494, 0, 495, 800))
+        #expect(r.exits == [3: CGRect(x: 751.5, y: 0, width: 495, height: 800)])
+        // Mirrored on the left.
+        let leftNeighbor = [CGRect(x: -800, y: 0, width: 800, height: 600)]
+        let l = Layout.compute(input(threeColumns(scroll: 300), others: leftNeighbor))
+        #expect(l.placements[1] == parked(999, 0, 495, 800))
+        #expect(l.exits == [1: CGRect(x: -246.5, y: 0, width: 495, height: 800)])
+    }
+
+    @Test func windowParkedOnItsOwnSideHasNoExit() {
+        #expect(Layout.compute(input(threeColumns(scroll: 0))).exits.isEmpty)
+        // With a display on each side, windows stay on their own edges.
+        let both = [CGRect(x: 1000, y: 0, width: 800, height: 600), CGRect(x: -800, y: 0, width: 800, height: 600)]
+        let r = Layout.compute(input(threeColumns(scroll: 252.5), others: both))
+        #expect(r.placements[3] == parked(999, 0, 495, 800))
+        #expect(r.exits.isEmpty)
+    }
+
+    @Test func exitNextToAPinStopsAtTheScrollArea() {
+        // Strip columns never slide under a pin: window 2 leaves flush with the scroll area's edge.
+        var left = leftPinStrip()
+        left.scroll = 100
+        let leftNeighbor = [CGRect(x: -800, y: 0, width: 800, height: 600)]
+        let r = Layout.compute(input(left, others: leftNeighbor))
+        #expect(r.placements[2] == parked(999, 0, 368.75, 800))
+        #expect(r.exits[2] == CGRect(x: 252.5, y: 0, width: 368.75, height: 800))
+    }
+
+    // MARK: - Transitions
+
+    func transition(_ id: WindowID, at current: CGRect?, to result: LayoutResult, from previous: LayoutResult?) -> Layout.Transition {
+        Layout.transition(of: id, at: current, to: result, from: previous, display: vp, sliver: 1)
+    }
+
+    @Test func windowOutOfSightJumpsInsteadOfCrossingTheDisplay() {
+        let neighbor = [CGRect(x: 1000, y: 0, width: 800, height: 600)]
+        let alone = Layout.compute(input(threeColumns(scroll: 0)))
+        let beside = Layout.compute(input(threeColumns(scroll: 0), others: neighbor))
+        // A display appears where window 3 is parked: it goes to the other edge at once.
+        #expect(transition(3, at: CGRect(x: 999, y: 0, width: 495, height: 800), to: beside, from: alone) == .jump)
+        // And back when the display goes away.
+        #expect(transition(3, at: CGRect(x: -494, y: 0, width: 495, height: 800), to: alone, from: beside) == .jump)
+        // A long scroll takes a window parked on the right to the left edge.
+        let far = Layout.compute(input(threeColumns(scroll: 1600)))
+        #expect(far.placements[3] == parked(-494, 0, 495, 800))
+        #expect(transition(3, at: CGRect(x: 999, y: 0, width: 495, height: 800), to: far, from: alone) == .jump)
+    }
+
+    @Test func visibleWindowLeavesThroughItsOwnSide() {
+        let neighbor = [CGRect(x: 1000, y: 0, width: 800, height: 600)]
+        let shown = Layout.compute(input(threeColumns(scroll: 505), others: neighbor))
+        let gone = Layout.compute(input(threeColumns(scroll: 252.5), others: neighbor))
+        #expect(shown.placements[3] == visible(505, 0, 495, 800))
+        #expect(transition(3, at: CGRect(x: 505, y: 0, width: 495, height: 800), to: gone, from: shown)
+                == .exit(through: CGRect(x: 751.5, y: 0, width: 495, height: 800)))
+        // Without a neighbor it just slides out over its edge.
+        let parkedRight = Layout.compute(input(threeColumns(scroll: 0)))
+        #expect(transition(3, at: CGRect(x: 505, y: 0, width: 495, height: 800), to: parkedRight, from: shown)
+                == .animate(from: nil))
+    }
+
+    @Test func windowComesBackThroughTheSideItLeftBy() {
+        let neighbor = [CGRect(x: 1000, y: 0, width: 800, height: 600)]
+        let gone = Layout.compute(input(threeColumns(scroll: 252.5), others: neighbor))
+        let shown = Layout.compute(input(threeColumns(scroll: 505), others: neighbor))
+        // Parked on the left edge, it enters from the right, where it left.
+        #expect(transition(3, at: CGRect(x: -494, y: 0, width: 495, height: 800), to: shown, from: gone)
+                == .animate(from: CGRect(x: 751.5, y: 0, width: 495, height: 800)))
+        // Parked on its own edge, it slides in from where it is.
+        let parkedRight = Layout.compute(input(threeColumns(scroll: 0)))
+        #expect(transition(3, at: CGRect(x: 999, y: 0, width: 495, height: 800),
+                           to: Layout.compute(input(threeColumns(scroll: 505))), from: parkedRight) == .animate(from: nil))
+        // A window whose frame is unknown animates as before.
+        #expect(transition(3, at: nil, to: shown, from: gone) == .animate(from: nil))
+    }
+
     @Test func parkedColumnKeepsEachWindowsOwnYAndSize() {
         let stack = Column(windows: [1, 2], width: .fraction(0.5))
         let strip = Strip(columns: [stack,

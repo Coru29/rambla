@@ -99,7 +99,7 @@ Rambla checks these for you in **Settings → Mac**:
 - **Displays have separate Spaces**: on (macOS default).
 - **Automatically rearrange Spaces based on most recent use**: off.
 - **Stage Manager** and **drag windows to screen edges to tile**: off.
-- With two displays, placing the second one **above or below** the main one works best. Side by side works too: windows only slide halfway toward the other display before they are parked.
+- With two displays, placing the second one **above or below** the main one works best. Side by side works too: windows slide at most halfway toward the other display, and those on that side are parked on the opposite edge.
 
 ## Automation
 

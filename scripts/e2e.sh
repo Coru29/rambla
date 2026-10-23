@@ -75,5 +75,21 @@ $CLI focus-first; $CHECK settle
 $CLI close-window
 $CHECK wait-columns 3
 
+# A display beside the strip's (the laptop's own screen, opened next to a monitor): the windows parked on that side go
+# to the other edge at once, and they come in and go out through their own side, never across the display.
+for _ in 1 2 3; do $CHECK host add; done
+$CHECK wait-columns 6
+$CLI focus-first; $CHECK settle
+LAST=$($CHECK window-at 5)
+$CHECK watch-hidden "$LAST" debug-neighbor $($CHECK neighbor-right)
+$CHECK check-parked
+$CHECK watch-enters "$LAST" right focus-last
+$CHECK check-parked
+$CHECK watch-leaves "$LAST" right focus-first
+$CHECK check-parked
+$CHECK watch-hidden "$LAST" debug-neighbor
+$CHECK check-parked
+$CHECK check-tiles
+
 $CHECK host quit >/dev/null
 echo "E2E OK"

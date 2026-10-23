@@ -12,6 +12,8 @@ final class Animator {
         var vx: Double = 0
         var vy: Double = 0
         var target: CGRect
+        /// Where the window goes, without animation, once it reaches `target`.
+        var then: CGRect?
     }
 
     private let write: ([WindowID: CGRect], _ verify: Bool) -> Void
@@ -32,7 +34,9 @@ final class Animator {
         states.mapValues { CGRect(x: $0.x, y: $0.y, width: $0.target.width, height: $0.target.height) }
     }
 
-    func animate(to targets: [WindowID: CGRect], from start: [WindowID: CGRect]) {
+    /// Animates each window from `start` (or from where it is, if it is animating) to `targets`, then sends the ones in
+    /// `then` straight on to that frame.
+    func animate(to targets: [WindowID: CGRect], from start: [WindowID: CGRect], then: [WindowID: CGRect] = [:]) {
         var sizeWrites: [WindowID: CGRect] = [:]
         for (id, target) in targets {
             if var state = states[id] {
@@ -40,14 +44,15 @@ final class Animator {
                     sizeWrites[id] = CGRect(x: state.x, y: state.y, width: target.width, height: target.height)
                 }
                 state.target = target
+                state.then = then[id]
                 states[id] = state
                 continue
             }
             guard let from = start[id], !from.approximatelyEquals(target, tolerance: 0.5) else {
-                write([id: target], true)
+                write([id: then[id] ?? target], true)
                 continue
             }
-            states[id] = State(x: from.minX, y: from.minY, target: target)
+            states[id] = State(x: from.minX, y: from.minY, target: target, then: then[id])
             if !from.size.approximatelyEquals(target.size, tolerance: 0.5) {
                 sizeWrites[id] = CGRect(origin: from.origin, size: target.size)
             }
@@ -91,7 +96,7 @@ final class Animator {
             spring.step(&state.y, &state.vy, target: state.target.minY, dt: dt)
             if Spring.settled(state.x, state.vx, target: state.target.minX),
                Spring.settled(state.y, state.vy, target: state.target.minY) {
-                finished[id] = state.target
+                finished[id] = state.then ?? state.target
                 states[id] = nil
             } else {
                 states[id] = state

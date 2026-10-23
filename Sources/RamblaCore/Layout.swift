@@ -86,6 +86,9 @@ public struct LayoutResult: Equatable, Sendable {
     /// Tab bar rects of tabbed columns that are not parked.
     public var tabBars: [UUID: CGRect]
     public var metrics: StripMetrics
+    /// Windows parked on the edge away from their side (a neighbor display sits on that side), with the frame where
+    /// they leave the display and come back on their own side. Animations go through it instead of crossing the display.
+    public var exits: [WindowID: CGRect] = [:]
 }
 
 public enum Layout {
@@ -201,6 +204,7 @@ public enum Layout {
         var placements: [WindowID: Placement] = [:]
         var columnFrames: [UUID: CGRect] = [:]
         var tabBars: [UUID: CGRect] = [:]
+        var exits: [WindowID: CGRect] = [:]
 
         for i in strip.columns.indices where !strip.isCollapsed(i, hidden: input.hidden) {
             let column = strip.columns[i]
@@ -220,8 +224,10 @@ public enum Layout {
             let side = isPinned ? nil : parkedSide(of: rect, display: input.display, others: input.otherDisplays, slots: slots)
             for (id, frame) in windowFrames(of: column, in: rect, input) {
                 if let side {
-                    placements[id] = .parked(parkingFrame(for: frame, side: side, display: input.display,
-                                                          others: input.otherDisplays, sliver: input.config.sliver))
+                    let park = parking(for: frame, side: side, display: input.display, others: input.otherDisplays,
+                                       sliver: input.config.sliver)
+                    placements[id] = .parked(park.frame)
+                    if park.edge != side { exits[id] = exitFrame(for: frame, side: side, display: input.display, slots: slots) }
                 } else {
                     placements[id] = .visible(frame)
                 }
@@ -230,7 +236,41 @@ public enum Layout {
                 tabBars[column.id] = CGRect(x: x, y: areaMinY, width: w, height: input.config.tabBarHeight)
             }
         }
-        return LayoutResult(placements: placements, columnFrames: columnFrames, tabBars: tabBars, metrics: m)
+        return LayoutResult(placements: placements, columnFrames: columnFrames, tabBars: tabBars, metrics: m, exits: exits)
+    }
+
+    // MARK: - Transitions
+
+    /// How a window gets to its placement when the strip animates.
+    public enum Transition: Equatable, Sendable {
+        /// Straight there, without animation.
+        case jump
+        /// Animated from `from` (nil: where the window is now).
+        case animate(from: CGRect?)
+        /// Animated out to `through`, then straight to its placement.
+        case exit(through: CGRect)
+    }
+
+    /// How window `id`, now at `current` (nil when unknown), gets to its placement in `result`, the layout that
+    /// replaces `previous` on `display`. A window out of sight (at most a sliver of it on the display) that stays out
+    /// of sight jumps: it would otherwise cross the display when it changes edges. A window parked on the edge away
+    /// from its side leaves and comes back through its own side (`LayoutResult.exits`).
+    public static func transition(of id: WindowID, at current: CGRect?, to result: LayoutResult, from previous: LayoutResult?,
+                                  display: CGRect, sliver: Double) -> Transition {
+        guard let placement = result.placements[id], let current else { return .animate(from: nil) }
+        let shown = current.intersects(display) ? Double(current.intersection(display).width) : 0
+        let outOfSight = shown <= sliver + 1
+        switch placement {
+        case .parked:
+            if outOfSight { return .jump }
+            if let exit = result.exits[id] { return .exit(through: exit) }
+        case .visible(let frame):
+            if outOfSight, let exit = previous?.exits[id] {
+                // Its size may have changed meanwhile: centered where it left.
+                return .animate(from: CGRect(x: exit.midX - frame.width / 2, y: frame.minY, width: frame.width, height: frame.height))
+            }
+        }
+        return .animate(from: nil)
     }
 
     // MARK: - Parking
@@ -240,13 +280,32 @@ public enum Layout {
     /// (touching edges do not overlap). Falls back to the first candidate when both are taken.
     /// There are no bottom-corner candidates: macOS clamps a window's y so its title bar stays above the Dock.
     public static func parkingFrame(for frame: CGRect, side: HDirection, display: CGRect, others: [CGRect], sliver: Double) -> CGRect {
+        parking(for: frame, side: side, display: display, others: others, sliver: sliver).frame
+    }
+
+    /// `parkingFrame`, with the edge it uses.
+    static func parking(for frame: CGRect, side: HDirection, display: CGRect, others: [CGRect], sliver: Double)
+        -> (frame: CGRect, edge: HDirection) {
         let width = Double(frame.width)
-        func edge(_ s: HDirection) -> CGRect {
+        func edge(_ s: HDirection) -> (frame: CGRect, edge: HDirection) {
             let x = s == .right ? Double(display.maxX) - sliver : Double(display.minX) + sliver - width
-            return CGRect(origin: CGPoint(x: x, y: Double(frame.minY)), size: frame.size)
+            return (CGRect(origin: CGPoint(x: x, y: Double(frame.minY)), size: frame.size), s)
         }
         let candidates = [edge(side), edge(side == .right ? .left : .right)]
-        return candidates.first { candidate in !others.contains { overlaps(candidate, $0) } } ?? candidates[0]
+        return candidates.first { candidate in !others.contains { overlaps(candidate.frame, $0) } } ?? candidates[0]
+    }
+
+    /// Where a window parked away from `side` leaves the display on `side`: as far out as a column may peek toward a
+    /// neighbor display, kept just under half so it still shows on this display; next to a pinned column, flush with
+    /// the scroll area instead (strip columns never slide under a pin).
+    private static func exitFrame(for frame: CGRect, side: HDirection, display: CGRect, slots: Slots) -> CGRect {
+        let w = Double(frame.width)
+        let x: Double
+        switch side {
+        case .right: x = slots.rightPin != nil ? Double(slots.area.maxX) - w : Double(display.maxX) - w / 2 - 1
+        case .left: x = slots.leftPin != nil ? Double(slots.area.minX) : Double(display.minX) - w / 2 + 1
+        }
+        return CGRect(x: x, y: Double(frame.minY), width: w, height: Double(frame.height))
     }
 }
 

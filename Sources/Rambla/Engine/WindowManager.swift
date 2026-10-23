@@ -46,6 +46,8 @@ final class WindowManager {
     /// Test mode (`--only-bundle`): only these apps' windows are managed, and the user's saved layout is neither read
     /// nor written.
     private(set) var onlyBundles: Set<String>?
+    /// Test mode only (`rambla debug-neighbor`): a display that is not there, beside which the strips lay out and park.
+    private var testNeighbor: CGRect?
 
     private var workers: [pid_t: AppWorker] = [:]
     private var appLaunchTimes: [pid_t: CFAbsoluteTime] = [:]
@@ -323,6 +325,14 @@ final class WindowManager {
         guard isRunning else { return }
         grace(2.5)
         scheduleReconcile(after: 0.4)
+    }
+
+    /// Lets the live tests plug and unplug a display beside the real ones (nil unplugs it). Test mode only.
+    func setTestNeighbor(_ frame: CGRect?) -> Bool {
+        guard onlyBundles != nil else { return false }
+        testNeighbor = frame
+        displaysReconfiguring()
+        return true
     }
 
     private func grace(_ seconds: CFAbsoluteTime) {
@@ -620,6 +630,9 @@ final class WindowManager {
 
         // Windows of a visible strip that are not on screen are either hidden on this Space
         // (minimized, app hidden, inactive native tab, full screen) or were moved to another Space.
+        // A minimized window or one of a hidden app cannot be moved to another Space by the user: macOS files it under
+        // another one when a display appears beside it (a parked window lies almost all past the edge), and it keeps
+        // its place.
         let hiddenBefore = hidden
         let notVisible = keys.flatMap { strips[$0]!.allWindows.filter { !visible.contains($0) } }
         let spacesOf = Private.spaces(for: notVisible)
@@ -627,7 +640,7 @@ final class WindowManager {
         for key in keys {
             for id in strips[key]!.allWindows where !visible.contains(id) {
                 let spaces = spacesOf[id] ?? []
-                if !spaces.isEmpty, !spaces.contains(key.spaceID),
+                if !spaces.isEmpty, !spaces.contains(key.spaceID), !isTuckedAway(id),
                    let target = spaces.lazy.compactMap({ self.stripKey(forSpace: $0) }).first, target != key {
                     let width = strips[key]!.location(of: id).map { strips[key]!.columns[$0.column].width } ?? .fraction(0.5)
                     strips[key]!.remove(window: id)
@@ -692,6 +705,12 @@ final class WindowManager {
         // Strips that wait for the apps' window lists need a reconcile once the wait is over, whichever came first.
         if waitingForWindowLists { checkDisplaysAgain(after: awaitingUntil - CFAbsoluteTimeGetCurrent() + 0.05) }
         onStateChanged?()
+    }
+
+    /// Minimized, or its app hidden: the user cannot take it to another Space.
+    private func isTuckedAway(_ id: WindowID) -> Bool {
+        guard let record = windows[id] else { return false }
+        return record.traits.isMinimized || NSRunningApplication(processIdentifier: record.pid)?.isHidden == true
     }
 
     /// A display that appears may take back, for `returnWindow`, the windows of its strips archived when it was
@@ -840,7 +859,7 @@ final class WindowManager {
         }
         return LayoutInput(
             strip: strip, viewport: viewport, display: display.frame,
-            otherDisplays: displays.filter { $0.uuid != display.uuid }.map(\.frame),
+            otherDisplays: displays.filter { $0.uuid != display.uuid }.map(\.frame) + (testNeighbor.map { [$0] } ?? []),
             hidden: hidden[key] ?? [], minSizes: minSizes, originalHeights: originalHeights,
             config: LayoutConfig(gap: prefs.innerGap, tabBarHeight: 28, centerMode: prefs.centerMode,
                                  keepOriginalHeight: prefs.keepOriginalHeight, sliver: 1))
@@ -849,7 +868,9 @@ final class WindowManager {
     func apply(_ key: StripKey, animate: Bool, verify: Bool = true) {
         guard isRunning, !isPaused, let strip = strips[key], let display = display(for: key),
               !prefs.disabledDisplays.contains(key.displayUUID) else { return }
-        let result = Layout.compute(layoutInput(for: key, strip: strip, display: display))
+        let input = layoutInput(for: key, strip: strip, display: display)
+        let previous = results[key]
+        let result = Layout.compute(input)
         results[key] = result
         var targets: [WindowID: CGRect] = [:]
         for (id, placement) in result.placements where !dragTracker.isFrozen(id) {
@@ -866,9 +887,28 @@ final class WindowManager {
         }
         if animate && prefs.animations {
             animator.speed = prefs.animationSpeed
-            var from: [WindowID: CGRect] = [:]
-            for id in changed.keys { from[id] = animator.current[id] ?? windows[id]?.frame }
-            animator.animate(to: changed, from: from)
+            var to: [WindowID: CGRect] = [:], from: [WindowID: CGRect] = [:], then: [WindowID: CGRect] = [:]
+            var jumps: [WindowID: CGRect] = [:]
+            for (id, frame) in changed {
+                let now = animator.current[id] ?? windows[id]?.frame
+                switch Layout.transition(of: id, at: now, to: result, from: previous, display: input.display,
+                                         sliver: input.config.sliver) {
+                case .jump:
+                    jumps[id] = frame
+                case .animate(let start):
+                    to[id] = frame
+                    from[id] = start?.integral(keepingSize: true) ?? now
+                case .exit(let through):
+                    to[id] = through.integral(keepingSize: true)
+                    from[id] = now
+                    then[id] = frame
+                }
+            }
+            if !jumps.isEmpty {
+                jumps.keys.forEach(animator.cancel)
+                write(jumps, verify: verify)
+            }
+            animator.animate(to: to, from: from, then: then)
         } else {
             changed.keys.forEach(animator.cancel)
             write(changed, verify: verify)

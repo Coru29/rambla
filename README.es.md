@@ -97,7 +97,7 @@ Rambla los revisa en **Configuración → Mac**:
 - **Las pantallas tienen Spaces separados**: activado (viene así).
 - **Reorganizar Spaces automáticamente según el uso más reciente**: desactivado.
 - El **Organizador visual** y **arrastrar ventanas a los bordes para disponerlas en mosaico**: desactivados.
-- Con dos pantallas, lo mejor es poner la segunda **arriba o abajo** de la principal. Lado a lado también funciona, pero las ventanas solo pueden salir hasta la mitad hacia la otra pantalla antes de estacionarse.
+- Con dos pantallas, lo mejor es poner la segunda **arriba o abajo** de la principal. Lado a lado también funciona: las ventanas salen como mucho hasta la mitad hacia la otra pantalla, y las de ese lado se estacionan en el borde opuesto.
 
 ## Automatización
 
