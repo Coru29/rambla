@@ -26,6 +26,10 @@ private let specActions: [(id: String, title: String)] = [
     ("move-up", "Mover ventana hacia arriba"),
     ("move-down", "Mover ventana hacia abajo"),
     ("send-next-display", "Mandar a la siguiente pantalla"),
+    ("strip-up", "Ir a la tira de arriba"),
+    ("strip-down", "Ir a la tira de abajo"),
+    ("send-strip-up", "Mandar a la tira de arriba"),
+    ("send-strip-down", "Mandar a la tira de abajo"),
     ("overview", "Vista general"),
     ("cycle-width", "Rotar ancho"),
     ("full-width", "Ancho completo"),
@@ -49,7 +53,7 @@ private let specActions: [(id: String, title: String)] = [
 
 @Test func actionIdsMatchSpecInOrder() {
     #expect(Action.allCases.map { $0.rawValue } == specActions.map { $0.id })
-    #expect(Action.allCases.count == 39)
+    #expect(Action.allCases.count == 43)
     #expect(Action.focus1.rawValue == "focus-1")
     #expect(Action.focus9.rawValue == "focus-9")
 }
@@ -65,7 +69,8 @@ private let specActions: [(id: String, title: String)] = [
     let expected: [ActionGroup: [String]] = [
         .navigate: ["focus-left", "focus-right", "focus-up", "focus-down", "focus-first", "focus-last",
                     "focus-1", "focus-2", "focus-3", "focus-4", "focus-5", "focus-6", "focus-7", "focus-8", "focus-9",
-                    "move-left", "move-right", "move-up", "move-down", "send-next-display", "overview"],
+                    "move-left", "move-right", "move-up", "move-down", "send-next-display",
+                    "strip-up", "strip-down", "send-strip-up", "send-strip-down", "overview"],
         .size: ["cycle-width", "full-width", "center", "wider", "narrower", "taller", "shorter",
                 "equalize-heights", "pin-left", "pin-right"],
         .stacks: ["stack-left", "stack-right", "pop-left", "pop-right", "toggle-tabbed", "toggle-float"],
@@ -92,6 +97,13 @@ private let specActions: [(id: String, title: String)] = [
     for word in ["", "focus", "focus-0", "focus-10", "focusLeft", "focus_left", "dump", "list"] {
         #expect(Action.parse(word) == nil, "\(word) must not parse")
     }
+}
+
+@Test func newActionsParseTheirIDs() {
+    #expect(Action.parse("strip-up") == .stripUp)
+    #expect(Action.parse("strip-down") == .stripDown)
+    #expect(Action.parse("send-strip-up") == .sendStripUp)
+    #expect(Action.parse("send-strip-down") == .sendStripDown)
 }
 
 @Test func actionDictionaryEncodesAsObjectKeyedById() throws {
@@ -129,6 +141,10 @@ private let specShortcuts: [(id: String, combos: [(code: UInt16, mods: String)])
     ("move-up", [(0x7E, "⌃⇧⌘"), (0x28, "⌃⇧⌘")]),
     ("move-down", [(0x7D, "⌃⇧⌘"), (0x26, "⌃⇧⌘")]),
     ("send-next-display", [(0x2D, "⌃⌘")]),
+    ("strip-up", [(0x7E, "⌃⌥⌘")]),
+    ("strip-down", [(0x7D, "⌃⌥⌘")]),
+    ("send-strip-up", [(0x7E, "⌃⌥⇧⌘")]),
+    ("send-strip-down", [(0x7D, "⌃⌥⇧⌘")]),
     ("overview", [(0x1F, "⌃⌘")]),
     ("cycle-width", [(0x0F, "⌃⌘")]),
     ("full-width", [(0x2E, "⌃⌘")]),
@@ -180,6 +196,16 @@ private func describeCombos(_ combos: [KeyCombo]) -> [String] {
         KeyCombo(keyCode: 0x7B, modifiers: [.control, .command]),
         KeyCombo(keyCode: 0x04, modifiers: [.control, .command]),
     ])
+}
+
+@Test func stripShortcutDefaults() {
+    // ⌃⌥⌘ moves between the stacked strips and ⇧ takes the focused window along.
+    let go: Modifiers = [.control, .option, .command]
+    let send: Modifiers = [.control, .option, .shift, .command]
+    #expect(DefaultShortcuts.table[.stripUp] == [KeyCombo(keyCode: KeyCode.up, modifiers: go)])
+    #expect(DefaultShortcuts.table[.stripDown] == [KeyCombo(keyCode: KeyCode.down, modifiers: go)])
+    #expect(DefaultShortcuts.table[.sendStripUp] == [KeyCombo(keyCode: KeyCode.up, modifiers: send)])
+    #expect(DefaultShortcuts.table[.sendStripDown] == [KeyCombo(keyCode: KeyCode.down, modifiers: send)])
 }
 
 @Test func defaultsMatchSpecTable() throws {

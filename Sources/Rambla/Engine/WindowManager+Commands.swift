@@ -109,7 +109,8 @@ extension WindowManager {
         case .closeWindow:
             if let id = strip.focusedWindow ?? focusedWindow { worker(for: id)?.close(id) }
             return
-        case .overview, .toggleFloat, .togglePause:
+        case .overview, .toggleFloat, .togglePause,
+             .stripUp, .stripDown, .sendStripUp, .sendStripDown:   // the strip commands are not wired to the engine yet
             return
         }
 

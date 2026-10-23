@@ -338,6 +338,10 @@
 "Mover ventana hacia arriba" = "Move window up";
 "Mover ventana hacia abajo" = "Move window down";
 "Mandar a la siguiente pantalla" = "Send to next display";
+"Ir a la tira de arriba" = "Go to the strip above";
+"Ir a la tira de abajo" = "Go to the strip below";
+"Mandar a la tira de arriba" = "Send to the strip above";
+"Mandar a la tira de abajo" = "Send to the strip below";
 "Vista general" = "Overview";
 "← → elegí una ventana · arrastrala o ⇧← → para moverla · ↩ la enfoca · esc cierra" = "← → choose a window · drag it or ⇧← → to move it · ↩ focuses it · esc closes";
 "Rotar ancho" = "Cycle width";
