@@ -64,6 +64,17 @@ extension WindowManager {
             toggleFloatFocused()
             return
         }
+        switch action {
+        case .stripUp, .stripDown:
+            // The stack of the focused window, else the one under the pointer, even before it has a strip.
+            if let stack = activeStripKey()?.stack ?? stackUnderPointer() { stepLevel(up: action == .stripUp, on: stack) }
+            return
+        case .sendStripUp, .sendStripDown:
+            sendFocusedWindow(up: action == .sendStripUp)
+            return
+        default:
+            break
+        }
         guard let key = activeStripKey(), var strip = strips[key], let display = display(for: key) else { return }
         let hiddenSet = hidden[key] ?? []
         let metrics = Layout.metrics(layoutInput(for: key, strip: strip, display: display))
@@ -109,9 +120,8 @@ extension WindowManager {
         case .closeWindow:
             if let id = strip.focusedWindow ?? focusedWindow { worker(for: id)?.close(id) }
             return
-        case .overview, .toggleFloat, .togglePause,
-             .stripUp, .stripDown, .sendStripUp, .sendStripDown:   // the strip commands are not wired to the engine yet
-            return
+        case .overview, .toggleFloat, .togglePause, .stripUp, .stripDown, .sendStripUp, .sendStripDown:
+            return   // handled before the strip guard
         }
 
         strips[key] = strip
@@ -231,7 +241,8 @@ extension WindowManager {
                 }
             }
             stripList.append([
-                "display": key.displayUUID, "space": key.spaceID, "current": isCurrent(key),
+                "display": key.displayUUID, "space": key.spaceID, "level": key.level,
+                "current": isCurrent(key), "active": isCurrent(key),
                 "scroll": strip.scroll, "focused": strip.focused as Any,
                 "columns": strip.columns.map { column -> [String: Any] in
                     var width: [String: Double] = [:]
@@ -246,10 +257,18 @@ extension WindowManager {
                 "placements": placements,
             ])
         }
+        // Every stack with a strip: the level in view and the highest one.
+        let stacks = Set(strips.keys.map(\.stack))
+            .sorted { ($0.displayUUID, $0.spaceID) < ($1.displayUUID, $1.spaceID) }
+            .map { stack -> [String: Any] in
+                ["display": stack.displayUUID, "space": stack.spaceID, "active": activeLevel(of: stack),
+                 "top": topLevel(of: stack)]
+            }
         let object: [String: Any] = [
             "paused": isPaused, "focused": focusedWindow as Any, "floating": Array(floating),
             "displays": displays.map { ["uuid": $0.uuid, "frame": rectJSON($0.frame), "visible": rectJSON($0.visible),
                                         "space": $0.currentSpace as Any] },
+            "stacks": stacks,
             "strips": stripList,
             "windows": windows.values.map { ["id": $0.id, "pid": $0.pid, "bundle": $0.bundleID as Any,
                                              "title": $0.title, "kind": "\($0.kind)", "frame": rectJSON($0.frame)] },

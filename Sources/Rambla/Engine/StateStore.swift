@@ -67,13 +67,15 @@ extension WindowManager {
         var refs: [RamblaCore.WindowRef] = []
         var saved: [SavedStrip] = []
         for (key, strip) in strips where !strip.columns.isEmpty {
-            guard let spaceKey = spaceKeys[key] else { continue }
+            guard let spaceKey = spaceKeys[key.stack] else { continue }
             // A desktop not rebuilt yet keeps its saved arrangement in the file: a window that went there meanwhile
-            // (moved to it from Mission Control, say) joins it when the desktop is rebuilt.
-            if !restoredKeys.contains(key), !archive.stack(displayUUID: key.displayUUID, spaceKey: spaceKey).isEmpty { continue }
+            // (moved to it from Mission Control, say) joins it when the desktop is rebuilt. A stack is rebuilt through
+            // its level 0.
+            if !restoredKeys.contains(key.stack.level(0)),
+               !archive.stack(displayUUID: key.displayUUID, spaceKey: spaceKey).isEmpty { continue }
             let mine = strip.allWindows.compactMap(ref)
             saved.append(SavedStrip(displayUUID: key.displayUUID, spaceKey: spaceKey, strip: strip, session: StateStore.session,
-                                    refs: mine))
+                                    refs: mine, level: key.level, activeLevel: activeLevel(of: key.stack)))
             refs += mine
         }
         // Only the windows the user floated: the ones Rambla floated by itself go back to the strip after a restart.
@@ -97,7 +99,7 @@ extension WindowManager {
         let now = CFAbsoluteTimeGetCurrent()
         for key in keys where !restoredKeys.contains(key) {
             // A display that has just appeared may be gone in a moment (`DisplayPresence`): wait until it stays.
-            guard presence.isSettled(key.displayUUID, now: now), let spaceKey = spaceKeys[key],
+            guard presence.isSettled(key.displayUUID, now: now), let spaceKey = spaceKeys[key.stack],
                   let display = displays.first(where: { $0.uuid == key.displayUUID }) else { continue }
             let returning = returningDisplays[key.displayUUID] != nil
             guard let saved = archive.stack(displayUUID: key.displayUUID, spaceKey: spaceKey).first

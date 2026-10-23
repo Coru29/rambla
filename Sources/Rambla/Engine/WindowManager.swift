@@ -2,9 +2,23 @@ import AppKit
 import IOKit
 import RamblaCore
 
+/// A display and Space: the stack of strips it holds, levels 0, 1, 2… from the bottom, one of them in view
+/// (`WindowManager.activeLevels`).
+struct StackKey: Hashable {
+    let displayUUID: String
+    let spaceID: UInt64
+
+    /// The strip at `level` of this stack.
+    func level(_ level: Int) -> StripKey { StripKey(displayUUID: displayUUID, spaceID: spaceID, level: level) }
+}
+
+/// One strip: its display and Space, and its level in their stack (0 is the strip there has always been).
 struct StripKey: Hashable, Codable {
     let displayUUID: String
     let spaceID: UInt64
+    var level: Int = 0
+
+    var stack: StackKey { StackKey(displayUUID: displayUUID, spaceID: spaceID) }
 }
 
 /// macOS is about to change the displays, or just did (one plugged or unplugged, a lid opened or closed).
@@ -18,7 +32,8 @@ private let displaysReconfigured: CGDisplayReconfigurationCallBack = { _, _, use
     }
 }
 
-/// Owns the model (one strip per display and Space), turns events into model changes and applies layouts.
+/// Owns the model (a stack of strips per display and Space, one in view), turns events into model changes and applies
+/// layouts.
 /// Everything here runs on the main thread; AX calls go through one AppWorker per app.
 @MainActor
 final class WindowManager {
@@ -55,10 +70,13 @@ final class WindowManager {
     private var frontmostPID: pid_t?
     private(set) var windows: [WindowID: WindowRecord] = [:]
     var floating: Set<WindowID> = []
+    /// Every strip, of every level: the levels out of view are parked out of sight (`shelve`).
     var strips: [StripKey: Strip] = [:]
+    /// The level in view of each stack; a stack missing here shows level 0.
+    var activeLevels: [StackKey: Int] = [:]
     private(set) var displays: [DisplayInfo] = []
-    /// Strip → Space UUID, so state can be matched to Spaces after a restart.
-    private(set) var spaceKeys: [StripKey: String] = [:]
+    /// Stack → Space UUID, so state can be matched to Spaces after a restart.
+    private(set) var spaceKeys: [StackKey: String] = [:]
     private(set) var hidden: [StripKey: Set<WindowID>] = [:]
     private(set) var results: [StripKey: LayoutResult] = [:]
     var focusedWindow: WindowID?
@@ -118,6 +136,10 @@ final class WindowManager {
     var overviewHook: ((StripKey) -> Void)?
     /// Offered every shortcut first while the overview is on screen; true when the overview used it.
     var overviewAction: ((Action) -> Bool)?
+    /// Called when another level of that stack comes into view (the levels indicator).
+    var levelHook: ((StackKey) -> Void)?
+    /// Called when the level that came into view of that stack is empty (its hint).
+    var emptyLevelHook: ((StackKey) -> Void)?
     /// Saved layout from the previous run (its floating windows; the strips go to `archive`).
     var restoreState: SavedState?
     /// Strips not in view: those of the previous run not seen yet, and those of unplugged displays. Each is rebuilt
@@ -516,7 +538,8 @@ final class WindowManager {
         windows[id] = record
         if grew, let key = key(containing: id) {
             Log.info("Window \(id) (\(record.bundleID ?? "?")) needs at least \(Int(minSize.width))×\(Int(minSize.height))")
-            apply(key, animate: false)
+            // Out of view too: parked at its old width, a wider window would show more than its sliver.
+            if isCurrent(key) { apply(key, animate: false) } else { shelve(key) }
         }
     }
 
@@ -528,6 +551,12 @@ final class WindowManager {
             // A floating window can end up under the strip (a swipe focuses the column it lands on). When its app
             // comes to the front (Dock, ⌘Tab, a click), it must be on top, not behind the strip's windows.
             worker(for: id)?.raise(id)
+        }
+        // A window of a level out of view got the focus (Mission Control, the Window menu, a click on its sliver): its
+        // level comes into view, so the keyboard never types into a window that cannot be seen.
+        if let id, !isPaused, let key = key(containing: id), !isCurrent(key), isCurrentStack(key.stack) {
+            switchLevel(of: key.stack, to: key.level, focusing: id)
+            return
         }
         guard let id, let key = key(containing: id), isCurrent(key) else {
             overlayHook?()
@@ -598,28 +627,50 @@ final class WindowManager {
         displays.filter { !prefs.disabledDisplays.contains($0.uuid) && $0.currentSpace != nil && !$0.isFullscreenSpace }
     }
 
+    /// The strip in view on `display`: the level in view of the stack of its current Space.
     func currentKey(of display: DisplayInfo) -> StripKey? {
-        display.currentSpace.map { StripKey(displayUUID: display.uuid, spaceID: $0) }
+        display.currentSpace.map { space in
+            let stack = StackKey(displayUUID: display.uuid, spaceID: space)
+            return stack.level(activeLevel(of: stack))
+        }
     }
 
+    /// The strips in view, one per managed display: only these are laid out with `apply`, have overlays and take
+    /// gestures. The other levels of their stacks are parked out of sight (`shelve`).
     var currentKeys: [StripKey] { enabledDisplays.compactMap(currentKey) }
 
     func isCurrent(_ key: StripKey) -> Bool { currentKeys.contains(key) }
 
-    func display(for key: StripKey) -> DisplayInfo? {
-        displays.first { $0.uuid == key.displayUUID && $0.currentSpace == key.spaceID }
+    /// Its display shows its Space and is managed: one of its levels is in view.
+    func isCurrentStack(_ stack: StackKey) -> Bool {
+        enabledDisplays.contains { $0.uuid == stack.displayUUID && $0.currentSpace == stack.spaceID }
     }
 
+    /// The display a strip is shown on: nil unless its Space is the display's current one and its level is the one in
+    /// view, so nothing lays out or draws a strip that is not there to see.
+    func display(for key: StripKey) -> DisplayInfo? {
+        guard key.level == activeLevel(of: key.stack) else { return nil }
+        return display(forStack: key.stack)
+    }
+
+    /// The display showing a stack's Space, whichever of its levels is in view.
+    func display(forStack stack: StackKey) -> DisplayInfo? {
+        displays.first { $0.uuid == stack.displayUUID && $0.currentSpace == stack.spaceID }
+    }
+
+    /// The strip holding a window, at any level.
     func key(containing id: WindowID) -> StripKey? {
         strips.first { $0.value.contains(id) }?.key
     }
 
+    /// The strip in view of a Space (a window moved to it in Mission Control joins it).
     private func stripKey(forSpace space: UInt64) -> StripKey? {
         for entry in Private.displaySpaces() where entry.uuids[space] != nil {
             let uuid = entry.displayUUID == "Main" ? (displays.first?.uuid ?? entry.displayUUID) : entry.displayUUID
             guard let display = displays.first(where: { $0.uuid.caseInsensitiveCompare(uuid) == .orderedSame }),
                   !prefs.disabledDisplays.contains(display.uuid), !entry.fullscreen.contains(space) else { return nil }
-            return StripKey(displayUUID: display.uuid, spaceID: space)
+            let stack = StackKey(displayUUID: display.uuid, spaceID: space)
+            return stack.level(activeLevel(of: stack))
         }
         return nil
     }
@@ -652,7 +703,7 @@ final class WindowManager {
         let keys = currentKeys
         for display in enabledDisplays {
             guard let key = currentKey(of: display) else { continue }
-            spaceKeys[key] = display.currentSpaceKey
+            spaceKeys[key.stack] = display.currentSpaceKey
             if strips[key] == nil { strips[key] = Strip() }
         }
 
@@ -660,7 +711,7 @@ final class WindowManager {
         // (minimized, app hidden, inactive native tab, full screen) or were moved to another Space.
         // A minimized window or one of a hidden app cannot be moved to another Space by the user: macOS files it under
         // another one when a display appears beside it (a parked window lies almost all past the edge), and it keeps
-        // its place.
+        // its place. So does a window of a level out of view, whatever Space macOS files it under.
         let hiddenBefore = hidden
         let notVisible = keys.flatMap { strips[$0]!.allWindows.filter { !visible.contains($0) } }
         let spacesOf = Private.spaces(for: notVisible)
@@ -683,8 +734,18 @@ final class WindowManager {
                 }
             }
         }
+        // The other levels of the stacks in view are on these Spaces too. A window of theirs that is not on screen takes
+        // no room and is not parked, and one that is back on screen (its app shown again) is parked with the rest.
+        let outOfView = strips.keys.filter { key in !keys.contains(key) && keys.contains { $0.stack == key.stack } }
+        for key in outOfView {
+            for id in strips[key]!.allWindows where !visible.contains(id) {
+                hiddenNow[key, default: []].insert(id)
+                if hiddenSince[id] == nil { hiddenSince[id] = now }
+            }
+        }
         for id in visible { hiddenSince[id] = nil }
-        hidden = HiddenWindows.update(hidden, found: hiddenNow, looked: Set(keys), exists: { strips[$0] != nil })
+        hidden = HiddenWindows.update(hidden, found: hiddenNow, looked: Set(keys + outOfView),
+                                      exists: { strips[$0] != nil })
         reappearing = reappearing.filter { $0.value > now }
         markReappearing(HiddenWindows.returned(before: hiddenBefore, now: hidden))
 
@@ -701,7 +762,9 @@ final class WindowManager {
         var managed = Set(strips.values.flatMap(\.allWindows))
         let candidates = windows.values
             .filter { $0.kind != .ignore && visible.contains($0.id) && !managed.contains($0.id) && !floating.contains($0.id) }
-        restoreFromSavedState(keys: keys, candidates: candidates, visible: visible, alive: existing)
+        // A saved strip comes back as level 0 of its stack, whichever level is in view: when that is another one, the
+        // end of this pass parks it with the other levels.
+        restoreFromSavedState(keys: keys.map { $0.stack.level(0) }, candidates: candidates, visible: visible, alive: existing)
         managed = Set(strips.values.flatMap(\.allWindows))
         let orphans = windows.values
             .filter { $0.kind == .tile && visible.contains($0.id) && !managed.contains($0.id) && !floating.contains($0.id) }
@@ -718,7 +781,7 @@ final class WindowManager {
             // A window on a disabled display stays untouched: look it up among all displays.
             // A strip waiting to be rebuilt takes its windows then, in their places.
             guard let display = Displays.best(for: whereShown(record), in: settled), let key = currentKey(of: display),
-                  keys.contains(key), restoredKeys.contains(key) || !waitingForWindowLists else { continue }
+                  keys.contains(key), restoredKeys.contains(key.stack.level(0)) || !waitingForWindowLists else { continue }
             insert(record, into: key)
             // A window that joins at the end can have the focus (it came back from somewhere): show it.
             if record.id == focusedWindow { strips[key]!.focus(window: record.id) }
@@ -730,6 +793,13 @@ final class WindowManager {
         }
         for key in keys {
             if revealKeys.contains(key) { reveal(key) } else { apply(key, animate: true) }
+        }
+        // The other levels of the stacks in view stay out of sight: what drifted (moved by its app, or by macOS while
+        // the displays changed) goes back to its parking spot, and nothing is written when nothing did. An empty level
+        // left above the others (its last window closed) goes.
+        for key in keys {
+            dropEmptyLevels(of: key.stack)
+            for other in Array(strips.keys) where other.stack == key.stack && other != key { shelve(other) }
         }
         // Strips that wait for the apps' window lists need a reconcile once the wait is over, whichever came first.
         if waitingForWindowLists { checkDisplaysAgain(after: awaitingUntil - CFAbsoluteTimeGetCurrent() + 0.05) }
@@ -822,16 +892,39 @@ final class WindowManager {
     /// Takes a strip out of the live state, into the archive when it holds windows of a known desktop. Rambla no longer
     /// places its windows, so the frames it asked for them are forgotten: the next listing reads where macOS put them.
     private func archiveStrip(_ key: StripKey, unplugged: Bool) {
-        if let spaceKey = spaceKeys[key], let strip = strips[key], !strip.columns.isEmpty {
+        if let spaceKey = spaceKeys[key.stack], let strip = strips[key], !strip.columns.isEmpty {
             archive.store(SavedStrip(displayUUID: key.displayUUID, spaceKey: spaceKey, strip: strip, session: StateStore.session,
-                                     refs: strip.allWindows.compactMap(ref), unplugged: unplugged), at: Date())
+                                     refs: strip.allWindows.compactMap(ref), unplugged: unplugged,
+                                     level: key.level, activeLevel: activeLevel(of: key.stack)), at: Date())
         }
         for id in strips[key]?.allWindows ?? [] { requested[id] = nil }
         strips[key] = nil
         results[key] = nil
         hidden[key] = nil
-        spaceKeys[key] = nil
         restoredKeys.remove(key)
+        // The stack goes with its last level: the other levels, archived after this one, still need its Space key.
+        if !strips.keys.contains(where: { $0.stack == key.stack }) {
+            spaceKeys[key.stack] = nil
+            activeLevels[key.stack] = nil
+        }
+    }
+
+    /// Removes an empty level that is no longer needed (`StripLevels.droppable`): its strip, its layout and its record
+    /// of hidden windows. A level that still has windows stays.
+    func dropLevel(_ key: StripKey) {
+        guard strips[key]?.columns.isEmpty ?? true else { return }
+        strips[key] = nil
+        results[key] = nil
+        hidden[key] = nil
+    }
+
+    /// Windows that move to another strip take along what is known of them being hidden (minimized, their app hidden):
+    /// a level out of view is not looked at, and would lay them out as shown.
+    func carryHidden(_ ids: [WindowID], from source: StripKey, to target: StripKey) {
+        guard let moving = hidden[source]?.intersection(ids), !moving.isEmpty else { return }
+        hidden[source]?.subtract(moving)
+        if hidden[source]?.isEmpty == true { hidden[source] = nil }
+        hidden[target, default: []].formUnion(moving)
     }
 
     /// A reconcile `delay` seconds from now, unless one is already due sooner: each reconcile asks again for what is
@@ -890,7 +983,7 @@ final class WindowManager {
         case .fraction(let fraction):
             return .fraction(fraction)
         case .natural:
-            guard let display = display(for: key) else { return .fraction(0.5) }
+            guard let display = display(forStack: key.stack) else { return .fraction(0.5) }
             let available = display.visible.width - 2 * prefs.outerGap
             return .points(min(max(record.frame.width, available * 0.25), available))
         }
@@ -964,6 +1057,29 @@ final class WindowManager {
         }
         overlayHook?()
         scheduleSave()
+    }
+
+    /// Lays out a level that is not the one in view, of a stack whose display shows its Space: every window parked out
+    /// of sight on a side edge (`Layout.shelved`). Only the frames that changed are written, and straight there, never
+    /// animated across the display: the windows of a level that leaves the view jump to their parking spot, and a
+    /// reconcile puts back what drifted. Windows being dragged, and those a display coming back will take, stay put.
+    func shelve(_ key: StripKey) {
+        guard isRunning, !isPaused, key.level != activeLevel(of: key.stack), let strip = strips[key],
+              let display = display(forStack: key.stack), !prefs.disabledDisplays.contains(key.displayUUID) else { return }
+        let result = Layout.shelved(layoutInput(for: key, strip: strip, display: display))
+        results[key] = result
+        var changed: [WindowID: CGRect] = [:]
+        for (id, placement) in result.placements where !dragTracker.isFrozen(id) && !heldForReturn.contains(id) {
+            let frame = placement.frame.integral(keepingSize: true)
+            if !(requested[id]?.approximatelyEquals(frame, tolerance: 0.5) ?? false)
+                || !(windows[id]?.frame.approximatelyEquals(frame, tolerance: 2) ?? false) {
+                changed[id] = frame
+            }
+            requested[id] = frame
+        }
+        guard !changed.isEmpty else { return }
+        changed.keys.forEach(animator.cancel)
+        write(changed, verify: true)
     }
 
     func applyAll(animate: Bool) {
@@ -1044,6 +1160,10 @@ final class WindowManager {
         guard !isPaused, let key = key(containing: id) else { return }
         // macOS is moving the windows of a display that went away; they join another strip once it is gone for good.
         guard displays.contains(where: { $0.uuid == key.displayUUID }) else { return }
+        if key.level != activeLevel(of: key.stack) {
+            shelvedWindowMoved(id, frame, from: previous, mouseDown: mouseDown, in: key)
+            return
+        }
         if mouseDown {
             dragTracker.began(id, startFrame: requested[id] ?? previous ?? frame)
             worker(for: id)?.freeze(id, true)
@@ -1078,6 +1198,30 @@ final class WindowManager {
         } else {
             apply(key, animate: true)
         }
+    }
+
+    /// A window of a level out of view moved: its app restoring or rearranging its frame, macOS putting it back from
+    /// the Dock or with its app shown again, or moving it while the displays change. None of that floats it or changes
+    /// its size in the strip: it goes back to its parking spot. Only the user focusing it brings its level into view.
+    private func shelvedWindowMoved(_ id: WindowID, _ frame: CGRect, from previous: CGRect?, mouseDown: Bool,
+                                    in key: StripKey) {
+        // The mouse is down (its sliver dragged, or the button held for something else), or the window is being
+        // dragged: it stays until a later pass parks it again. A stack out of view is parked again once it is in view.
+        guard !mouseDown, !dragTracker.isFrozen(id), isCurrentStack(key.stack) else { return }
+        // Exactly where Rambla parked it: its own move, reported late.
+        if let wanted = requested[id], frame.approximatelyEquals(wanted, tolerance: 2) { return }
+        let reference = requested[id] ?? previous ?? frame
+        if inGrace {
+            // As for the windows in view: once the displays are done changing, the reconcile parks it again.
+            Log.info("Window \(id) moved by macOS from \(Self.describe(reference)) "
+                     + "to \(Self.describe(frame)) while the displays changed: it goes back to its place")
+            checkDisplaysAgain(after: graceUntil - CFAbsoluteTimeGetCurrent() + 0.1)
+            return
+        }
+        let byMacOS = hidden[key]?.contains(id) == true || (reappearing[id] ?? 0) > CFAbsoluteTimeGetCurrent()
+        Log.info("Window \(id) of strip level \(key.level) moved by \(byMacOS ? "macOS" : "another app") "
+                 + "from \(Self.describe(reference)) to \(Self.describe(frame)): back to its place")
+        shelve(key)
     }
 
     func adoptSize(_ id: WindowID, frame: CGRect, in key: StripKey) {
