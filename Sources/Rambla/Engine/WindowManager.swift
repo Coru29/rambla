@@ -87,6 +87,8 @@ final class WindowManager {
     static let returnWindow: CFAbsoluteTime = 10
     /// Displays that appeared, and until when they may take their windows back.
     private(set) var returningDisplays: [String: CFAbsoluteTime] = [:]
+    /// When each display appeared: one that has not stayed a moment takes and gets no windows.
+    private(set) var presence = DisplayPresence()
     private var graceUntil: CFAbsoluteTime = 0
     private var reconcileScheduled = false
     var pendingReveal: StripKey?
@@ -151,6 +153,7 @@ final class WindowManager {
         dragTracker.onMouseUp = { [weak self] point in self?.mouseUp(at: point) }
         dragTracker.setEnabled(true)
         displays = Displays.current()
+        presence.update(connected: Set(displays.map(\.uuid)), now: CFAbsoluteTimeGetCurrent(), atLaunch: true)
         frontmostPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
         restoreState = onlyBundles == nil ? StateStore.load() : nil
         archive = StripArchive(loading: restoreState, at: Date())
@@ -612,6 +615,11 @@ final class WindowManager {
         onScreenFrames = Self.windowFrames(onScreenOnly: true)
         let visible = Set(onScreenFrames.keys)
         let now = CFAbsoluteTimeGetCurrent()
+        presence.update(connected: Set(displays.map(\.uuid)), now: now)
+        let settled = displays.filter { presence.isSettled($0.uuid, now: now) }
+        for display in displays {
+            if let at = presence.settles(display.uuid, now: now) { checkDisplaysAgain(after: at - now + 0.1) }
+        }
 
         for id in Array(windows.keys) where !existing.contains(id) {
             worker(for: id)?.forgetWindow(id)
@@ -641,7 +649,8 @@ final class WindowManager {
             for id in strips[key]!.allWindows where !visible.contains(id) {
                 let spaces = spacesOf[id] ?? []
                 if !spaces.isEmpty, !spaces.contains(key.spaceID), !isTuckedAway(id),
-                   let target = spaces.lazy.compactMap({ self.stripKey(forSpace: $0) }).first, target != key {
+                   let target = spaces.lazy.compactMap({ self.stripKey(forSpace: $0) }).first, target != key,
+                   presence.isSettled(target.displayUUID, now: now) {
                     let width = strips[key]!.location(of: id).map { strips[key]!.columns[$0.column].width } ?? .fraction(0.5)
                     strips[key]!.remove(window: id)
                     var other = strips[target] ?? Strip()
@@ -688,7 +697,7 @@ final class WindowManager {
         for record in orphans {
             // A window on a disabled display stays untouched: look it up among all displays.
             // A strip waiting to be rebuilt takes its windows then, in their places.
-            guard let display = Displays.best(for: whereShown(record), in: displays), let key = currentKey(of: display),
+            guard let display = Displays.best(for: whereShown(record), in: settled), let key = currentKey(of: display),
                   keys.contains(key), restoredKeys.contains(key) || !waitingForWindowLists else { continue }
             insert(record, into: key)
             // A window that joins at the end can have the focus (it came back from somewhere): show it.
@@ -718,7 +727,12 @@ final class WindowManager {
     /// never pulls windows the user is working with somewhere else.
     private func followReturningDisplays(connectedBefore: Set<String>, now: CFAbsoluteTime) {
         let connected = Set(displays.map(\.uuid))
-        for uuid in connected.subtracting(connectedBefore) { returningDisplays[uuid] = now + Self.returnWindow }
+        for display in displays where !connectedBefore.contains(display.uuid) {
+            returningDisplays[display.uuid] = now + DisplayPresence.settleDelay + Self.returnWindow
+            Log.info("Display \(display.uuid.prefix(8)) appeared: \(display.name), \(Int(display.frame.width))×\(Int(display.frame.height)) "
+                     + "at \(Int(display.frame.minX)),\(Int(display.frame.minY)), vendor \(CGDisplayVendorNumber(display.id)) "
+                     + "model \(CGDisplayModelNumber(display.id))")
+        }
         for (uuid, until) in returningDisplays {
             if !connected.contains(uuid) {
                 returningDisplays[uuid] = nil

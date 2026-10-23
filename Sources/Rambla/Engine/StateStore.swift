@@ -96,8 +96,9 @@ extension WindowManager {
     func restoreFromSavedState(keys: [StripKey], candidates: [WindowRecord], visible: Set<WindowID>, alive: Set<WindowID>) {
         let now = CFAbsoluteTimeGetCurrent()
         for key in keys where !restoredKeys.contains(key) {
-            guard let spaceKey = spaceKeys[key], let display = displays.first(where: { $0.uuid == key.displayUUID })
-            else { continue }
+            // A display that has just appeared may be gone in a moment (`DisplayPresence`): wait until it stays.
+            guard presence.isSettled(key.displayUUID, now: now), let spaceKey = spaceKeys[key],
+                  let display = displays.first(where: { $0.uuid == key.displayUUID }) else { continue }
             let returning = returningDisplays[key.displayUUID] != nil
             guard let saved = archive.strip(displayUUID: key.displayUUID, spaceKey: spaceKey)
                 ?? (returning && !display.spaceKeys.isEmpty
