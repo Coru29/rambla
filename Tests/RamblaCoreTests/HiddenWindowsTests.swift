@@ -48,3 +48,11 @@ struct HiddenWindowsTests {
         #expect(!HiddenWindows.returned(window, on: desktop, before: [other: [window]], now: [:]))
     }
 }
+
+@Test func theWindowsThatCameBackAreTheOnesNoLongerHidden() {
+    // On strip "a" window 2 was minimized and is back, 3 still is; on "b" window 7 came back from a hidden app.
+    let before: [String: Set<WindowID>] = ["a": [2, 3], "b": [7]]
+    let now: [String: Set<WindowID>] = ["a": [3]]
+    #expect(HiddenWindows.returned(before: before, now: now) == [2, 7])
+    #expect(HiddenWindows.returned(before: now, now: now).isEmpty)
+}

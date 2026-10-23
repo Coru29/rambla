@@ -10,6 +10,11 @@ public enum HiddenWindows {
         record.filter { !looked.contains($0.key) && exists($0.key) }.merging(found) { _, new in new }
     }
 
+    /// The windows hidden on their strip before the pass and shown after it: back from the Dock, their app unhidden.
+    public static func returned<Key: Hashable>(before: [Key: Set<WindowID>], now: [Key: Set<WindowID>]) -> Set<WindowID> {
+        before.reduce(into: Set<WindowID>()) { back, entry in back.formUnion(entry.value.subtracting(now[entry.key] ?? [])) }
+    }
+
     /// True when `id` was hidden on `key` before the pass and is shown after it.
     public static func returned<Key: Hashable>(_ id: WindowID, on key: Key, before: [Key: Set<WindowID>],
                                                now: [Key: Set<WindowID>]) -> Bool {

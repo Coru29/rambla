@@ -64,6 +64,10 @@ final class WindowManager {
     /// Where the WindowServer showed each on-screen window at the last reconcile (`whereShown`).
     private var onScreenFrames: [WindowID: CGRect] = [:]
     private var hiddenSince: [WindowID: CFAbsoluteTime] = [:]
+    /// Windows macOS is putting back (back from the Dock, their app unhidden), and until when: macOS moves them by
+    /// itself then (a parked one back on screen, a minimized one to where it was), which is not another app's move.
+    private var reappearing: [WindowID: CFAbsoluteTime] = [:]
+    private static let reappearDelay: CFAbsoluteTime = 1.5
     /// Displays that have strips but are not connected, and since when (a resolution change, a dock or a wake can drop
     /// a display for a while). In uptime, which does not count time asleep, and waking starts the count again.
     private var displayGoneSince: [String: TimeInterval] = [:]
@@ -234,7 +238,13 @@ final class WindowManager {
             }
         }
         observe(ws, NSWorkspace.didHideApplicationNotification) { [weak self] _ in self?.scheduleReconcile() }
-        observe(ws, NSWorkspace.didUnhideApplicationNotification) { [weak self] _ in self?.scheduleReconcile() }
+        observe(ws, NSWorkspace.didUnhideApplicationNotification) { [weak self] note in
+            guard let self else { return }
+            if let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication {
+                markReappearing(windows.values.filter { $0.pid == app.processIdentifier }.map(\.id))
+            }
+            scheduleReconcile()
+        }
         observe(ws, NSWorkspace.activeSpaceDidChangeNotification) { [weak self] _ in
             guard let self else { return }
             // The focused window belongs to the Space we left: drop it so the border and dimming hide
@@ -363,6 +373,11 @@ final class WindowManager {
         checkDisplaysAgain(after: Self.windowListWait + 0.05)
     }
 
+    private func markReappearing<S: Sequence>(_ ids: S) where S.Element == WindowID {
+        let until = CFAbsoluteTimeGetCurrent() + Self.reappearDelay
+        for id in ids { reappearing[id] = until }
+    }
+
     /// Some app has not listed its windows yet (`awaitingWindowLists`).
     var waitingForWindowLists: Bool { !awaitingWindowLists.isEmpty && CFAbsoluteTimeGetCurrent() < awaitingUntil }
 
@@ -407,6 +422,7 @@ final class WindowManager {
             externalFrameChange(id, frame, mouseDown: mouseDown)
         case .minimized(_, let id, let isMinimized):
             windows[id]?.traits.isMinimized = isMinimized
+            if !isMinimized { markReappearing([id]) }
             scheduleReconcile()
         case .titleChanged(_, let id, let title):
             windows[id]?.title = title
@@ -627,6 +643,8 @@ final class WindowManager {
         }
         for id in visible { hiddenSince[id] = nil }
         hidden = HiddenWindows.update(hidden, found: hiddenNow, looked: Set(keys), exists: { strips[$0] != nil })
+        reappearing = reappearing.filter { $0.value > now }
+        markReappearing(HiddenWindows.returned(before: hiddenBefore, now: hidden))
 
         // Windows that stopped being tileable (rules changed) leave their strips. A window in native full screen keeps
         // its column, hidden like a minimized one, so it comes back to its place when it leaves full screen.
@@ -946,6 +964,12 @@ final class WindowManager {
         guard !inGrace, !dragTracker.isFrozen(id) else { return }
         // Exactly where Rambla put it: the app reported Rambla's own move late (it applies AX writes asynchronously).
         if let wanted = requested[id], frame.approximatelyEquals(wanted, tolerance: 2) { return }
+        // macOS putting a hidden window back by itself (back from the Dock, its app unhidden): it goes back to its place
+        // in the strip instead of floating.
+        if hidden[key]?.contains(id) == true || (reappearing[id] ?? 0) > CFAbsoluteTimeGetCurrent() {
+            apply(key, animate: true)
+            return
+        }
         let reference = requested[id] ?? previous ?? frame
         if FrameChange.isAnchoredResize(from: reference, to: frame) {
             // The app resized itself (terminals snap to their character grid keeping a corner fixed).

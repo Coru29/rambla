@@ -43,7 +43,20 @@ $CHECK check-parked
 $CLI cycle-width; $CHECK settle
 $CHECK check-tiles
 
-# Another app moving a window (what Rectangle does) makes it float where it was put.
+# Hiding the app (⌘H) or minimizing a window keeps their columns: they come back to their places, not floating, even
+# when macOS puts a parked window back on screen as it shows it again.
+ORDER=$($CHECK column-order)
+$CHECK host hide; sleep 1
+$CHECK host unhide; $CHECK settle
+$CHECK check-order "$ORDER"
+$CHECK host "minimize 2"; sleep 1
+$CHECK host "restore 2"; $CHECK settle
+$CHECK check-order "$ORDER"
+$CHECK check-tiles
+
+# Another app moving a window (what Rectangle does) makes it float where it was put. (After the restore above, moves
+# of that window count as macOS putting it back for 1.5 s.)
+sleep 2
 ID=$($CHECK window-at 1)
 $CLI debug-external-move "$ID" 200 150 700 500
 $CHECK settle

@@ -139,6 +139,16 @@ case "host":
     DistributedNotificationCenter.default().postNotificationName(Notification.Name("TestHost.command"), object: args[1], userInfo: nil, deliverImmediately: true)
     usleep(200_000)
     pass("host \(args[1])")
+case "column-order":
+    // The strip's columns, as the first window of each, in order.
+    guard let s = currentStrip(dump()) else { fail("no strip") }
+    print(columns(s).compactMap { ($0["windows"] as? [NSNumber])?.first?.stringValue }.joined(separator: ","))
+case "check-order":
+    guard let s = currentStrip(dump()) else { fail("no strip") }
+    let order = columns(s).compactMap { ($0["windows"] as? [NSNumber])?.first?.stringValue }.joined(separator: ",")
+    let floating = (dump()["floating"] as? [NSNumber] ?? []).map(\.uint32Value)
+    if !floating.isEmpty { fail("windows floating: \(floating)") }
+    if order == args[1] { pass("columns in the same order: \(order)") } else { fail("columns \(order), expected \(args[1])") }
 case "window-at":
     let n = Int(args[1])!
     guard let s = currentStrip(dump()) else { fail("no strip") }
@@ -146,6 +156,6 @@ case "window-at":
     guard cols.indices.contains(n), let id = (cols[n]["windows"] as? [NSNumber])?.first else { fail("no column \(n)") }
     print(id.uint32Value)
 default:
-    print("usage: e2e-check wait-columns N | settle | check-tiles | check-parked | check-focused-visible | check-focused-index N | check-gathered | check-floating ID | check-frame ID X Y | window-at N")
+    print("usage: e2e-check wait-columns N | settle | check-tiles | check-parked | check-focused-visible | check-focused-index N | check-gathered | check-floating ID | check-frame ID X Y | column-order | check-order IDS | window-at N")
     exit(2)
 }

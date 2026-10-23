@@ -1,5 +1,6 @@
 // A tiny regular app with plain resizable windows, so live tests never touch the user's real apps.
-// Commands (distributed notification "TestHost.command"): "add", "quit".
+// Commands (distributed notification "TestHost.command"): "add", "quit", "hide", "unhide", "minimize N", "restore N"
+// (N counts the windows in the order they were made, from 1).
 import AppKit
 
 final class Host: NSObject, NSApplicationDelegate, NSWindowDelegate {
@@ -9,9 +10,15 @@ final class Host: NSObject, NSApplicationDelegate, NSWindowDelegate {
         for _ in 0..<count { add() }
         DistributedNotificationCenter.default().addObserver(forName: Notification.Name("TestHost.command"), object: nil, queue: .main) { [weak self] note in
             MainActor.assumeIsolated {
-                switch note.object as? String {
+                let words = (note.object as? String ?? "").split(separator: " ").map(String.init)
+                let window = words.count > 1 ? Int(words[1]).flatMap { n in self?.windows.indices.contains(n - 1) == true ? self?.windows[n - 1] : nil } : nil
+                switch words.first {
                 case "add": self?.add()
                 case "quit": NSApp.terminate(nil)
+                case "hide": NSApp.hide(nil)
+                case "unhide": NSApp.unhide(nil)
+                case "minimize": window?.miniaturize(nil)
+                case "restore": window?.deminiaturize(nil)
                 default: break
                 }
             }
