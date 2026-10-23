@@ -239,6 +239,25 @@ public enum Layout {
         return LayoutResult(placements: placements, columnFrames: columnFrames, tabBars: tabBars, metrics: m, exits: exits)
     }
 
+    /// Target frames for every window of a strip that is not in view, all parked with a sliver on the display so
+    /// nothing of it shows. Windows `compute` leaves visible (pinned ones too) park at the edge on the side of the
+    /// display their center is on, or at the other edge when a neighbor display touches it (see `parking`); windows
+    /// `compute` already parks stay as they are, and hidden ones stay out. Nothing shows to put a tab bar on or to
+    /// animate across the display, so there are no tab bars and no exits. The column frames and metrics are
+    /// `compute`'s: the strip keeps its place for when it comes back into view.
+    public static func shelved(_ input: LayoutInput) -> LayoutResult {
+        var result = compute(input)
+        result.placements = result.placements.mapValues { placement in
+            guard case .visible(let frame) = placement else { return placement }
+            let side: HDirection = frame.midX < input.display.midX ? .left : .right
+            return .parked(parking(for: frame, side: side, display: input.display, others: input.otherDisplays,
+                                   sliver: input.config.sliver).frame)
+        }
+        result.tabBars = [:]
+        result.exits = [:]
+        return result
+    }
+
     // MARK: - Transitions
 
     /// How a window gets to its placement when the strip animates.
