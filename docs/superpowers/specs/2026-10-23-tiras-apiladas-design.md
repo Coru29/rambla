@@ -118,7 +118,7 @@ La opción vale para el trackpad y para los botones del mouse. El interruptor ac
     - se estacionan con ella;
     - vuelven a su lugar al volver a esa tira.
   - **Si Rambla se reinicia** mientras una de esas está escondida, vuelve a la vista como flotante de la tira activa.
-- **Pantalla con otra pantalla a los dos lados:** no hay borde libre, así que las ventanas de las otras tiras asoman 1 pt en la pantalla vecina del lado más cercano. Es un límite conocido, documentado en el manual, y no es la configuración del usuario.
+- **Pantalla con otra pantalla a los dos lados:** no hay borde libre, así que las ventanas de las otras tiras quedan sobre la pantalla vecina del lado más cercano. Es el mismo límite que ya tienen hoy las columnas estacionadas en esa configuración. Queda documentado en el manual y no es la configuración del usuario.
 
 ### El cambio de tira
 
@@ -265,4 +265,4 @@ La opción vale para el trackpad y para los botones del mouse. El interruptor ac
 10. **Tira vacía:** al llegar a una, Rambla toma el teclado para que no se escriba en una ventana que no se ve.
 11. **Pantallas:** las pilas son por pantalla y escritorio. Al desconectar una pantalla, su tira N va a la tira N de la otra.
 12. **Foco movido por macOS:** cuando macOS mueve el foco después de cerrar, minimizar, ocultar o salir, Rambla nunca cambia de tira.
-13. **Pantallas vecinas a los dos lados:** las ventanas de las otras tiras asoman 1 pt en la vecina. Queda como límite documentado.
+13. **Pantallas vecinas a los dos lados:** las ventanas de las otras tiras quedan sobre la pantalla vecina, igual que hoy las columnas estacionadas. Queda como límite documentado.
