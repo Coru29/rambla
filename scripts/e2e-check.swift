@@ -174,12 +174,30 @@ case "check-order":
     let floating = (dump()["floating"] as? [NSNumber] ?? []).map(\.uint32Value)
     if !floating.isEmpty { fail("windows floating: \(floating)") }
     if order == args[1] { pass("columns in the same order: \(order)") } else { fail("columns \(order), expected \(args[1])") }
+case "check-columns":
+    // The strip's columns are these, in this order (windows floating since earlier steps do not matter).
+    guard let s = currentStrip(dump()) else { fail("no strip") }
+    let order = columns(s).compactMap { ($0["windows"] as? [NSNumber])?.first?.stringValue }.joined(separator: ",")
+    if order == args[1] { pass("columns in the same order: \(order)") } else { fail("columns \(order), expected \(args[1])") }
 case "window-at":
     let n = Int(args[1])!
     guard let s = currentStrip(dump()) else { fail("no strip") }
     let cols = columns(s)
     guard cols.indices.contains(n), let id = (cols[n]["windows"] as? [NSNumber])?.first else { fail("no column \(n)") }
     print(id.uint32Value)
+case "check-placed":
+    // Every window of the current strip is exactly where the strip puts it (visible or parked).
+    let d = dump()
+    guard let s = currentStrip(d), let placements = s["placements"] as? [String: [String: Any]] else { fail("no strip") }
+    var misplaced: [String] = []
+    for (key, p) in placements {
+        guard let id = UInt32(key), let real = bounds(id), let f = p["frame"] as? [String: Double] else { continue }
+        let want = CGRect(x: f["x"] ?? 0, y: f["y"] ?? 0, width: f["w"] ?? 0, height: f["h"] ?? 0)
+        if abs(real.minX - want.minX) > 2 || abs(real.minY - want.minY) > 2 || abs(real.width - want.width) > 2 {
+            misplaced.append("\(id) at \(Int(real.minX)),\(Int(real.minY)) \(Int(real.width)) instead of \(Int(want.minX)),\(Int(want.minY)) \(Int(want.width))")
+        }
+    }
+    if misplaced.isEmpty { pass("\(placements.count) windows where the strip puts them") } else { fail("misplaced: \(misplaced.joined(separator: "; "))") }
 case "neighbor-right":
     // Arguments for `rambla debug-neighbor`: a laptop-sized display right of the strip's one.
     let f = display(dump()).frame
@@ -209,6 +227,6 @@ case "watch-enters", "watch-leaves":
         fail("window \(id) crossed the display at x: \(trace(frames, on: disp)) (\(entering ? "ends" : "starts") at \(Int(reference.minX)))")
     }
 default:
-    print("usage: e2e-check wait-columns N | settle | check-tiles | check-parked | check-focused-visible | check-focused-index N | check-gathered | check-floating ID | check-frame ID X Y | column-order | check-order IDS | window-at N | neighbor-right | watch-hidden ID COMMAND... | watch-enters ID right|left COMMAND... | watch-leaves ID right|left COMMAND...")
+    print("usage: e2e-check wait-columns N | settle | check-tiles | check-parked | check-focused-visible | check-focused-index N | check-gathered | check-floating ID | check-frame ID X Y | column-order | check-order IDS | check-columns IDS | window-at N | neighbor-right | watch-hidden ID COMMAND... | watch-enters ID right|left COMMAND... | watch-leaves ID right|left COMMAND...")
     exit(2)
 }

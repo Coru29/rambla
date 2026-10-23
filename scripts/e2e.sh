@@ -91,5 +91,17 @@ $CHECK watch-hidden "$LAST" debug-neighbor
 $CHECK check-parked
 $CHECK check-tiles
 
+# macOS moves windows while it changes the displays (one that spans two, one parked past an edge), after Rambla has
+# laid them out: they must not float, and they go back to their places once it is done.
+ORDER=$($CHECK column-order)
+FIRST=$($CHECK window-at 0)
+$CLI debug-neighbor $($CHECK neighbor-right); sleep 1
+$CLI debug-external-move "$FIRST" 300 200 700 500; sleep 3
+$CHECK settle
+$CHECK check-columns "$ORDER"
+$CHECK check-placed
+$CLI debug-neighbor; sleep 1; $CHECK settle
+$CHECK check-placed
+
 $CHECK host quit >/dev/null
 echo "E2E OK"

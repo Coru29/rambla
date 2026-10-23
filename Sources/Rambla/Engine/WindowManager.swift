@@ -1015,9 +1015,17 @@ final class WindowManager {
             animator.cancel(id)
             return
         }
-        guard !inGrace, !dragTracker.isFrozen(id) else { return }
+        guard !dragTracker.isFrozen(id) else { return }
         // Exactly where Rambla put it: the app reported Rambla's own move late (it applies AX writes asynchronously).
         if let wanted = requested[id], frame.approximatelyEquals(wanted, tolerance: 2) { return }
+        if inGrace {
+            // macOS moving windows while it changes the displays or the Space (one that spanned two displays, one
+            // parked past an edge) is not another app's move: once it is done, the strips put them back in place.
+            Log.info("Window \(id) moved by macOS from \(Self.describe(requested[id] ?? previous ?? frame)) "
+                     + "to \(Self.describe(frame)) while the displays changed: it goes back to its place")
+            checkDisplaysAgain(after: graceUntil - CFAbsoluteTimeGetCurrent() + 0.1)
+            return
+        }
         // macOS putting a hidden window back by itself (back from the Dock, its app unhidden): it goes back to its place
         // in the strip instead of floating.
         if hidden[key]?.contains(id) == true || (reappearing[id] ?? 0) > CFAbsoluteTimeGetCurrent() {
