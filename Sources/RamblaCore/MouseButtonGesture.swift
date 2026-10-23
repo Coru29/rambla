@@ -2,10 +2,13 @@ import Foundation
 
 /// Gestures made by moving the mouse with a chosen combination of its buttons held (a "chord": the middle button, or
 /// the side buttons 4 and 5 pressed together, say). Sideways slides the strip under the pointer and lets it settle on
-/// release, like the trackpad swipe. A clear move up is one command per press, at once; a move down is decided when the
-/// buttons are released (the previous width), unless it goes on long enough to open the overview. Buttons are numbered the way
-/// mouse apps number them: 3 is the middle button (pressing the wheel), 4 and 5 the side ones. The left and right
-/// buttons never take part.
+/// release, like the trackpad swipe. What a clear move up or down does depends on `vertical`:
+/// - width mode: a move up is one command per press, at once; a move down is decided when the buttons are released
+///   (the previous width), unless it goes on long enough to open the overview;
+/// - strips mode: a move up or down is decided when the buttons are released (change strip), unless it goes on long
+///   enough to act at once: the full width up, the overview down.
+/// Buttons are numbered the way mouse apps number them: 3 is the middle button (pressing the wheel), 4 and 5 the side
+/// ones. The left and right buttons never take part.
 ///
 /// A chord's presses are kept from the other apps (Mac Mouse Fix included) until it is clear they are Rambla's:
 /// - a press of one button of a larger chord waits `chordWindow` for the others, and goes on to the apps (replayed)
@@ -38,10 +41,14 @@ public struct MouseButtonGesture: Sendable {
         case slide(Double)
         /// The slide is over: let the strip settle, carrying the pointer's speed (points per second, positive: right).
         case slideEnded(velocity: Double)
-        /// A move up (true) or down: one per press of the chord.
+        /// Width mode: a move up (true) or down: one per press of the chord.
         case vertical(up: Bool)
         /// A long move down: the overview.
         case overview
+        /// Strips mode: a short move up (true) or down, decided when the buttons are released: change strip.
+        case strip(up: Bool)
+        /// Strips mode: a long move up: the focused column's full width, or back to its width.
+        case toggleWidth
     }
 
     public struct Output: Equatable, Sendable {
@@ -66,7 +73,8 @@ public struct MouseButtonGesture: Sendable {
     public static let slideStart = 8.0
     /// Upward or downward movement (points) that counts as a move up or down.
     public static let verticalStart = 40.0
-    /// Downward movement (points) that opens the overview instead of giving back the previous width.
+    /// Downward movement (points) that opens the overview instead of giving back the previous width (or changing
+    /// strip). In strips mode, upward movement this long gives the focused column the full width.
     public static let overviewStart = 160.0
 
     private enum Phase: Sendable {
@@ -76,13 +84,17 @@ public struct MouseButtonGesture: Sendable {
         /// The whole chord is down: the pointer moved this much since, and the next moves decide what it is.
         case armed(dx: Double, dy: Double)
         case sliding
-        /// Moved down far enough to give back the previous width when released, or to open the overview if it goes on.
+        /// Strips mode: moved up far enough to change strip when released, or to give the full width if it goes on.
+        case goingUp(dx: Double, dy: Double)
+        /// Moved down far enough to give back the previous width (to change strip, in strips mode) when released, or
+        /// to open the overview if it goes on.
         case goingDown(dx: Double, dy: Double)
         /// This press already did its part (or came apart): the rest of it is swallowed until its buttons are released.
         case spent
     }
 
     private let chord: Set<Int>
+    private let vertical: VerticalGesture
     /// The chord's presses held back from the apps, in the order they came.
     private var held: [Int] = []
     /// Presses that went to the apps (handed on or never Rambla's): their releases go there too.
@@ -91,8 +103,9 @@ public struct MouseButtonGesture: Sendable {
     private var position = 0.0
     private var velocity = VelocityTracker()
 
-    public init(buttons: [Int]) {
+    public init(buttons: [Int], vertical: VerticalGesture = .width) {
         chord = Set(buttons)
+        self.vertical = vertical
     }
 
     /// While true, the app feeds the pointer's moves (and only then: moving without the chord is none of Rambla's
@@ -191,11 +204,17 @@ public struct MouseButtonGesture: Sendable {
             velocity.reset()
             phase = held.isEmpty ? .idle : .spent
             return Output(passes: false, commands: [.slideEnded(velocity: speed)])
-        case .goingDown(_, let y):
-            // Still down when released: the previous width. Back near the start: nothing.
+        case .goingUp(_, let y):
+            // Still up when released: change strip. Back near the start: nothing.
             held.remove(at: index)
             phase = held.isEmpty ? .idle : .spent
-            return Output(passes: false, commands: y >= Self.verticalStart ? [.vertical(up: false)] : [])
+            return Output(passes: false, commands: -y >= Self.verticalStart ? [.strip(up: true)] : [])
+        case .goingDown(_, let y):
+            // Still down when released: the previous width (a strip, in strips mode). Back near the start: nothing.
+            held.remove(at: index)
+            phase = held.isEmpty ? .idle : .spent
+            guard y >= Self.verticalStart else { return Output(passes: false) }
+            return Output(passes: false, commands: [vertical == .strips ? .strip(up: false) : .vertical(up: false)])
         case .spent, .idle:
             held.remove(at: index)
             if held.isEmpty { phase = .idle }
@@ -225,6 +244,7 @@ public struct MouseButtonGesture: Sendable {
             }
             if abs(y) >= Self.verticalStart, abs(y) > 2 * abs(x) {
                 if y < 0 {
+                    if vertical == .strips { return goUp(x, y) }
                     phase = .spent
                     return Output(passes: false, commands: [.vertical(up: true)])
                 }
@@ -232,6 +252,8 @@ public struct MouseButtonGesture: Sendable {
             }
             phase = .armed(dx: x, dy: y)
             return Output(passes: false)
+        case .goingUp(let x, let y):
+            return goUp(x + dx, y + dy)
         case .goingDown(let x, let y):
             return goDown(x + dx, y + dy)
         case .sliding:
@@ -244,6 +266,17 @@ public struct MouseButtonGesture: Sendable {
     }
 
     // MARK: - Helpers
+
+    /// Strips mode: the pointer is `-y` points above where the chord came together: the full width once it is far
+    /// enough. Only the way up counts: coming back past the start and on down is not a long move up.
+    private mutating func goUp(_ x: Double, _ y: Double) -> Output {
+        guard -y >= Self.overviewStart else {
+            phase = .goingUp(dx: x, dy: y)
+            return Output(passes: false)
+        }
+        phase = .spent
+        return Output(passes: false, commands: [.toggleWidth])
+    }
 
     /// The pointer is `y` points below where the chord came together: the overview once it is far enough.
     private mutating func goDown(_ x: Double, _ y: Double) -> Output {

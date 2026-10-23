@@ -148,6 +148,7 @@ final class MouseButtonTracker: @unchecked Sendable {
                     case .slideEnded(let velocity): handlers.slideEnded(velocity)
                     case .vertical(let up): handlers.vertical(up)
                     case .overview: handlers.overview()
+                    case .strip, .toggleWidth: break   // strips mode: a later task wires them
                     }
                 }
             }

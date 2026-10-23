@@ -108,6 +108,7 @@ final class GestureTracker {
         case .fullWidth: onVertical(true)
         case .previousWidth: onVertical(false)
         case .overview: onOverview()
+        case .toggleWidth, .strip, .armed: break   // strips mode: a later task wires them
         }
     }
 
