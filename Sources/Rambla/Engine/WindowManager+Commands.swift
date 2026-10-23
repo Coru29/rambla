@@ -144,15 +144,20 @@ extension WindowManager {
     }
 
     /// Focuses a strip window: real keyboard focus through its app, then scrolls it into view. With "mouse follows
-    /// focus" on, the pointer goes to it too, unless `mouseFollows` is false: a focus Rambla only routes, after macOS or
-    /// another app moved it (`FocusRoute`), leaves the pointer where it is.
-    func focus(window id: WindowID, in key: StripKey, mouseFollows: Bool = true) {
+    /// focus" on, the pointer goes to it too. `routed`: Rambla only passes on a focus that macOS or another app moved
+    /// (`FocusRoute`), which behaves like any focus from outside: the pointer stays where it is, and while the mouse
+    /// button is down the strip scrolls only once it is released.
+    func focus(window id: WindowID, in key: StripKey, routed: Bool = false) {
         revealSuppressedFor = nil   // this focus reveals by itself; an older suppression must not outlive it
         focusedWindow = id
         strips[key]?.focus(window: id)
         worker(for: id)?.focus(id)
-        reveal(key)
-        if mouseFollows, prefs.mouseFollowsFocus, let frame = results[key]?.placements[id]?.frame {
+        if routed, dragTracker.isMouseDown {
+            pendingReveal = key
+        } else {
+            reveal(key)
+        }
+        if !routed, prefs.mouseFollowsFocus, let frame = results[key]?.placements[id]?.frame {
             CGWarpMouseCursorPosition(CGPoint(x: frame.midX, y: frame.midY))
             CGAssociateMouseAndMouseCursorPosition(1)
         }

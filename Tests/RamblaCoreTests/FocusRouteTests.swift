@@ -4,9 +4,10 @@ import Testing
 struct FocusRouteTests {
     /// The focus lands on a window of level 1 while level 0 is in view, unless a test says otherwise.
     func decide(level: Int = 1, active: Int = 0, byActivation: Bool = false, afterLoss: Bool = false,
-                app: [WindowID] = [], all: [WindowID] = [], sinceOwnSwitch: Double? = nil) -> FocusRoute {
+                chosen: Bool = false, app: [WindowID] = [], all: [WindowID] = [],
+                sinceOwnSwitch: Double? = nil) -> FocusRoute {
         FocusRoute.decide(windowLevel: level, active: active, byActivation: byActivation, afterLoss: afterLoss,
-                          appWindowsInView: app, windowsInView: all, sinceOwnSwitch: sinceOwnSwitch)
+                          chosen: chosen, appWindowsInView: app, windowsInView: all, sinceOwnSwitch: sinceOwnSwitch)
     }
 
     @Test func aWindowInViewNeedsNothing() {
@@ -59,6 +60,18 @@ struct FocusRouteTests {
     @Test func aCloseWithNothingLeftInViewTakesTheKeyboard() {
         #expect(decide(afterLoss: true) == .takeKeyboard)
         #expect(decide(byActivation: true, afterLoss: true) == .takeKeyboard)
+    }
+
+    @Test func aWindowBroughtBackFromTheDockGoesToItsLevel() {
+        // Picking that very window in the Dock is a choice, like Mission Control: its level comes into view even when
+        // its app was activated with it and has windows in view…
+        #expect(decide(byActivation: true, chosen: true, app: [5], all: [5, 3]) == .switchLevel)
+        // …and right after a switch, since it is no late report.
+        #expect(decide(chosen: true, all: [3], sinceOwnSwitch: 0.2) == .switchLevel)
+        // In view it needs nothing; after a loss macOS is moving the focus by itself, which never changes the level.
+        #expect(decide(level: 0, chosen: true) == .none)
+        #expect(decide(afterLoss: true, chosen: true, app: [5], all: [3, 5]) == .redirect(5))
+        #expect(decide(afterLoss: true, chosen: true) == .takeKeyboard)
     }
 
     @Test func windowsInViewGoMostRecentlyUsedFirst() {

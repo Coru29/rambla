@@ -32,16 +32,16 @@ extension WindowManager {
     /// Brings `level` of `stack` into view, a new empty one when it has no strip yet, and focuses `window` (one of that
     /// level's) or else the level's focused window. The windows that arrive jump to their places first, behind the ones
     /// that leave, which then jump to their parking spots: nothing crosses the display and nothing in between shows. On
-    /// an empty level Rambla takes the keyboard, so nothing typed reaches a window out of sight. `mouseFollows` is
-    /// false when the switch follows a focus from outside Rambla (`FocusRoute`): "mouse follows focus" is for the focus
-    /// Rambla gives through its own shortcuts.
-    func switchLevel(of stack: StackKey, to level: Int, focusing window: WindowID? = nil, mouseFollows: Bool = true) {
+    /// an empty level Rambla takes the keyboard, so nothing typed reaches a window out of sight. `routed`: the switch
+    /// follows a focus from outside Rambla (`FocusRoute`), so the pointer stays where it is: "mouse follows focus" is
+    /// for the focus Rambla gives through its own shortcuts.
+    func switchLevel(of stack: StackKey, to level: Int, focusing window: WindowID? = nil, routed: Bool = false) {
         guard isRunning, !isPaused, isCurrentStack(stack), level >= 0, level <= topLevel(of: stack) + 1 else { return }
         let old = activeLevel(of: stack)
         let new = stack.level(level)
         let chosen = window.flatMap { strips[new]?.contains($0) == true ? $0 : nil }
         guard level != old else {
-            if let chosen { focus(window: chosen, in: new, mouseFollows: mouseFollows) }
+            if let chosen { focus(window: chosen, in: new, routed: routed) }
             return
         }
         activeLevels[stack] = level
@@ -52,7 +52,7 @@ extension WindowManager {
         dropEmptyLevels(of: stack)
         // A strip read from an older file may have no focused column: its first one then.
         if let focused = chosen ?? strips[new]?.focusedWindow ?? strips[new]?.columns.first?.activeWindow {
-            focus(window: focused, in: new, mouseFollows: mouseFollows)
+            focus(window: focused, in: new, routed: routed)
         } else {
             takeKeyboardFocus()
             emptyLevelHook?(stack)

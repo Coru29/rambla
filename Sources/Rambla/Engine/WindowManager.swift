@@ -178,12 +178,16 @@ final class WindowManager {
     private var lastActivation: (pid: pid_t, at: CFAbsoluteTime)?
     /// A report of focus on one of its windows this soon after its app was activated came with that activation.
     private static let activationWindow: CFAbsoluteTime = 0.5
-    /// When a window in view last closed or was minimized, or an app was last hidden or quit: macOS then moves the
-    /// focus by itself, which never changes the level in view (`FocusRoute`).
+    /// When the focused window (in a level in view, or floating on a display in view) last closed or was minimized,
+    /// or an app was last hidden or quit: macOS then moves the focus by itself, which never changes the level in view
+    /// (`FocusRoute`).
     private var lastLossAt: CFAbsoluteTime?
     /// When each window last had the focus in a level in view: a window that gets the focus instead of one out of view
     /// is the most recently used.
     private var lastFocusedAt: [WindowID: CFAbsoluteTime] = [:]
+    /// Windows coming back from the Dock (unminimized), and until when: one that takes the focus then was picked by the
+    /// user, like a window chosen in Mission Control.
+    private var backFromDock: [WindowID: CFAbsoluteTime] = [:]
     /// When Rambla last switched the level in view of each stack: a report of focus right after can be a late one.
     var levelSwitchedAt: [StackKey: CFAbsoluteTime] = [:]
     /// A focus that came before `displays` showed its window's Space (⌘Tab to an app on another desktop: only the next
@@ -501,10 +505,16 @@ final class WindowManager {
         case .frameChanged(_, let id, let frame, let mouseDown):
             externalFrameChange(id, frame, mouseDown: mouseDown)
         case .minimized(_, let id, let isMinimized):
+            // Minimizing the focused window moves the focus by itself; a window back from the Dock that takes the focus
+            // was picked by the user (`FocusRoute`).
+            if isMinimized, id == focusedWindow, spaceInView(of: id, record: windows[id]) != nil {
+                lastLossAt = CFAbsoluteTimeGetCurrent()
+            }
             windows[id]?.traits.isMinimized = isMinimized
-            // Minimizing a window in view moves the focus by itself (`FocusRoute`).
-            if isMinimized, let key = key(containing: id), isCurrent(key) { lastLossAt = CFAbsoluteTimeGetCurrent() }
-            if !isMinimized { markReappearing([id]) }
+            if !isMinimized {
+                markReappearing([id])
+                backFromDock[id] = CFAbsoluteTimeGetCurrent() + Self.reappearDelay
+            }
             scheduleReconcile()
         case .titleChanged(_, let id, let title):
             windows[id]?.title = title
@@ -542,14 +552,16 @@ final class WindowManager {
     }
 
     func removeWindow(_ id: WindowID) {
-        guard windows.removeValue(forKey: id) != nil || floating.contains(id) else { return }
-        // A window in view that goes away (closed, or gone with its app) moves the focus by itself (`FocusRoute`).
-        if let key = key(containing: id), isCurrent(key) { lastLossAt = CFAbsoluteTimeGetCurrent() }
+        let record = windows.removeValue(forKey: id)
+        guard record != nil || floating.contains(id) else { return }
+        // The focused window going away (closed, or gone with its app) moves the focus by itself (`FocusRoute`).
+        if id == focusedWindow, spaceInView(of: id, record: record) != nil { lastLossAt = CFAbsoluteTimeGetCurrent() }
         floating.remove(id)
         autoFloated.remove(id)
         requested[id] = nil
         hiddenSince[id] = nil
         lastFocusedAt[id] = nil
+        backFromDock[id] = nil
         for key in Array(hidden.keys) { hidden[key]?.remove(id) }
         animator.cancel(id)
         for key in strips.keys where strips[key]!.contains(id) {
@@ -577,13 +589,14 @@ final class WindowManager {
 
     // MARK: - Focus
 
-    /// How a focus came to a window, for `FocusRoute`: when, whether its app had just been activated, and whether macOS
-    /// was moving the focus by itself after a loss.
+    /// How a focus came to a window, for `FocusRoute`: when, whether its app had just been activated, whether macOS was
+    /// moving the focus by itself after a loss, and whether the user picked that very window, back from the Dock.
     private struct FocusArrival {
         let window: WindowID
         let at: CFAbsoluteTime
         var byActivation: Bool
         var afterLoss: Bool
+        var chosen: Bool
     }
 
     func focusChanged(_ id: WindowID?) {
@@ -614,7 +627,8 @@ final class WindowManager {
         var arrival = arrival(of: id, at: now)
         if let awaiting, awaiting.window == id, now - awaiting.at < Self.spaceChangeWait {
             arrival = FocusArrival(window: id, at: awaiting.at, byActivation: arrival.byActivation || awaiting.byActivation,
-                                   afterLoss: arrival.afterLoss || awaiting.afterLoss)
+                                   afterLoss: arrival.afterLoss || awaiting.afterLoss,
+                                   chosen: arrival.chosen || awaiting.chosen)
         }
         if isCurrentStack(key.stack) {
             route(arrival, in: key, leaving: previous)
@@ -642,13 +656,15 @@ final class WindowManager {
         onStateChanged?()
     }
 
-    /// How the focus came to `id` at `now`: right after its app was activated, and while macOS moves the focus after a
-    /// loss.
+    /// How the focus came to `id` at `now`: right after its app was activated, while macOS moves the focus after a
+    /// loss, and as the window comes back from the Dock. Its report of being unminimized may come after the focus: a
+    /// window still minimized as far as Rambla knows is coming back too.
     private func arrival(of id: WindowID, at now: CFAbsoluteTime) -> FocusArrival {
         let pid = windows[id]?.pid
         return FocusArrival(window: id, at: now,
                             byActivation: lastActivation.map { $0.pid == pid && now - $0.at < Self.activationWindow } ?? false,
-                            afterLoss: lastLossAt.map { now - $0 < FocusRoute.lateReportWindow } ?? false)
+                            afterLoss: lastLossAt.map { now - $0 < FocusRoute.lateReportWindow } ?? false,
+                            chosen: windows[id]?.traits.isMinimized == true || (backFromDock[id] ?? 0) > now)
     }
 
     /// A window of `key`, a level of a stack in view, got the focus from outside Rambla (Mission Control, ⌘Tab, a
@@ -659,26 +675,29 @@ final class WindowManager {
         let id = arrival.window
         let now = CFAbsoluteTimeGetCurrent()
         let active = key.stack.level(activeLevel(of: key.stack))
-        let shown = Self.windowIDs(onScreenOnly: true)
         var afterLoss = arrival.afterLoss
-        // The window that had the focus in a level in view went away (closed, minimized, its app hidden or quit), and
-        // its app reported the new focus before saying so: the loss counts from now.
-        if !afterLoss, key != active, let previous, previous != id, let was = self.key(containing: previous),
-           isCurrent(was), wentAway(previous, from: was, shown: shown) {
+        // The window that had the focus in view (in a level in view, or floating) went away (closed, minimized, its app
+        // hidden or quit), and its app reported the new focus before saying so: the loss counts from now.
+        if !afterLoss, key != active, let previous, previous != id,
+           let space = spaceInView(of: previous, record: windows[previous]), wentAway(previous, from: space) {
             lastLossAt = now
             afterLoss = true
         }
         // What can take the focus in view: the windows of the level in view that are on screen, the last used first.
+        let shown = Self.windowIDs(onScreenOnly: true)
         let inView = FocusRoute.byLastUse((strips[active]?.allWindows ?? []).filter {
             shown.contains($0) && windows[$0]?.traits.isMinimized != true
         }, lastUsed: lastFocusedAt)
         let pid = windows[id]?.pid
-        let route = FocusRoute.decide(windowLevel: key.level, active: active.level, byActivation: arrival.byActivation,
-                                      afterLoss: afterLoss, appWindowsInView: inView.filter { windows[$0]?.pid == pid },
-                                      windowsInView: inView, sinceOwnSwitch: levelSwitchedAt[key.stack].map { now - $0 })
-        let report = "Window \(id) of strip level \(key.level) got the focus"
-            + (afterLoss ? " as something in view went away" : arrival.byActivation ? " as its app came to the front" : "")
-        switch route {
+        let decision = FocusRoute.decide(
+            windowLevel: key.level, active: active.level, byActivation: arrival.byActivation, afterLoss: afterLoss,
+            chosen: arrival.chosen, appWindowsInView: inView.filter { windows[$0]?.pid == pid }, windowsInView: inView,
+            sinceOwnSwitch: levelSwitchedAt[key.stack].map { now - $0 })
+        let cause = afterLoss ? " as something in view went away"
+            : arrival.chosen ? " as it came back from the Dock"
+            : arrival.byActivation ? " as its app came to the front" : ""
+        let report = "Window \(id) of strip level \(key.level) got the focus\(cause)"
+        switch decision {
         case .none:
             if key == active {
                 focusSettled(id, in: key)
@@ -695,26 +714,34 @@ final class WindowManager {
             followFocus(to: id, in: key)
         case .redirect(let window):
             Log.info("\(report): window \(window), in view, gets it instead")
-            focus(window: window, in: active, mouseFollows: false)
+            focus(window: window, in: active, routed: true)
         case .takeKeyboard:
             Log.info("\(report): nothing in view can take it")
             takeKeyboardFocus()
         }
     }
 
-    /// A window of `key`, a level in view, is no longer on screen (`shown`): it closed or was minimized, or its app was
-    /// hidden or quit. A window the user took to another Space in Mission Control did not go away: it is on that Space.
-    private func wentAway(_ id: WindowID, from key: StripKey, shown: Set<WindowID>) -> Bool {
-        guard !shown.contains(id) else { return false }
+    /// The Space on which `id` is in view: its strip's when that is a level in view, or the current one of the display
+    /// it floats on (a dialog, a settings window, one the user floated). Nil when it is not in view.
+    private func spaceInView(of id: WindowID, record: WindowRecord?) -> UInt64? {
+        if let key = key(containing: id) { return isCurrent(key) ? key.spaceID : nil }
+        guard let record, floating.contains(id) || record.kind == .float else { return nil }
+        return Displays.best(for: whereShown(record), in: enabledDisplays)?.currentSpace
+    }
+
+    /// `id`, a window in view on `space`, is no longer on screen: it closed or was minimized, or its app was hidden or
+    /// quit. A window the user took to another Space in Mission Control did not go away: it is on that Space.
+    private func wentAway(_ id: WindowID, from space: UInt64) -> Bool {
+        guard !Self.isOnScreen(id) else { return false }
         let spaces = Private.spaces(for: [id])[id] ?? []
-        return spaces.isEmpty || spaces.contains(key.spaceID)
+        return spaces.isEmpty || spaces.contains(space)
     }
 
     /// The level of `id`, a window of `key` that got the focus from outside Rambla, comes into view with that window
     /// focused, leaving the pointer where it is. The window already has the focus, so its app may not report it again:
     /// it counts as the most recently used here.
     private func followFocus(to id: WindowID, in key: StripKey) {
-        switchLevel(of: key.stack, to: key.level, focusing: id, mouseFollows: false)
+        switchLevel(of: key.stack, to: key.level, focusing: id, routed: true)
         if isCurrent(key) { lastFocusedAt[id] = CFAbsoluteTimeGetCurrent() }
     }
 
@@ -758,6 +785,12 @@ final class WindowManager {
             frames[id] = bounds ?? .zero
         }
         return frames
+    }
+
+    /// The WindowServer shows the window now, whatever its layer (a dialog or a panel can float above the others).
+    private static func isOnScreen(_ id: WindowID) -> Bool {
+        let list = CGWindowListCopyWindowInfo(.optionIncludingWindow, CGWindowID(id)) as? [[String: Any]]
+        return list?.first?[kCGWindowIsOnscreen as String] as? Bool ?? false
     }
 
     /// Where a window is: where the WindowServer shows it when it is on screen, else where Rambla last knew it. Rambla's
@@ -891,6 +924,7 @@ final class WindowManager {
         hidden = HiddenWindows.update(hidden, found: hiddenNow, looked: Set(keys + outOfView),
                                       exists: { strips[$0] != nil })
         reappearing = reappearing.filter { $0.value > now }
+        backFromDock = backFromDock.filter { $0.value > now }
         markReappearing(HiddenWindows.returned(before: hiddenBefore, now: hidden))
 
         // Windows that stopped being tileable (rules changed) leave their strips. A window in native full screen keeps
@@ -1060,6 +1094,7 @@ final class WindowManager {
         if !strips.keys.contains(where: { $0.stack == key.stack }) {
             spaceKeys[key.stack] = nil
             activeLevels[key.stack] = nil
+            levelSwitchedAt[key.stack] = nil
         }
     }
 
