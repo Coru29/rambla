@@ -119,6 +119,9 @@ final class WindowManager {
     private var graceUntil: CFAbsoluteTime = 0
     private var reconcileScheduled = false
     var pendingReveal: StripKey?
+    /// A window of a level out of view that got the focus while the mouse button was down (a click on its sliver): its
+    /// level comes into view once the button is released, so nothing moves under a click or a drag.
+    private var pendingLevelSwitch: WindowID?
     private var observers: [(NotificationCenter, NSObjectProtocol)] = []
 
     private(set) lazy var animator = Animator { [weak self] frames, verify in
@@ -171,6 +174,23 @@ final class WindowManager {
     var slideDetent: SlideDetent?
     /// Focus given by hover or swipe: do not scroll when macOS confirms it.
     var revealSuppressedFor: WindowID?
+    /// The last app activated (⌘Tab, the Dock, a notification, a click on one of its windows), and when.
+    private var lastActivation: (pid: pid_t, at: CFAbsoluteTime)?
+    /// A report of focus on one of its windows this soon after its app was activated came with that activation.
+    private static let activationWindow: CFAbsoluteTime = 0.5
+    /// When a window in view last closed or was minimized, or an app was last hidden or quit: macOS then moves the
+    /// focus by itself, which never changes the level in view (`FocusRoute`).
+    private var lastLossAt: CFAbsoluteTime?
+    /// When each window last had the focus in a level in view: a window that gets the focus instead of one out of view
+    /// is the most recently used.
+    private var lastFocusedAt: [WindowID: CFAbsoluteTime] = [:]
+    /// When Rambla last switched the level in view of each stack: a report of focus right after can be a late one.
+    var levelSwitchedAt: [StackKey: CFAbsoluteTime] = [:]
+    /// A focus that came before `displays` showed its window's Space (⌘Tab to an app on another desktop: only the next
+    /// reconcile reads the Space change), and how it came. That reconcile routes it.
+    private var focusAwaitingSpace: FocusArrival?
+    /// How long such a focus may wait for a reconcile that sees its Space.
+    private static let spaceChangeWait: CFAbsoluteTime = 2
 
     // MARK: - Lifecycle
 
@@ -258,6 +278,8 @@ final class WindowManager {
             register(app)
         }
         observe(ws, NSWorkspace.didTerminateApplicationNotification) { [weak self] note in
+            // A quit moves the focus by itself, often to a window of the next app.
+            self?.lastLossAt = CFAbsoluteTimeGetCurrent()
             if let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication {
                 self?.unregister(app.processIdentifier)
             }
@@ -265,6 +287,7 @@ final class WindowManager {
         observe(ws, NSWorkspace.didActivateApplicationNotification) { [weak self] note in
             guard let self, let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
             frontmostPID = app.processIdentifier
+            lastActivation = (app.processIdentifier, CFAbsoluteTimeGetCurrent())
             // Some apps only become "regular" (Dock icon) after launching.
             if workers[app.processIdentifier] == nil { register(app) }
             if let worker = workers[app.processIdentifier] {
@@ -273,7 +296,11 @@ final class WindowManager {
                 focusChanged(nil)
             }
         }
-        observe(ws, NSWorkspace.didHideApplicationNotification) { [weak self] _ in self?.scheduleReconcile() }
+        observe(ws, NSWorkspace.didHideApplicationNotification) { [weak self] _ in
+            // Hiding an app moves the focus by itself, to a window of the next app.
+            self?.lastLossAt = CFAbsoluteTimeGetCurrent()
+            self?.scheduleReconcile()
+        }
         observe(ws, NSWorkspace.didUnhideApplicationNotification) { [weak self] note in
             guard let self else { return }
             if let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication {
@@ -475,6 +502,8 @@ final class WindowManager {
             externalFrameChange(id, frame, mouseDown: mouseDown)
         case .minimized(_, let id, let isMinimized):
             windows[id]?.traits.isMinimized = isMinimized
+            // Minimizing a window in view moves the focus by itself (`FocusRoute`).
+            if isMinimized, let key = key(containing: id), isCurrent(key) { lastLossAt = CFAbsoluteTimeGetCurrent() }
             if !isMinimized { markReappearing([id]) }
             scheduleReconcile()
         case .titleChanged(_, let id, let title):
@@ -514,10 +543,13 @@ final class WindowManager {
 
     func removeWindow(_ id: WindowID) {
         guard windows.removeValue(forKey: id) != nil || floating.contains(id) else { return }
+        // A window in view that goes away (closed, or gone with its app) moves the focus by itself (`FocusRoute`).
+        if let key = key(containing: id), isCurrent(key) { lastLossAt = CFAbsoluteTimeGetCurrent() }
         floating.remove(id)
         autoFloated.remove(id)
         requested[id] = nil
         hiddenSince[id] = nil
+        lastFocusedAt[id] = nil
         for key in Array(hidden.keys) { hidden[key]?.remove(id) }
         animator.cancel(id)
         for key in strips.keys where strips[key]!.contains(id) {
@@ -545,23 +577,59 @@ final class WindowManager {
 
     // MARK: - Focus
 
+    /// How a focus came to a window, for `FocusRoute`: when, whether its app had just been activated, and whether macOS
+    /// was moving the focus by itself after a loss.
+    private struct FocusArrival {
+        let window: WindowID
+        let at: CFAbsoluteTime
+        var byActivation: Bool
+        var afterLoss: Bool
+    }
+
     func focusChanged(_ id: WindowID?) {
+        let now = CFAbsoluteTimeGetCurrent()
+        let previous = focusedWindow
         focusedWindow = id
         if let id, key(containing: id) == nil, floating.contains(id) || windows[id]?.kind == .float {
             // A floating window can end up under the strip (a swipe focuses the column it lands on). When its app
             // comes to the front (Dock, ⌘Tab, a click), it must be on top, not behind the strip's windows.
             worker(for: id)?.raise(id)
         }
-        // A window of a level out of view got the focus (Mission Control, the Window menu, a click on its sliver): its
-        // level comes into view, so the keyboard never types into a window that cannot be seen.
-        if let id, !isPaused, let key = key(containing: id), !isCurrent(key), isCurrentStack(key.stack) {
-            switchLevel(of: key.stack, to: key.level, focusing: id)
-            return
-        }
-        guard let id, let key = key(containing: id), isCurrent(key) else {
+        let awaiting = focusAwaitingSpace
+        focusAwaitingSpace = nil
+        guard let id, let key = key(containing: id) else {
             overlayHook?()
             return
         }
+        if isCurrent(key) {
+            focusSettled(id, in: key)
+            return
+        }
+        guard !isPaused else {
+            overlayHook?()
+            return
+        }
+        // A window of a level out of view got the focus, or one of a Space not read yet. When the same window was
+        // waiting for its Space, how its focus first came still counts.
+        var arrival = arrival(of: id, at: now)
+        if let awaiting, awaiting.window == id, now - awaiting.at < Self.spaceChangeWait {
+            arrival = FocusArrival(window: id, at: awaiting.at, byActivation: arrival.byActivation || awaiting.byActivation,
+                                   afterLoss: arrival.afterLoss || awaiting.afterLoss)
+        }
+        if isCurrentStack(key.stack) {
+            route(arrival, in: key, leaving: previous)
+        } else {
+            // Its display may have just changed Space (⌘Tab to an app on another desktop), which `displays` shows only
+            // from the next reconcile: that one routes this focus.
+            focusAwaitingSpace = arrival
+            overlayHook?()
+        }
+    }
+
+    /// The focus settled on a window of a level in view: it becomes its strip's focused window, its column comes into
+    /// view, and it is the most recently used there.
+    private func focusSettled(_ id: WindowID, in key: StripKey) {
+        lastFocusedAt[id] = CFAbsoluteTimeGetCurrent()
         strips[key]!.focus(window: id)
         if revealSuppressedFor == id {
             revealSuppressedFor = nil
@@ -572,6 +640,82 @@ final class WindowManager {
             reveal(key)
         }
         onStateChanged?()
+    }
+
+    /// How the focus came to `id` at `now`: right after its app was activated, and while macOS moves the focus after a
+    /// loss.
+    private func arrival(of id: WindowID, at now: CFAbsoluteTime) -> FocusArrival {
+        let pid = windows[id]?.pid
+        return FocusArrival(window: id, at: now,
+                            byActivation: lastActivation.map { $0.pid == pid && now - $0.at < Self.activationWindow } ?? false,
+                            afterLoss: lastLossAt.map { now - $0 < FocusRoute.lateReportWindow } ?? false)
+    }
+
+    /// A window of `key`, a level of a stack in view, got the focus from outside Rambla (Mission Control, ⌘Tab, a
+    /// click on its sliver, or macOS after a window closed): `FocusRoute` says whether its level comes into view, a
+    /// window of the level in view gets the focus instead, or Rambla takes the keyboard, so the keyboard never types
+    /// into a window that cannot be seen. `previous`: the window that had the focus before, if known.
+    private func route(_ arrival: FocusArrival, in key: StripKey, leaving previous: WindowID?) {
+        let id = arrival.window
+        let now = CFAbsoluteTimeGetCurrent()
+        let active = key.stack.level(activeLevel(of: key.stack))
+        let shown = Self.windowIDs(onScreenOnly: true)
+        var afterLoss = arrival.afterLoss
+        // The window that had the focus in a level in view went away (closed, minimized, its app hidden or quit), and
+        // its app reported the new focus before saying so: the loss counts from now.
+        if !afterLoss, key != active, let previous, previous != id, let was = self.key(containing: previous),
+           isCurrent(was), wentAway(previous, from: was, shown: shown) {
+            lastLossAt = now
+            afterLoss = true
+        }
+        // What can take the focus in view: the windows of the level in view that are on screen, the last used first.
+        let inView = FocusRoute.byLastUse((strips[active]?.allWindows ?? []).filter {
+            shown.contains($0) && windows[$0]?.traits.isMinimized != true
+        }, lastUsed: lastFocusedAt)
+        let pid = windows[id]?.pid
+        let route = FocusRoute.decide(windowLevel: key.level, active: active.level, byActivation: arrival.byActivation,
+                                      afterLoss: afterLoss, appWindowsInView: inView.filter { windows[$0]?.pid == pid },
+                                      windowsInView: inView, sinceOwnSwitch: levelSwitchedAt[key.stack].map { now - $0 })
+        let report = "Window \(id) of strip level \(key.level) got the focus"
+            + (afterLoss ? " as something in view went away" : arrival.byActivation ? " as its app came to the front" : "")
+        switch route {
+        case .none:
+            if key == active {
+                focusSettled(id, in: key)
+            } else {
+                Log.info("\(report) right after a level switch: a late report, left alone")
+                overlayHook?()
+            }
+        case .switchLevel where dragTracker.isMouseDown:
+            Log.info("\(report): its level comes into view once the mouse button is released")
+            pendingLevelSwitch = id
+            overlayHook?()
+        case .switchLevel:
+            Log.info("\(report): its level comes into view")
+            followFocus(to: id, in: key)
+        case .redirect(let window):
+            Log.info("\(report): window \(window), in view, gets it instead")
+            focus(window: window, in: active, mouseFollows: false)
+        case .takeKeyboard:
+            Log.info("\(report): nothing in view can take it")
+            takeKeyboardFocus()
+        }
+    }
+
+    /// A window of `key`, a level in view, is no longer on screen (`shown`): it closed or was minimized, or its app was
+    /// hidden or quit. A window the user took to another Space in Mission Control did not go away: it is on that Space.
+    private func wentAway(_ id: WindowID, from key: StripKey, shown: Set<WindowID>) -> Bool {
+        guard !shown.contains(id) else { return false }
+        let spaces = Private.spaces(for: [id])[id] ?? []
+        return spaces.isEmpty || spaces.contains(key.spaceID)
+    }
+
+    /// The level of `id`, a window of `key` that got the focus from outside Rambla, comes into view with that window
+    /// focused, leaving the pointer where it is. The window already has the focus, so its app may not report it again:
+    /// it counts as the most recently used here.
+    private func followFocus(to id: WindowID, in key: StripKey) {
+        switchLevel(of: key.stack, to: key.level, focusing: id, mouseFollows: false)
+        if isCurrent(key) { lastFocusedAt[id] = CFAbsoluteTimeGetCurrent() }
     }
 
     /// Scrolls the strip so its focused column is visible (per the centering mode) and applies the layout.
@@ -801,6 +945,16 @@ final class WindowManager {
             dropEmptyLevels(of: key.stack)
             for other in Array(strips.keys) where other.stack == key.stack && other != key { shelve(other) }
         }
+        // A focus that came before this pass read its window's Space (⌘Tab to an app on another desktop) is routed now
+        // that its stack is in view, if the window still has it. It is dropped once the focus moved on, or too late.
+        if let held = focusAwaitingSpace {
+            if focusedWindow == held.window, let home = key(containing: held.window), isCurrentStack(home.stack) {
+                focusAwaitingSpace = nil
+                route(held, in: home, leaving: nil)
+            } else if (focusedWindow != nil && focusedWindow != held.window) || now - held.at >= Self.spaceChangeWait {
+                focusAwaitingSpace = nil
+            }
+        }
         // Strips that wait for the apps' window lists need a reconcile once the wait is over, whichever came first.
         if waitingForWindowLists { checkDisplaysAgain(after: awaitingUntil - CFAbsoluteTimeGetCurrent() + 0.05) }
         onStateChanged?()
@@ -910,9 +1064,9 @@ final class WindowManager {
     }
 
     /// Removes an empty level that is no longer needed (`StripLevels.droppable`): its strip, its layout and its record
-    /// of hidden windows. A level that still has windows stays.
+    /// of hidden windows. Level 0, the level in view and a level that still has windows always stay, whoever asks.
     func dropLevel(_ key: StripKey) {
-        guard strips[key]?.columns.isEmpty ?? true else { return }
+        guard key.level != 0, key.level != activeLevel(of: key.stack), strips[key]?.columns.isEmpty ?? true else { return }
         strips[key] = nil
         results[key] = nil
         hidden[key] = nil
@@ -1254,7 +1408,8 @@ final class WindowManager {
         if automatic { autoFloated.insert(id) } else { autoFloated.remove(id) }
         requested[id] = nil
         animator.cancel(id)
-        if center, let display = display(for: key), let frame = windows[id]?.frame {
+        // A window of a level out of view floats on the display of its stack too, instead of where it was parked.
+        if center, let display = display(forStack: key.stack), let frame = windows[id]?.frame {
             let area = display.visible
             let size = CGSize(width: min(frame.width, area.width * 0.8), height: min(frame.height, area.height * 0.8))
             let target = CGRect(x: area.midX - size.width / 2, y: area.midY - size.height / 2,
@@ -1262,13 +1417,21 @@ final class WindowManager {
             write([id: target], verify: true)
             worker(for: id)?.raise(id)
         }
-        apply(key, animate: true)
+        if isCurrent(key) { apply(key, animate: true) } else { shelve(key) }
         onStateChanged?()
     }
 
     // MARK: - Mouse drags
 
     private func mouseUp(at point: CGPoint) {
+        // The level of a window that got the focus while the button was down comes into view now, if that window still
+        // has the focus and its level is still out of view.
+        if let id = pendingLevelSwitch {
+            pendingLevelSwitch = nil
+            if focusedWindow == id, let key = key(containing: id), !isCurrent(key), isCurrentStack(key.stack) {
+                followFocus(to: id, in: key)
+            }
+        }
         if let key = pendingReveal {
             pendingReveal = nil
             reveal(key)

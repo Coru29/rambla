@@ -32,24 +32,27 @@ extension WindowManager {
     /// Brings `level` of `stack` into view, a new empty one when it has no strip yet, and focuses `window` (one of that
     /// level's) or else the level's focused window. The windows that arrive jump to their places first, behind the ones
     /// that leave, which then jump to their parking spots: nothing crosses the display and nothing in between shows. On
-    /// an empty level Rambla takes the keyboard, so nothing typed reaches a window out of sight.
-    func switchLevel(of stack: StackKey, to level: Int, focusing window: WindowID? = nil) {
+    /// an empty level Rambla takes the keyboard, so nothing typed reaches a window out of sight. `mouseFollows` is
+    /// false when the switch follows a focus from outside Rambla (`FocusRoute`): "mouse follows focus" is for the focus
+    /// Rambla gives through its own shortcuts.
+    func switchLevel(of stack: StackKey, to level: Int, focusing window: WindowID? = nil, mouseFollows: Bool = true) {
         guard isRunning, !isPaused, isCurrentStack(stack), level >= 0, level <= topLevel(of: stack) + 1 else { return }
         let old = activeLevel(of: stack)
         let new = stack.level(level)
         let chosen = window.flatMap { strips[new]?.contains($0) == true ? $0 : nil }
         guard level != old else {
-            if let chosen { focus(window: chosen, in: new) }
+            if let chosen { focus(window: chosen, in: new, mouseFollows: mouseFollows) }
             return
         }
         activeLevels[stack] = level
+        levelSwitchedAt[stack] = CFAbsoluteTimeGetCurrent()
         if strips[new] == nil { strips[new] = Strip() }
         apply(new, animate: false)
         shelve(stack.level(old))
         dropEmptyLevels(of: stack)
         // A strip read from an older file may have no focused column: its first one then.
         if let focused = chosen ?? strips[new]?.focusedWindow ?? strips[new]?.columns.first?.activeWindow {
-            focus(window: focused, in: new)
+            focus(window: focused, in: new, mouseFollows: mouseFollows)
         } else {
             takeKeyboardFocus()
             emptyLevelHook?(stack)
@@ -71,21 +74,18 @@ extension WindowManager {
         return true
     }
 
-    /// Nothing in view to give the keyboard to (an empty level came into view): Rambla takes it, so nothing typed
-    /// reaches a window out of sight. No window has the focus until the user picks one, or opens or chooses an app.
+    /// Nothing in view to give the keyboard to (an empty level came into view, or the last window in view went away
+    /// while the focus landed out of view): Rambla takes it, so nothing typed reaches a window out of sight, and shows
+    /// nothing. No window has the focus until the user picks one, or opens or chooses an app.
     func takeKeyboardFocus() {
         focusedWindow = nil
         overlayHook?()
         Log.info("Nothing to focus in view: Rambla takes the keyboard")
+        // The WindowServer brings Rambla to the front without raising any of its windows. NSApp.activate() could bring
+        // an open Settings window forward, so it is only the fallback for when that private call is missing or fails.
+        if Private.activateOwnProcess() { return }
+        Log.error("Could not take the keyboard through the WindowServer: activating Rambla instead")
         NSApp.activate()
-        // Cooperative activation (macOS 14) may ignore that from an app in the background: if Rambla is still not in
-        // front on the next turn, and no window took the focus meanwhile, the WindowServer is asked directly.
-        DispatchQueue.main.async { [weak self] in
-            MainActor.assumeIsolated {
-                guard let self, self.focusedWindow == nil, !NSApp.isActive else { return }
-                if !Private.activateOwnProcess() { Log.error("Could not bring Rambla to the front") }
-            }
-        }
     }
 
     // MARK: - Sending windows
