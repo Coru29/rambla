@@ -93,22 +93,32 @@ extension WindowManager {
     }
 
     /// A short vertical swipe: the fingers (or the pointer) went up when `fingersUp`. With the device's natural direction
-    /// the content follows them, so going down shows the strip above. Acts on the stack under the pointer.
+    /// the content follows them, so going down shows the strip above. Acts on the stack under the pointer; while the
+    /// overview shows that stack, on its rows instead: the selection goes to the row above or below (`overviewSwipe`).
     func stripSwipe(fingersUp: Bool, onTrackpad: Bool) {
         guard isRunning, !isPaused, gestureKey == nil, let stack = stackUnderPointer() else { return }
         let natural = onTrackpad ? prefs.trackpad.natural : prefs.mouseButtons.natural
         let up = StripLevels.stripAbove(fingersUp: fingersUp, natural: natural)
+        // At the top or the bottom row nothing happens, as at either end of the stack.
+        if let moved = overviewSwipe?(stack, up, true) {
+            let row = up ? "the row above" : "the row below"
+            Log.info("Swipe \(fingersUp ? "up" : "down") over the overview: " + (moved ? row : "no row that way"))
+            return
+        }
         Log.info("Swipe \(fingersUp ? "up" : "down"): strip \(up ? "above" : "below")")
         // At either end of the stack nothing happens, and nothing more is needed.
         stepLevel(up: up, on: stack)
     }
 
-    /// The swipe just became a short vertical one: a haptic tap when there is a strip that way (trackpad, haptics on).
+    /// The swipe just became a short vertical one: a haptic tap when there is a strip that way, or, over the overview
+    /// of that stack, a row (trackpad, haptics on).
     func stripSwipeArmed(fingersUp: Bool) {
         guard isRunning, !isPaused, gestureKey == nil, prefs.trackpad.haptics, let stack = stackUnderPointer() else { return }
         let up = StripLevels.stripAbove(fingersUp: fingersUp, natural: prefs.trackpad.natural)
-        guard StripLevels.target(from: activeLevel(of: stack), up: up, top: topLevel(of: stack),
-                                 occupied: occupiedLevels(of: stack)) != nil else { return }
+        let somewhere = overviewSwipe?(stack, up, false)
+            ?? (StripLevels.target(from: activeLevel(of: stack), up: up, top: topLevel(of: stack),
+                                   occupied: occupiedLevels(of: stack)) != nil)
+        guard somewhere else { return }
         Haptics.gesture()
     }
 

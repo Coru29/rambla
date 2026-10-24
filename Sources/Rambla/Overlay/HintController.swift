@@ -37,6 +37,15 @@ final class HintController {
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.visibleDuration, execute: work)
     }
 
+    /// Fades the hint out now instead of when its time is up: what it says no longer holds (the empty strip it was about
+    /// was left for one with windows), or something else takes its place (the overview).
+    func hide() {
+        guard let window, window.isVisible else { return }
+        hideWork?.cancel()
+        hideWork = nil
+        fadeOut()
+    }
+
     private func fadeOut() {
         guard let window else { return }
         fadeToken += 1

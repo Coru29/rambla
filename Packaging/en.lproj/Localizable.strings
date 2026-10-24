@@ -114,6 +114,11 @@
 "Esta pantalla no tiene ventanas" = "This display has no windows";
 "Tira vacía" = "Empty strip";
 
+/* Rambla/Overlay/OverviewController.swift */
+"← → elegí una ventana · arrastrala o ⇧← → para moverla · ↩ la enfoca · esc cierra" = "← → choose a window · drag it or ⇧← → to move it · ↩ focuses it · esc closes";
+"← → ↑ ↓ elegí una ventana · arrastrala o ⇧ + flecha para moverla · ↩ la enfoca · esc cierra" = "← → ↑ ↓ choose a window · drag it or ⇧ + arrow to move it · ↩ focuses it · esc closes";
+"Tira nueva" = "New strip";
+
 /* Rambla/Settings/SettingsWindowController.swift */
 "Configuración de Rambla" = "Rambla Settings";
 
@@ -353,7 +358,6 @@
 "Mandar a la tira de arriba" = "Send to the strip above";
 "Mandar a la tira de abajo" = "Send to the strip below";
 "Vista general" = "Overview";
-"← → elegí una ventana · arrastrala o ⇧← → para moverla · ↩ la enfoca · esc cierra" = "← → choose a window · drag it or ⇧← → to move it · ↩ focuses it · esc closes";
 "Rotar ancho" = "Cycle width";
 "Ancho completo" = "Full width";
 "Centrar columna" = "Center column";

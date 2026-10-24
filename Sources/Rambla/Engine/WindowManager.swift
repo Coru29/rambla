@@ -145,6 +145,10 @@ final class WindowManager {
     var overviewHook: ((StripKey) -> Void)?
     /// Offered every shortcut first while the overview is on screen; true when the overview used it.
     var overviewAction: ((Action) -> Bool)?
+    /// Offered a short vertical swipe on a stack first while the overview is on screen (`up`: toward the strip above).
+    /// Nil when the overview does not show that stack, and the swipe changes strips. Otherwise whether its selection
+    /// can go to the row that way, and, with `move`, it goes there.
+    var overviewSwipe: ((_ stack: StackKey, _ up: Bool, _ move: Bool) -> Bool?)?
     /// Called when another level of that stack comes into view (the levels indicator).
     var levelHook: ((StackKey) -> Void)?
     /// Called when the level that came into view of that stack is empty (its hint).
@@ -786,6 +790,25 @@ final class WindowManager {
         let pid = windows[id]?.pid
         let report = "Window \(id), which has the focus, is now out of view on strip level \(key.level)"
         if let window = inView.first(where: { windows[$0]?.pid == pid }) ?? inView.first {
+            Log.info("\(report): window \(window), in view, gets it instead")
+            focus(window: window, in: active, routed: true)
+        } else {
+            Log.info("\(report): nothing in view can take it")
+            takeKeyboardFocus()
+        }
+    }
+
+    /// The focused window is on a level out of view of a stack in view, because its column was moved there
+    /// (`moveColumn(id:from:toLevel:at:handOverKeyboard:)`): nothing typed may reach it there, and the level in view
+    /// does not change for it. That level's focused window gets the keyboard (when it is not on screen, the window of
+    /// that level used last that is), or Rambla takes it when that level has none. The pointer stays where it is.
+    func keepKeyboardInView() {
+        guard isRunning, !isPaused, let id = focusedWindow, let home = key(containing: id), !isCurrent(home),
+              isCurrentStack(home.stack) else { return }
+        let active = home.stack.level(activeLevel(of: home.stack))
+        let inView = windowsInView(of: active)
+        let report = "Window \(id), which has the focus, went to strip level \(home.level), out of view"
+        if let window = strips[active]?.focusedWindow.flatMap({ inView.contains($0) ? $0 : nil }) ?? inView.first {
             Log.info("\(report): window \(window), in view, gets it instead")
             focus(window: window, in: active, routed: true)
         } else {

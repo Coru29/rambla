@@ -14,7 +14,11 @@ final class OverlayCoordinator {
         onChoose: { [weak self] id, key in self?.focusFromOverview(id, in: key) },
         onMove: { [weak self] column, target, key, window in
             self?.moveFromOverview(column, toPlaceOf: target, in: key, selecting: window)
-        })
+        },
+        onSend: { [weak self] column, key, level, index, window in
+            self?.sendFromOverview(column, from: key, toLevel: level, at: index, selecting: window)
+        },
+        onDismiss: { [weak self] in self?.engine.keepKeyboardInView() })
     private let border = FocusBorderController()
     private let hint = HintController()
     private let dimmer = DimmerController()
@@ -28,10 +32,11 @@ final class OverlayCoordinator {
         self.engine = engine
         engine.overlayHook = { [weak self] in self?.refresh() }
         engine.indicatorHook = { [weak self] key, modifiers in self?.showIndicator(key, holding: modifiers) }
-        engine.levelHook = { [weak self] stack in self?.showLevels(of: stack) }
+        engine.levelHook = { [weak self] stack in self?.levelChanged(on: stack) }
         engine.emptyLevelHook = { [weak self] stack in self?.showEmptyStripHint(of: stack) }
         engine.overviewHook = { [weak self] key in self?.toggleOverview(key) }
         engine.overviewAction = { [weak self] action in self?.overview.perform(action) ?? false }
+        engine.overviewSwipe = { [weak self] stack, up, move in self?.overview.swipe(on: stack, up: up, move: move) ?? nil }
     }
 
     func refresh() {
@@ -135,9 +140,18 @@ final class OverlayCoordinator {
         }
     }
 
-    /// Another strip of `stack` came into view: shows the stack on its display, unless the indicator is off. With one
-    /// strip left (the empty one that was just left is dropped) there is nothing to tell apart: nothing is shown, and the
-    /// panel of the switch before, which still lists the dropped strip, goes.
+    /// Another strip of `stack` came into view. The hint of an empty strip that was left goes, unless the strip that
+    /// came is empty too: Rambla holds the keyboard then (`takeKeyboardFocus`), and the engine has just shown that
+    /// strip's own hint. An overview of the stack no longer shows the strip in view as it is, and goes.
+    private func levelChanged(on stack: StackKey) {
+        if engine.focusedWindow != nil { hint.hide() }
+        if overview.shows(stack) { overview.close() }
+        showLevels(of: stack)
+    }
+
+    /// Shows the stack on its display, unless the indicator is off. With one strip left (the empty one that was just
+    /// left is dropped) there is nothing to tell apart: nothing is shown, and the panel of the switch before, which still
+    /// lists the dropped strip, goes.
     private func showLevels(of stack: StackKey) {
         guard engine.prefs.indicatorEnabled, let display = engine.display(forStack: stack) else { return }
         let rows = levelRows(of: stack)
@@ -164,24 +178,21 @@ final class OverlayCoordinator {
 
     // MARK: - Overview
 
-    /// Largest card height, as a share of the screen: an overview, not another copy of the screen.
-    private static let overviewHeight: CGFloat = 0.42
-    /// Smallest scale before the strip scrolls sideways instead of shrinking further.
-    private static let overviewMinScale: CGFloat = 0.16
-
+    /// Opens the overview of the stack of `key`, the strip in view, or closes it when it is on screen. A stack without a
+    /// window in any of its strips has nothing to show: a hint says how to bring one.
     private func toggleOverview(_ key: StripKey) {
         if overview.isShown {
             overview.hide()
             return
         }
         guard let display = engine.display(for: key) else { return }
-        guard let content = overviewContent(for: key, display: display) else {
-            // A display without windows has nothing to show: say how to bring one.
-            if engine.strips[key]?.columns.isEmpty ?? true { showEmptyHint(on: display.screen) }
+        guard let content = overviewContent(for: key.stack, display: display) else {
+            showEmptyHint(on: display.screen)
             return
         }
+        hint.hide()
         indicator.hide()
-        overview.show(content, key: key, on: display.screen)
+        overview.show(content, stack: key.stack, on: display.screen)
     }
 
     private func showEmptyHint(on screen: NSScreen) {
@@ -191,58 +202,76 @@ final class OverlayCoordinator {
         hint.show(String(localized: "Esta pantalla no tiene ventanas"), detail: detail, on: screen)
     }
 
-    /// `selecting` is the window the overview starts on (the focused one when nil).
-    private func overviewContent(for key: StripKey, display: DisplayInfo, selecting: WindowID? = nil) -> OverviewContent? {
-        guard let strip = engine.strips[key], !strip.columns.isEmpty, let result = engine.results[key] else { return nil }
-        let hidden = engine.hidden[key] ?? []
-        var pinned: [UUID: Double] = [:]
-        for column in strip.columns where column.pinned != nil {
-            if let frame = result.columnFrames[column.id] { pinned[column.id] = Double(frame.width) }
-        }
-        let overview = Overview(strip: strip, metrics: result.metrics, pinnedWidths: pinned, gap: engine.prefs.innerGap,
-                                hidden: hidden, focused: selecting ?? engine.focusedWindow)
+    /// The overview of a stack: a row per level from the top one down to 0, each laid out as it is in view, or would be
+    /// (a strip out of view keeps its place for when it comes back). `selecting` is the window the overview starts on
+    /// (the focused one, and in each other row its strip's focused column, when nil). Nil when no strip has a window.
+    private func overviewContent(for stack: StackKey, display: DisplayInfo, selecting: WindowID? = nil) -> OverviewContent? {
+        var rows: [OverviewStack.Row] = []
         var items: [WindowID: OverviewItem] = [:]
-        for column in strip.columns {
-            for id in column.windows {
+        for level in (0...engine.topLevel(of: stack)).reversed() {
+            let key = stack.level(level)
+            let strip = engine.strips[key] ?? Strip()
+            let hidden = engine.hidden[key] ?? []
+            let result = Layout.compute(engine.layoutInput(for: key, strip: strip, display: display))
+            var pinned: [UUID: Double] = [:]
+            for column in strip.columns where column.pinned != nil {
+                if let frame = result.columnFrames[column.id] { pinned[column.id] = Double(frame.width) }
+            }
+            rows.append(OverviewStack.Row(level: level, overview: Overview(
+                strip: strip, metrics: result.metrics, pinnedWidths: pinned, gap: engine.prefs.innerGap, hidden: hidden,
+                focused: selecting ?? engine.focusedWindow)))
+            for id in strip.allWindows {
                 let record = engine.windows[id]
                 let app = record.flatMap { NSRunningApplication(processIdentifier: $0.pid)?.localizedName } ?? ""
                 items[id] = OverviewItem(app: app, title: record?.title ?? "", icon: icon(for: id), tint: tint(for: id),
                                          hidden: hidden.contains(id))
             }
         }
-        // Cards keep the windows' proportions: as tall as a share of the screen, narrower when the strip is long. Small
-        // cards and gaps are drawn wider than their share, so it shrinks a few times until the row fits.
-        let screen = display.screen.frame
-        var content = OverviewContent(overview: overview, items: items,
-                                      scale: screen.height * Self.overviewHeight / max(display.visible.height, 1),
-                                      cardHeight: 0)
-        let room = screen.width - 160
-        for _ in 0..<3 {
-            let width = CGFloat(content.drawn.width)
-            guard width > room, content.scale > Self.overviewMinScale else { break }
-            content.scale = max(content.scale * room / width, Self.overviewMinScale)
+        guard rows.contains(where: { !$0.overview.cards.isEmpty }) else { return nil }
+        let active = engine.activeLevel(of: stack)
+        var model = OverviewStack(rows: rows, activeLevel: active)
+        if let selecting, let row = rows.firstIndex(where: { $0.overview.cards.contains { $0.windows.contains(selecting) } }) {
+            model.select(row: row, rows[row].overview.selection)
         }
-        content.cardHeight = display.visible.height * content.scale
-        return content
+        return OverviewContent(stack: model, items: items, activeLevel: active, screen: display.screen.frame.size,
+                               visible: display.visible.size)
     }
 
-    /// A column moved in the overview: the strip behind it changes, and the overview shows it as it is now. Columns
-    /// are found by id, since the strip may have changed since the overview was made.
+    /// A column moved in its row of the overview: its strip changes, and the overview shows the stack as it is now.
+    /// Columns are found by id, since the strip may have changed since the overview was made.
     private func moveFromOverview(_ column: UUID, toPlaceOf target: UUID, in key: StripKey,
                                   selecting window: WindowID?) -> OverviewContent? {
-        guard let display = engine.display(for: key), let strip = engine.strips[key],
+        guard let display = engine.display(forStack: key.stack), let strip = engine.strips[key],
               let from = strip.index(ofColumn: column), let to = strip.index(ofColumn: target) else { return nil }
         engine.moveColumn(in: key, from: from, to: to)
-        return overviewContent(for: key, display: display, selecting: window)
+        return overviewContent(for: key.stack, display: display, selecting: window)
     }
 
-    /// A window chosen in the overview, unless it closed meanwhile.
+    /// A column sent to another strip of the stack in the overview (dragged to another row or to the new strip, or
+    /// ⇧↑ ⇧↓): the overview shows the stack as it is now. The overview holds the keyboard meanwhile, so a focused window
+    /// that goes out of view with its column hands it over only once the overview closes (`onDismiss`).
+    private func sendFromOverview(_ column: UUID, from key: StripKey, toLevel level: Int, at index: Int?,
+                                  selecting window: WindowID?) -> OverviewContent? {
+        guard let display = engine.display(forStack: key.stack), engine.strips[key]?.index(ofColumn: column) != nil else {
+            return nil
+        }
+        engine.moveColumn(id: column, from: key, toLevel: level, at: index, handOverKeyboard: false)
+        guard engine.strips[key.stack.level(level)]?.index(ofColumn: column) != nil else { return nil }
+        return overviewContent(for: key.stack, display: display, selecting: window)
+    }
+
+    /// A window chosen in the overview, unless it closed meanwhile. One of the strip in view gets the focus; one of
+    /// another strip brings that strip into view, with it focused.
     private func focusFromOverview(_ id: WindowID, in key: StripKey) {
         guard engine.windows[id] != nil, engine.strips[key]?.contains(id) == true else {
             NSSound.beep()
             return
         }
-        engine.focus(window: id, in: key)
+        if key.level == engine.activeLevel(of: key.stack) {
+            engine.focus(window: id, in: key)
+        } else {
+            engine.switchLevel(of: key.stack, to: key.level, focusing: id)
+        }
     }
 
     /// The app's color for its miniature in the overview.

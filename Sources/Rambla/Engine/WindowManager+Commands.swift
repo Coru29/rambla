@@ -170,13 +170,25 @@ extension WindowManager {
     }
 
     /// Moves a column (the strip indicator's or the overview's drag): the focused window keeps the focus and stays in
-    /// view, where the keyboard still is.
+    /// view, where the keyboard still is. A strip out of view (another row of the overview) keeps its focused column
+    /// for when it comes back, and stays out of sight.
     func moveColumn(in key: StripKey, from: Int, to: Int) {
         guard var strip = strips[key], strip.columns.indices.contains(from), strip.columns.indices.contains(to) else { return }
+        let focusedColumn = strip.focusedColumn?.id
         strip.moveColumn(from: from, to: to)
-        if let id = focusedWindow, strip.contains(id) { strip.focus(window: id) }
+        let inView = isCurrent(key)
+        if let id = focusedWindow, strip.contains(id) {
+            strip.focus(window: id)
+        } else if !inView, let focusedColumn {
+            strip.focused = strip.index(ofColumn: focusedColumn)
+        }
         strips[key] = strip
-        reveal(key)
+        if inView {
+            reveal(key)
+        } else {
+            shelve(key)
+            scheduleSave()
+        }
         onStateChanged?()
     }
 

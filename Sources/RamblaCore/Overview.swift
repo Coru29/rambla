@@ -3,6 +3,7 @@ import Foundation
 /// The overview ("Vista general"): one strip laid out as a single row of cards, to see every window at once and jump
 /// to one. Positions are strip points (the view scales them to fit its screen): the left-pinned column first, then the
 /// strip's columns in order, then the right-pinned one, `gap` apart. It also keeps the selection the keyboard moves.
+/// The overview of a display shows one per strip of its stack (`OverviewStack`).
 public struct Overview: Equatable, Sendable {
     public struct Card: Equatable, Identifiable, Sendable {
         /// The column's id: the card stays the same card when the columns move.
@@ -162,6 +163,23 @@ public struct Overview: Equatable, Sendable {
         return (cards[card].id, cards[slot].id)
     }
 
+    /// Where a card of another row (another strip), dragged with its center at `center` (drawn points), lands in this
+    /// one: like `dropSlot`, after every movable card whose center is left of it, so always between the pinned ones.
+    /// The place is a card index: the cards from there on make room.
+    public func insertionSlot(center: Double, in drawn: Drawn) -> Int {
+        guard let movable else { return cards.filter { $0.pinned == .left }.count }
+        return movable.lowerBound + movable.filter { (drawn.cards[$0].lowerBound + drawn.cards[$0].upperBound) / 2 < center }.count
+    }
+
+    /// The index in the strip's columns at which a column that comes from another strip, unpinned, is drawn at card
+    /// place `slot` (`insertionSlot`): before the column of the movable card there, or after the last movable one.
+    /// Pinned columns can sit anywhere in the strip's array, so the card index alone would not do.
+    public func columnIndex(insertingAt slot: Int) -> Int {
+        // Without unpinned columns, any index draws it between the pinned ones.
+        guard let movable else { return 0 }
+        return slot <= movable.upperBound ? cards[max(slot, movable.lowerBound)].column : cards[movable.upperBound].column + 1
+    }
+
     /// The window of the `number`th card from 1, the one its column shows. Like ⌃⌘1…9, it counts only the columns
     /// with a window on screen.
     public func window(atCard number: Int) -> WindowID? {
@@ -203,6 +221,15 @@ public struct Overview: Equatable, Sendable {
             return cards[card].active
         }
         return windows.firstIndex { !hidden.contains($0) } ?? cards[card].active
+    }
+
+    /// The row a card is entered on from the row of cards below it (`fromBelow`) or above it (`OverviewStack`): of a
+    /// stack, its window on screen nearest that side; of tabs, which share one miniature, the one it shows (`entryRow`).
+    func entryRow(_ card: Int, fromBelow: Bool) -> Int {
+        let windows = cards[card].windows
+        guard !cards[card].tabbed else { return entryRow(card) }
+        let open = windows.indices.filter { !hidden.contains(windows[$0]) }
+        return (fromBelow ? open.last : open.first) ?? entryRow(card)
     }
 
     public mutating func select(_ selection: Selection) {

@@ -131,8 +131,12 @@ extension WindowManager {
     /// Moves a whole column (its windows, width and mode; not its pin) to `level` of the same stack, at `index`, or
     /// after that level's focused column when nil: the overview's drags between rows, and ⇧↑ ⇧↓ there. Each of the two
     /// levels is laid out where it is, the one in view on screen and any other out of sight. The level in view does not
-    /// change, nor does the keyboard focus: that is the caller's.
-    func moveColumn(id columnID: UUID, from key: StripKey, toLevel level: Int, at index: Int?) {
+    /// change. When the column holds the focused window and goes out of view, the keyboard does not stay with it: a
+    /// window in view gets it, or Rambla takes it (`keepKeyboardInView`). Unless `handOverKeyboard` is false: the
+    /// overview holds the keyboard while it is on screen, and handing it over then would close it, so it does that
+    /// itself once it closes.
+    func moveColumn(id columnID: UUID, from key: StripKey, toLevel level: Int, at index: Int?,
+                    handOverKeyboard: Bool = true) {
         let stack = key.stack
         guard isRunning, !isPaused, isCurrentStack(stack), level >= 0, level != key.level,
               level <= topLevel(of: stack) + 1, var source = strips[key],
@@ -157,6 +161,7 @@ extension WindowManager {
         layOutLevel(targetKey)
         layOutLevel(key)
         dropEmptyLevels(of: stack)
+        if handOverKeyboard, let id = focusedWindow, column.windows.contains(id) { keepKeyboardInView() }
         onStateChanged?()
         scheduleSave()
     }
