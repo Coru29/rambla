@@ -16,7 +16,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         onChange: { [weak self] dx in self?.engine.gestureChanged(dx) },
         onEnd: { [weak self] velocity in self?.engine.gestureEnded(velocity: velocity) },
         onVertical: { [weak self] up in self?.engine.verticalSwipe(up: up, onTrackpad: true) },
-        onOverview: { [weak self] in self?.engine.showOverviewUnderPointer(onTrackpad: true) })
+        onOverview: { [weak self] in self?.engine.showOverviewUnderPointer(onTrackpad: true) },
+        // The scroll tap keeps the swipe's scrolling from the app under the pointer.
+        onTouches: { [weak self] touching, time in self?.wheel.touched(touching, at: time) })
     private lazy var wheel = ScrollWheelTracker(handlers: .init(
         step: { [weak self] columns in self?.engine.wheelStep(columns) },
         // Two fingers on the trackpad scroll like a wheel; a Magic Mouse has no haptic engine and taps nothing.
@@ -165,16 +167,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func applyInputs() {
         let prefs = store.prefs
         let active = !engine.isPaused && prefs.enabled
-        gestures.configure(enabled: active && prefs.trackpad.enabled, fingers: prefs.trackpad.fingers,
-                           vertical: prefs.trackpad.verticalSwipe)
-        wheel.configure(enabled: active && prefs.mouse.enabled, modifiers: prefs.mouse.modifiers)
+        let trackpad = active && prefs.trackpad.enabled
+        let fingers = prefs.trackpad.fingers
+        gestures.configure(enabled: trackpad, fingers: fingers, vertical: prefs.trackpad.verticalSwipe)
+        // The scroll tap serves the wheel, and keeps the trackpad swipe's scrolling from the apps: only with a finger
+        // count a swipe can have, since 2 would keep every two-finger scroll from them.
+        wheel.configure(wheel: active && prefs.mouse.enabled, modifiers: prefs.mouse.modifiers,
+                        swipeFingers: trackpad && (3...4).contains(fingers) ? fingers : nil)
         mouseButtons.configure(enabled: active && prefs.mouseButtons.enabled, buttons: prefs.mouseButtons.buttons)
         mouseFocus.setEnabled(active && prefs.focusFollowsMouse)
     }
 
     /// The wheel's and the mouse buttons' taps must stay ahead of other apps' (Mac Mouse Fix's, for one), and a tap
     /// created later goes first. So after any app starts, once it has had time to set up its own (3 s, and 15 s for a
-    /// slow start), Rambla makes its taps again. Cheap, and nothing happens while those features are off.
+    /// slow start), Rambla makes its taps again. Cheap, and nothing happens while those taps are off.
     private func keepInputTapsInFront() {
         launchObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didLaunchApplicationNotification, object: nil, queue: .main

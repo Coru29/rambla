@@ -35,6 +35,16 @@ import Testing
     #expect(TrackpadSwipe.frame(touching: 2, total: 2, fingers: 4) == .end)     // a two-finger scroll
 }
 
+@Test func newFingersMeanTheLiftWentUnreported() {
+    // Fingers by `NSTouch.identity`, which a finger keeps while it touches. All of them new: the others lifted in
+    // between, and macOS never reported it.
+    #expect(TrackpadSwipe.liftWentUnreported(before: [1, 2, 3, 4], now: [5, 6]))
+    #expect(!TrackpadSwipe.liftWentUnreported(before: [1, 2, 3, 4], now: [1, 2]))     // lifting one by one
+    #expect(!TrackpadSwipe.liftWentUnreported(before: [1], now: [1, 5, 6]))           // landing beside a resting one
+    #expect(!TrackpadSwipe.liftWentUnreported(before: [], now: [5, 6]))               // the lift was reported
+    #expect(!TrackpadSwipe.liftWentUnreported(before: [1, 2], now: []))               // the lift itself
+}
+
 // MARK: - Up and down
 
 @Test func upGivesTheFullWidthAtOnce() {
