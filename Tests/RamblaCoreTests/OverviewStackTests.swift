@@ -88,6 +88,16 @@ private func stacking(_ windows: [WindowID], in column: Int, of strip: Strip, ta
     #expect(between.selectedWindow == 2)
 }
 
+@Test func aFallbackRowStartsOnACardThatCanBeChosen() {
+    // The strip in view is empty, and the one above focuses a column whose only window's app is hidden: the selection
+    // starts on that row's first card that can be chosen, not on the hidden one.
+    let above = overview(strip([300, 300, 300], first: 11, focused: 0), hidden: [11])
+    #expect(above.cards[above.selection.card].collapsed)
+    let stack = OverviewStack(rows: [row(1, above), row(0, overview(Strip()))], activeLevel: 0)
+    #expect(stack.selectedRow == 0)
+    #expect(stack.selectedWindow == 12)
+}
+
 @Test func aRowWhoseWindowsAreAllHiddenHasNothingToChoose() {
     // Level 0 in view has only a minimized window: the selection goes to the level above, which has one on screen.
     let stack = OverviewStack(rows: [row(1, overview(strip([300], first: 11))), row(0, overview(strip([300], first: 1), hidden: [1]))],
@@ -247,6 +257,28 @@ private func stacking(_ windows: [WindowID], in column: Int, of strip: Strip, ta
     stack.select(row: 5, Overview.Selection(card: 0, row: 0))
     #expect(stack.selectedRow == 0)
     #expect(stack.selectedWindow == 12)
+}
+
+// MARK: - A new strip
+
+@Test func theOnlyColumnOfTheTopStripMakesNoNewStrip() {
+    // Moving it up would only leave an empty strip below.
+    let bottom = row(0, overview(strip([300, 300], first: 1)))
+    let stack = OverviewStack(rows: [row(1, overview(strip([300], first: 11))), bottom], activeLevel: 0)
+    #expect(!stack.offersNewStrip(movingFrom: 0))
+    #expect(stack.offersNewStrip(movingFrom: 1))
+    // With two columns on top, either one can go up.
+    let two = OverviewStack(rows: [row(1, overview(strip([300, 300], first: 11))), bottom], activeLevel: 0)
+    #expect(two.offersNewStrip(movingFrom: 0))
+    // A strip alone with one window has nothing to make a new strip from.
+    let alone = OverviewStack(rows: [row(0, overview(strip([300], first: 1)))], activeLevel: 0)
+    #expect(!alone.offersNewStrip(movingFrom: 0))
+}
+
+@Test func anEmptyTopStripTakesTheCardInsteadOfANewOne() {
+    let stack = OverviewStack(rows: [row(1, overview(Strip())), row(0, overview(strip([300, 300], first: 1)))],
+                              activeLevel: 1)
+    #expect(!stack.offersNewStrip(movingFrom: 1))
 }
 
 // MARK: - A card dropped on another row

@@ -23,7 +23,9 @@ public struct OverviewStack: Equatable, Sendable {
 
     /// The selection starts in the row of `activeLevel`, on that overview's own selection; when that row has no cards,
     /// in the nearest row that has. A row has cards to choose when one of them has a window on screen; with one as near
-    /// on each side, the row below, the way back from an empty strip (`StripLevels.nearestOccupied`).
+    /// on each side, the row below, the way back from an empty strip (`StripLevels.nearestOccupied`). That row's own
+    /// selection may be a card with no window on screen (its strip focuses a column of a hidden app): then its first
+    /// card that can be chosen.
     public init(rows: [Row], activeLevel: Int) {
         self.rows = rows
         let active = rows.firstIndex { $0.level == activeLevel } ?? 0
@@ -34,6 +36,11 @@ public struct OverviewStack: Equatable, Sendable {
         let candidates = rows.indices.filter { Self.hasCards(rows[$0]) }
         // Rows go from the highest level down, so on a tie the larger index is the row below.
         selectedRow = candidates.min { (abs($0 - active), -$0) < (abs($1 - active), -$1) } ?? active
+        guard selectedRow != active else { return }
+        let overview = self.rows[selectedRow].overview
+        if !overview.cards.indices.contains(overview.selection.card) || overview.cards[overview.selection.card].collapsed {
+            self.rows[selectedRow].overview.move(.first)
+        }
     }
 
     public var selectedWindow: WindowID? {
@@ -84,6 +91,14 @@ public struct OverviewStack: Equatable, Sendable {
         selectedRow = target
         rows[target].overview.select(Overview.Selection(card: card, row: overview.entryRow(card, fromBelow: up)))
         return true
+    }
+
+    /// Whether a column of `row` can go to a new strip above the top one: the top row has windows (an empty top strip is
+    /// already there to take it), and the column is not the only one of the top row, which would only leave an empty
+    /// strip below the new one.
+    public func offersNewStrip(movingFrom row: Int) -> Bool {
+        guard let top = rows.first, !top.overview.cards.isEmpty else { return false }
+        return row != 0 || top.overview.cards.count > 1
     }
 
     /// Chooses a window of any row; nothing changes when there is none at `selection`.

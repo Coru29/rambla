@@ -79,6 +79,9 @@ struct OverviewContent {
     static let minimumCardHeight: CGFloat = 48
     /// Smallest scale before a row scrolls sideways instead of shrinking further.
     static let minimumScale: CGFloat = 0.16
+    /// How far up a card has to be dragged before the new strip above the rows takes it: more than a reorder of the top
+    /// row drifts, even when the card was picked up by its title bar, right under the new strip.
+    static let newStripTravel: CGFloat = 2 * rowPadding
 
     /// The overview of `stack` on a screen of `screen` points, whose windows have `visible` (without the menu bar and
     /// the Dock). Cards keep the windows' proportions, at one scale for every row: as tall as a share of the screen,
@@ -119,10 +122,6 @@ struct OverviewContent {
 
     /// A row as tall as it is drawn: its cards and the room around them.
     var rowHeight: CGFloat { cardHeight + 2 * Self.rowPadding }
-
-    /// A card dragged out of its row can make a new strip above the top one, unless the top one is an empty strip,
-    /// already there to drop on.
-    var offersNewStrip: Bool { stack.rows.first.map { !$0.overview.cards.isEmpty } ?? false }
 }
 
 /// Where a card dragged out of its row is let go: at a place among the cards of another row (`Overview.insertionSlot`),
@@ -310,7 +309,8 @@ final class OverviewController {
     }
 
     /// ⇧↑ ⇧↓: the chosen card's column goes to the strip above or below its own (above the top one, to a new strip),
-    /// after the focused column there (`StripLevels.target`). A beep when there is no strip that way.
+    /// after the focused column there (`StripLevels.target`). A beep when there is no strip that way, or when the column
+    /// is the only one of the top strip, which a new strip would only leave empty (`OverviewStack.offersNewStrip`).
     private func sendChosenColumn(up: Bool) {
         guard let content = state.content, content.stack.rows.indices.contains(content.stack.selectedRow) else {
             NSSound.beep()
@@ -318,9 +318,10 @@ final class OverviewController {
         }
         let rows = content.stack.rows
         let row = content.stack.selectedRow
+        let top = rows.map(\.level).max() ?? 0
         let occupied = Set(rows.filter { !$0.overview.cards.isEmpty }.map(\.level))
-        guard let level = StripLevels.target(from: rows[row].level, up: up, top: rows.map(\.level).max() ?? 0,
-                                             occupied: occupied),
+        guard let level = StripLevels.target(from: rows[row].level, up: up, top: top, occupied: occupied),
+              level <= top || content.stack.offersNewStrip(movingFrom: row),
               send(row: row, card: rows[row].overview.selection.card, toLevel: level, at: nil) else {
             NSSound.beep()
             return
@@ -488,7 +489,7 @@ final class OverviewHostingView<Content: View>: NSHostingView<Content> {
 /// highest on top. A window dragged to another place lifts off its row, the others make room where it would land, and
 /// once let go it glides there before its column moves. Dragged more than half a row up or down, it goes to the row
 /// under the pointer, whose cards make room in turn; while a window is dragged, a "Tira nueva" row above the top one
-/// takes it to a new strip.
+/// takes it to a new strip (unless it is the only window of the top strip).
 struct OverviewView: View {
     @ObservedObject var state: OverviewState
     let choose: (WindowID?) -> Void
@@ -556,9 +557,10 @@ struct OverviewView: View {
     }
 
     /// The rows, the highest strip on top, each as wide as the screen. While a card is dragged, it is drawn over them,
-    /// and so is the new strip.
+    /// and so is the new strip, whose label goes over the card.
     private func rows(_ content: OverviewContent) -> some View {
         let place = drag.flatMap { landingPlace(of: $0, content) }
+        let newStrip = drag.map { content.stack.offersNewStrip(movingFrom: $0.row) } ?? false
         let ids = content.stack.rows.map { $0.overview.cards.map(\.id) }
         return VStack(spacing: OverviewContent.rowSpacing) {
             ForEach(Array(content.stack.rows.enumerated()), id: \.element.level) { index, _ in
@@ -567,11 +569,14 @@ struct OverviewView: View {
         }
         .coordinateSpace(.named(Self.rows))
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(Self.screen)) } action: { rowsFrame = $0 }
-        .overlay(alignment: .top) {
-            if drag != nil, content.offersNewStrip { newStrip(content, targeted: place == .newStrip) }
+        .overlay(alignment: .topLeading) {
+            if newStrip { newStripBand(content, targeted: place == .newStrip) }
         }
         .overlay(alignment: .topLeading) {
             if let drag { lifted(drag, content, place: place) }
+        }
+        .overlay(alignment: .topLeading) {
+            if newStrip { newStripLabel(content, targeted: place == .newStrip) }
         }
         // The stack changed under a drag (a shortcut moved a column meanwhile): the drag's card is not that one.
         .onChange(of: ids) { _, _ in drag = nil }
@@ -741,20 +746,29 @@ struct OverviewView: View {
         return CGFloat(span.upperBound - span.lowerBound)
     }
 
-    /// How tall the new strip is: the room above the rows, at most as tall as a card.
-    private func newStripHeight(_ content: OverviewContent) -> CGFloat {
-        max(36, min(content.cardHeight, rowsFrame.minY - 8))
+    /// Where the new strip is drawn (`Self.rows` space): in the room above the rows, at most as tall as a card, and as
+    /// wide as the widest row.
+    private func newStripFrame(_ content: OverviewContent) -> CGRect {
+        let height = max(36, min(content.cardHeight, rowsFrame.minY - 8))
+        let widest = content.drawn.map { CGFloat($0.width) }.max() ?? 0
+        let width = min(max(widest, content.emptyWidth, 320), max(rowsFrame.width - 140, 320))
+        return CGRect(x: (rowsFrame.width - width) / 2, y: -height, width: width, height: height)
     }
 
     /// Where `drag` would land now. In its own row it lands where the others make room for it, as it always did;
     /// dragged more than half a row's height up or down, in the row under the pointer, where its center falls; with the
-    /// pointer above the rows, on the new strip, when there is one. Nil when its card is gone.
+    /// pointer in the band of the new strip (or above it, at the edge of the screen), on the new strip, when there is
+    /// one and the card went up far enough (`OverviewContent.newStripTravel`). Nil when its card is gone.
     private func landingPlace(of drag: CardDrag, _ content: OverviewContent) -> Place? {
         if let landing = drag.landing { return landing }
         let rows = content.stack.rows
         guard rows.indices.contains(drag.row), rows[drag.row].overview.cards.indices.contains(drag.card) else { return nil }
         let pointer = drag.start.y + drag.offset.height
-        if content.offersNewStrip, pointer < 0 { return .newStrip }
+        if content.stack.offersNewStrip(movingFrom: drag.row), -drag.offset.height >= OverviewContent.newStripTravel {
+            let band = newStripFrame(content)
+            let x = drag.start.x + drag.offset.width
+            if pointer < band.maxY, x >= band.minX, x <= band.maxX { return .newStrip }
+        }
         var row = drag.row
         if abs(drag.offset.height) > content.rowHeight / 2 {
             // Rows meet halfway through the space between them.
@@ -780,21 +794,20 @@ struct OverviewView: View {
             drag = nil
             return
         }
-        let start = CGPoint(x: origin(of: landing.row, content) + CGFloat(content.drawn(landing.row).cards[landing.card].lowerBound),
-                            y: cardsTop(of: landing.row, content))
-        let end: CGPoint
         switch place {
         case .row(let row, let slot):
+            let start = CGPoint(x: origin(of: landing.row, content)
+                                    + CGFloat(content.drawn(landing.row).cards[landing.card].lowerBound),
+                                y: cardsTop(of: landing.row, content))
             let before = cells(of: row, content, place: place).prefix(slot)
             let x = before.reduce(CGFloat(0)) { $0 + width(of: $1, in: row, content) + content.gap(row) }
-            end = CGPoint(x: origin(of: row, content) + x, y: cardsTop(of: row, content))
+            let end = CGPoint(x: origin(of: row, content) + x, y: cardsTop(of: row, content))
+            landing.offset = CGSize(width: end.x - start.x, height: end.y - start.y)
         case .newStrip:
-            // Its grab point to the middle of the new strip.
-            let grab = CGPoint(x: landing.start.x - start.x, y: landing.start.y - start.y)
-            end = CGPoint(x: rowsFrame.width / 2 - grab.x, y: -newStripHeight(content) / 2 - grab.y)
+            // To the middle of the band, where the card stays while it is over it (`liftedCard`).
+            landing.offset.width = newStripFrame(content).midX - landing.start.x
         }
         landing.landing = place
-        landing.offset = CGSize(width: end.x - start.x, height: end.y - start.y)
         withAnimation(.spring(response: 0.25, dampingFraction: 0.9), completionCriteria: .logicallyComplete) {
             drag = landing
         } completion: {
@@ -836,43 +849,54 @@ struct OverviewView: View {
         if inOwnRow, overview.cards[drag.card].pinned == nil, let movable = overview.movable {
             x = min(max(x, drawn.cards[movable.lowerBound].lowerBound), drawn.cards[movable.upperBound].upperBound - width)
         }
-        let left = origin(of: drag.row, content) + CGFloat(x)
-        let top = cardsTop(of: drag.row, content) + drag.offset.height
-        // The card shrinks toward the point it was picked up by.
-        let picked = UnitPoint(x: (drag.start.x - origin(of: drag.row, content) - CGFloat(span.lowerBound)) / max(CGFloat(width), 1),
-                               y: (drag.start.y - cardsTop(of: drag.row, content)) / max(content.cardHeight, 1))
         let up = drag.landing == nil
-        // Over the new strip it shrinks to about the height of that row, which may be thin.
-        let small = max(0.2, min(0.5, newStripHeight(content) / max(content.cardHeight, 1)))
+        // Over the new strip it shrinks to fit the band, which may be thin, and sits in it under the pointer.
+        let band = newStripFrame(content)
+        let overNewStrip = place == .newStrip
+        let small = min(0.5, max(band.height - 8, 4) / max(content.cardHeight, 1))
+        let left = overNewStrip ? drag.start.x + drag.offset.width - CGFloat(width) / 2
+                                : origin(of: drag.row, content) + CGFloat(x)
+        let top = overNewStrip ? band.midY - content.cardHeight / 2
+                               : cardsTop(of: drag.row, content) + drag.offset.height
         return OverviewCard(card: overview.cards[drag.card], row: drag.row, index: drag.card, content: content,
                             hovered: .constant(nil), choose: { _ in }, opaque: true)
             .frame(width: CGFloat(width), height: content.cardHeight)
-            .scaleEffect(place == .newStrip ? small : (up ? 1.04 : 1), anchor: picked)
-            .shadow(color: .black.opacity(up ? 0.6 : 0.4), radius: up ? 28 : 14, y: up ? 18 : 8)
-            .animation(.spring(response: 0.25, dampingFraction: 0.86), value: place == .newStrip)
+            .scaleEffect(overNewStrip ? small : (up ? 1.04 : 1))
+            .shadow(color: .black.opacity(up ? 0.6 : 0.4), radius: overNewStrip ? 6 : (up ? 28 : 14),
+                    y: overNewStrip ? 3 : (up ? 18 : 8))
             .offset(x: left, y: top)
+            // Into the band and out of it, it glides; elsewhere it stays under the pointer.
+            .animation(.spring(response: 0.25, dampingFraction: 0.86), value: overNewStrip)
             .allowsHitTesting(false)
     }
 
-    /// While a card is dragged, a row above the top one that takes it to a new strip, as tall as the room there allows.
-    /// It lights up while the pointer is over it.
-    private func newStrip(_ content: OverviewContent, targeted: Bool) -> some View {
-        let height = newStripHeight(content)
-        let widest = content.drawn.map { CGFloat($0.width) }.max() ?? 0
-        let width = min(max(widest, content.emptyWidth, 320), max(rowsFrame.width - 140, 320))
+    /// While a card is dragged, a row above the top one that takes it to a new strip, as tall as the room there allows
+    /// (`newStripFrame`). It lights up while the card is over it. Its label is drawn apart, over the card.
+    private func newStripBand(_ content: OverviewContent, targeted: Bool) -> some View {
+        let band = newStripFrame(content)
         let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        return shape.fill(.white.opacity(targeted ? 0.14 : 0.05))
+            .overlay(shape.strokeBorder(targeted ? Color.accentColor : .white.opacity(0.3),
+                                        style: StrokeStyle(lineWidth: targeted ? 2.5 : 1.5, dash: targeted ? [] : [6, 5])))
+            .frame(width: band.width, height: band.height)
+            .animation(.easeOut(duration: 0.15), value: targeted)
+            .offset(x: band.minX, y: band.minY)
+            .allowsHitTesting(false)
+    }
+
+    /// The new strip's name, over the dragged card, which never hides it.
+    private func newStripLabel(_ content: OverviewContent, targeted: Bool) -> some View {
+        let band = newStripFrame(content)
         return HStack(spacing: 7) {
             Image(systemName: "plus")
             Text("Tira nueva")
         }
         .font(.system(size: 14, weight: .semibold))
         .foregroundStyle(.white.opacity(targeted ? 0.95 : 0.6))
-        .frame(width: width, height: height)
-        .background(shape.fill(.white.opacity(targeted ? 0.14 : 0.05)))
-        .overlay(shape.strokeBorder(targeted ? Color.accentColor : .white.opacity(0.3),
-                                    style: StrokeStyle(lineWidth: targeted ? 2.5 : 1.5, dash: targeted ? [] : [6, 5])))
+        .shadow(color: .black.opacity(0.5), radius: 2)
+        .frame(width: band.width, height: band.height)
         .animation(.easeOut(duration: 0.15), value: targeted)
-        .offset(y: -height)
+        .offset(x: band.minX, y: band.minY)
         .allowsHitTesting(false)
     }
 

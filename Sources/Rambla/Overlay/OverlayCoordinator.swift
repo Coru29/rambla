@@ -261,10 +261,12 @@ final class OverlayCoordinator {
     }
 
     /// A window chosen in the overview, unless it closed meanwhile. One of the strip in view gets the focus; one of
-    /// another strip brings that strip into view, with it focused.
+    /// another strip brings that strip into view, with it focused. When it is gone, the overview has closed all the
+    /// same, so the keyboard comes back from it as when the user closes it (`keepKeyboardInView`).
     private func focusFromOverview(_ id: WindowID, in key: StripKey) {
         guard engine.windows[id] != nil, engine.strips[key]?.contains(id) == true else {
             NSSound.beep()
+            engine.keepKeyboardInView()
             return
         }
         if key.level == engine.activeLevel(of: key.stack) {

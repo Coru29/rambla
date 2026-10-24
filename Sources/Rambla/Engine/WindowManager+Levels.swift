@@ -134,7 +134,9 @@ extension WindowManager {
     /// change. When the column holds the focused window and goes out of view, the keyboard does not stay with it: a
     /// window in view gets it, or Rambla takes it (`keepKeyboardInView`). Unless `handOverKeyboard` is false: the
     /// overview holds the keyboard while it is on screen, and handing it over then would close it, so it does that
-    /// itself once it closes.
+    /// itself once it closes. When it comes into view with the focused window (sent away and back), the level in view
+    /// focuses its column, as `moveColumn(in:from:to:)` does: the keyboard, the border, the commands and the scroll go
+    /// to the same window.
     func moveColumn(id columnID: UUID, from key: StripKey, toLevel level: Int, at index: Int?,
                     handOverKeyboard: Bool = true) {
         let stack = key.stack
@@ -153,6 +155,8 @@ extension WindowManager {
         target.columns.insert(column, at: slot)
         // The level keeps its focused column; one that had none focuses what arrived.
         target.focused = focusedID.flatMap(target.index(ofColumn:)) ?? slot
+        // Unless what arrived in view holds the focused window: the level focuses it, so the layout brings it into view.
+        if isCurrent(targetKey), let id = focusedWindow, column.windows.contains(id) { target.focus(window: id) }
         strips[targetKey] = target
         carryHidden(column.windows, from: key, to: targetKey)
         Log.info("Column of \(column.windows.count) window(s) moved from strip level \(key.level) to \(level)")
