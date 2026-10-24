@@ -816,3 +816,61 @@ public struct OverviewStack: Equatable, Sendable {
   - Point to the new design document instead of repeating it.
 - [ ] **Step 1: Write.**
 - [ ] **Step 2: Commit** with the message `docs: stacked strips`.
+
+### Task 14: Floating windows go with their strip
+
+**When it runs:** after Task 10 and before Task 11. The number keeps the earlier tasks' numbers stable. The user confirmed the spec's floating-window rule on 2026-10-23 ("A, dale").
+
+**Files:**
+- Modify:
+  - `Sources/Rambla/Engine/WindowManager.swift`
+  - `Sources/Rambla/Engine/WindowManager+Levels.swift`
+  - `Sources/Rambla/Engine/WindowManager+Commands.swift` (`dumpJSON`, `sendFocusedWindow`'s floating case)
+  - `Sources/Rambla/Engine/StateStore.swift`, only if needed
+- Test: a pure helper in RamblaCore, when one falls out naturally (for example, which floating windows a switch captures), with its test. Everything else is checked live in Task 12.
+
+**Interfaces:**
+- Produces:
+
+```swift
+/// Floating windows (the user's ⌃⌘T ones and the ones Rambla floated after another app moved them) parked with a
+/// level that went out of view, with the frame each had then.
+var floatShelf: [StripKey: [WindowID: CGRect]]
+```
+
+**Required behavior.** The windows in `floating` are the user's floats and Rambla's automatic ones. Windows of kind `.float` that are not in `floating` (rule floats, dialogs and panels) are never touched.
+
+1. **Leaving a level.** When `switchLevel` takes stack S on display D from level `old` to `new`, it captures every window in `floating` that meets all of these:
+   - on screen;
+   - not minimized;
+   - its app not hidden;
+   - not being dragged;
+   - on D (`Displays.best(for: whereShown)` is D);
+   - not the focused window that `sendFocusedWindow` is taking along.
+
+   For each one, it records the window's frame in `floatShelf[old]` and parks it on a side edge, with the strip-shelving rules: side by midX, the edge that does not touch another display, and the sliver. This happens after the incoming strip is in place, together with the outgoing strip's shelving.
+2. **Returning to a level.** When `new` has `floatShelf[new]`, its windows that still exist and are still in `floating` go back to their recorded frames. Then the entry is cleared.
+3. **Focus.** A parked floating window that takes the focus is routed like a window of its level (Task 7's `FocusRoute`, with `windowLevel` = the level of its shelf). Coming back with its level restores its frame.
+4. **Moves by others.** A parked floating window moved by macOS or by its app is parked again, never treated as a new floating frame:
+   - in the grace period, the end-of-reconcile pass handles it;
+   - otherwise it is parked again at once.
+
+   The reconcile also parks again any parked floating window that drifted, the way it shelves strips.
+5. **Closing.** A parked floating window that closes leaves its shelf.
+6. **`gatherAll`** (quit, pause, "Traer todas las ventanas") puts every parked floating window back at its recorded frame and clears every shelf. They are plain floating windows from then on.
+7. **"Reacomodar ventanas" (`relayoutAll`).** A parked window Rambla floated by itself (in `autoFloated`) goes back into the strip of its own level, shelved if that level is out of view, not into the level in view. Its shelf entry is cleared.
+8. **Sending.** `sendFocusedWindow(up:)` with a focused floating window steps the level and keeps that window in view with the focus: it goes with you.
+9. **Archiving.** Archiving a stack's levels (an unplugged display, a gone Space) drops their `floatShelf` entries, and logs it. Those windows stay where macOS puts them, as plain floating windows.
+10. **`dumpJSON`** lists `floatShelf`: each level key with its window ids.
+
+**Steps:**
+- [ ] **Step 1: Implement** behaviors 1–10, with a pure tested helper where one falls out naturally.
+- [ ] **Step 2: Build and test.** Run `swift build` and `scripts/test.sh`. Expected: green.
+- [ ] **Step 3: Commit** with the message `feat(levels): floating windows go with their strip`.
+
+**Additions to Task 12's live scenario:**
+- Float a TestHost window with `toggle-float`.
+- `strip-up`: the float is parked, `check-shelved` counts it, and `floatShelf` lists it.
+- `strip-down`: the float is back at its frame.
+
+**Addition to Task 13:** the manual says which floating windows go with their strip and which stay in view.

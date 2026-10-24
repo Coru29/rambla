@@ -112,12 +112,14 @@ La opción vale para el trackpad y para los botones del mouse. El interruptor ac
 - **Si alguien las mueve:** puede ser macOS al cambiar las pantallas, la app al reacomodarse sola, una ventana que vuelve del Dock o una app oculta que se muestra. En todos esos casos Rambla las vuelve a estacionar, y nunca flotan por eso.
 - **Escritorios:** no cambian de escritorio aunque macOS las archive en otro, igual que las minimizadas.
 - **Mission Control y App Exposé:** las siguen mostrando, porque están en el mismo escritorio. Elegir una ahí es ir a ella (ver "Foco desde afuera").
-- **Ventanas flotantes** (propuesta, a confirmar con el usuario):
-  - **Las que flotan por una regla de app** (WhatsApp, por ejemplo) no son de ninguna tira y se ven en todas.
+- **Ventanas flotantes** (confirmado por el usuario: "A, dale"):
+  - **Las que flotan por una regla de app** (WhatsApp, por ejemplo) no son de ninguna tira y se ven en todas. Lo mismo vale para los diálogos y paneles que Rambla nunca acomoda.
   - **Las que el usuario hizo flotar** (⌃⌘T), y las que Rambla dejó flotando porque otra app las movió (Rectangle), son de la tira que estaba a la vista en su pantalla al cambiar de tira:
     - se estacionan con ella;
     - vuelven a su lugar al volver a esa tira.
-  - **Si Rambla se reinicia** mientras una de esas está escondida, vuelve a la vista como flotante de la tira activa.
+  - **Si Rambla se reinicia, se pausa o trae todas las ventanas** mientras una de esas está escondida, vuelve a la vista en su lugar, como flotante de la tira activa.
+  - **"Reacomodar ventanas"** devuelve las que Rambla dejó flotando a la tira de la que eran, no a la que estás viendo.
+  - **Mandar a otra tira** (⌃⌥⌘⇧↑/↓) una flotante enfocada: la ventana se va con vos.
 - **Pantalla con otra pantalla a los dos lados:** no hay borde libre, así que las ventanas de las otras tiras quedan sobre la pantalla vecina del lado más cercano. Es el mismo límite que ya tienen hoy las columnas estacionadas en esa configuración. Queda documentado en el manual y no es la configuración del usuario.
 
 ### El cambio de tira
@@ -257,7 +259,7 @@ La opción vale para el trackpad y para los botones del mouse. El interruptor ac
 5. **Estacionamiento y cambio:** las ventanas de las otras tiras se estacionan en los bordes laterales, porque arriba y abajo no se puede, y el cambio es inmediato.
 6. **Indicador:** muestra las tiras con íconos, sin nombres.
 7. **Foco:** manda lo que enfocás. Con ⌘Tab, el Dock o una notificación, si la app tiene una ventana en la tira actual, te quedás.
-8. **Ventanas flotantes:** las de reglas de app se ven en todas las tiras. Las que flotan por el usuario o por Rectangle son de su tira. Esto está pendiente de confirmar con el usuario.
+8. **Ventanas flotantes:** las de reglas de app, los diálogos y los paneles se ven en todas las tiras. Las que flotan por el usuario o por Rectangle son de su tira. El usuario lo confirmó.
 9. **Atajos y arrastre:**
    - los atajos son ⌃⌥⌘↑/↓ y ⌃⌥⌘⇧↑/↓;
    - mandar con atajo mueve la ventana sola;
