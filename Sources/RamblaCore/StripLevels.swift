@@ -24,6 +24,19 @@ public enum StripLevels {
         return highestKept < top ? Array((highestKept + 1)...top) : []
     }
 
+    /// The level to go back to from `active`, which has no windows: the nearest one in `occupied`, below or above, and
+    /// with one as near on each side, the one below. Nil when no other level has windows.
+    public static func nearestOccupied(from active: Int, occupied: Set<Int>) -> Int? {
+        let below = occupied.filter { $0 < active }.max()
+        let above = occupied.filter { $0 > active }.min()
+        switch (below, above) {
+        case let (below?, above?): return active - below <= above - active ? below : above
+        case let (below?, nil): return below
+        case let (nil, above?): return above
+        case (nil, nil): return nil
+        }
+    }
+
     /// Whether a short swipe up or down goes to the strip above: the fingers (or the pointer) went up when `fingersUp`.
     /// With the device's natural direction the content follows them, so going down brings the strip above into view;
     /// without it, going up does.

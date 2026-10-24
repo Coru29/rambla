@@ -135,34 +135,31 @@ final class OverlayCoordinator {
         }
     }
 
-    /// Another strip of `stack` came into view: shows the stack on its display, unless the indicator is off.
+    /// Another strip of `stack` came into view: shows the stack on its display, unless the indicator is off. With one
+    /// strip left (the empty one that was just left is dropped) there is nothing to tell apart: nothing is shown, and the
+    /// panel of the switch before, which still lists the dropped strip, goes.
     private func showLevels(of stack: StackKey) {
         guard engine.prefs.indicatorEnabled, let display = engine.display(forStack: stack) else { return }
-        indicator.showLevels(levelRows(of: stack), on: display.screen)
+        let rows = levelRows(of: stack)
+        guard rows.count > 1 else {
+            indicator.hide()
+            return
+        }
+        indicator.showLevels(rows, on: display.screen)
     }
 
     /// An empty strip came into view and Rambla holds the keyboard, with nothing on screen to show for it: the hint
-    /// says how to fill it and how to leave it.
+    /// says how to fill it and how to go back.
     private func showEmptyStripHint(of stack: StackKey) {
         guard let display = engine.display(forStack: stack) else { return }
-        hint.show(String(localized: "Tira vacía"), detail: emptyStripDetail(), on: display.screen)
+        hint.show(String(localized: "Tira vacía"), detail: emptyStripDetail(of: stack), on: display.screen)
     }
 
-    /// The hint's second line: bring the focused window with the shortcut that sends it to the strip above, go back
-    /// with the one that goes to the strip below. A shortcut that is not bound leaves its clause out.
-    private func emptyStripDetail() -> String {
-        let send = engine.prefs.shortcuts(for: .sendStripUp).first.map { KeyNames.display($0) }
-        let back = engine.prefs.shortcuts(for: .stripDown).first.map { KeyNames.display($0) }
-        switch (send, back) {
-        case let (send?, back?):
-            return String(localized: "Abrí acá lo que quieras, o traé la ventana enfocada con \(send). Para volver, deslizá hacia arriba o usá \(back).")
-        case let (send?, nil):
-            return String(localized: "Abrí acá lo que quieras, o traé la ventana enfocada con \(send).")
-        case let (nil, back?):
-            return String(localized: "Abrí acá lo que quieras. Para volver, deslizá hacia arriba o usá \(back).")
-        case (nil, nil):
-            return String(localized: "Abrí acá lo que quieras.")
-        }
+    /// The hint's second line (`EmptyStripHint`), from the levels as the switch left them (the empty ones that were not
+    /// needed went before the hook ran) and from the shortcuts and the swipe the user has.
+    private func emptyStripDetail(of stack: StackKey) -> String {
+        EmptyStripHint.detail(active: engine.activeLevel(of: stack), occupied: engine.occupiedLevels(of: stack),
+                              prefs: engine.prefs, shortcutName: KeyNames.display)
     }
 
     // MARK: - Overview

@@ -60,3 +60,28 @@ import Testing
     #expect(StripLevels.stripAbove(fingersUp: true, natural: false))
     #expect(!StripLevels.stripAbove(fingersUp: false, natural: false))
 }
+
+@Test func goingBackFromAnEmptyLevelGoesToTheNearestOneWithWindows() {
+    #expect(StripLevels.nearestOccupied(from: 1, occupied: [0]) == 0)
+    #expect(StripLevels.nearestOccupied(from: 0, occupied: [1]) == 1)
+    // Levels in between with no windows are passed.
+    #expect(StripLevels.nearestOccupied(from: 3, occupied: [0, 1]) == 1)
+    #expect(StripLevels.nearestOccupied(from: 0, occupied: [2, 5]) == 2)
+}
+
+@Test func theNearestLevelWithWindowsCanBeOnEitherSide() {
+    #expect(StripLevels.nearestOccupied(from: 2, occupied: [0, 3]) == 3)
+    #expect(StripLevels.nearestOccupied(from: 3, occupied: [0, 4, 5]) == 4)
+    #expect(StripLevels.nearestOccupied(from: 4, occupied: [3, 7]) == 3)
+}
+
+@Test func withOneLevelAsNearOnEachSideTheOneBelowWins() {
+    #expect(StripLevels.nearestOccupied(from: 1, occupied: [0, 2]) == 0)
+    #expect(StripLevels.nearestOccupied(from: 4, occupied: [2, 6]) == 2)
+}
+
+@Test func withNoOtherLevelWithWindowsThereIsNowhereToGoBackTo() {
+    #expect(StripLevels.nearestOccupied(from: 1, occupied: []) == nil)
+    // The level itself is not a way back.
+    #expect(StripLevels.nearestOccupied(from: 1, occupied: [1]) == nil)
+}

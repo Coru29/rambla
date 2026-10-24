@@ -109,10 +109,6 @@
 "Vacía" = "Empty";
 
 /* Rambla/Overlay/OverlayCoordinator.swift */
-"Abrí acá lo que quieras." = "Open anything here.";
-"Abrí acá lo que quieras, o traé la ventana enfocada con %@." = "Open anything here, or bring the focused window with %@.";
-"Abrí acá lo que quieras. Para volver, deslizá hacia arriba o usá %@." = "Open anything here. To go back, swipe up or use %@.";
-"Abrí acá lo que quieras, o traé la ventana enfocada con %@. Para volver, deslizá hacia arriba o usá %@." = "Open anything here, or bring the focused window with %@. To go back, swipe up or use %@.";
 "Arrastrá una ventana hasta acá desde otra pantalla." = "Drag a window here from another display.";
 "Con %@ mandás acá la ventana enfocada, o arrastrá una desde otra pantalla." = "Press %@ to send the focused window here, or drag one from another display.";
 "Esta pantalla no tiene ventanas" = "This display has no windows";
@@ -376,6 +372,16 @@
 "Flotar / volver a la tira" = "Float / back to the strip";
 "Cerrar ventana" = "Close window";
 "Pausar / reanudar Rambla" = "Pause / resume Rambla";
+
+/* RamblaCore/EmptyStripHint.swift */
+"Abrí acá lo que quieras." = "Open anything here.";
+"O mandá una ventana desde la tira de abajo con %@." = "Or send a window from the strip below with %@.";
+"O mandá una ventana desde la tira de arriba con %@." = "Or send a window from the strip above with %@.";
+"Para volver, deslizá hacia arriba o usá %@." = "To go back, swipe up or use %@.";
+"Para volver, deslizá hacia abajo o usá %@." = "To go back, swipe down or use %@.";
+"Para volver, deslizá hacia arriba." = "To go back, swipe up.";
+"Para volver, deslizá hacia abajo." = "To go back, swipe down.";
+"Para volver, usá %@." = "To go back, use %@.";
 
 /* RamblaCore/MacSettings.swift */
 "Apagarlo en macOS" = "Turn Off in macOS";

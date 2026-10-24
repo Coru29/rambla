@@ -92,9 +92,9 @@ final class IndicatorController {
             hide()
             return
         }
-        // The tile under the mouse button goes away with its row: what the button does next is not for the new content.
-        press = nil
-        model.endDrag()
+        // The levels take the place of the tiles, so a tile still pressed is let go: what the mouse does next is not for
+        // the new content.
+        dropPress()
         let panel = panel ?? makePanel()
         let visible = screen.visibleFrame
         let metrics = LevelsMetrics(rows: rows, maxHeight: visible.height - Self.bottomOffset - Self.screenMargin)
@@ -128,10 +128,15 @@ final class IndicatorController {
     func hide() {
         stopTimer()
         cancelFade()
-        press = nil
-        model.endDrag()
+        dropPress()
         isShown = false
         panel?.orderOut(nil)
+    }
+
+    /// Lets go of the tile under the mouse button, and of its drag.
+    private func dropPress() {
+        press = nil
+        model.endDrag()
     }
 
     private func startTimer() {
@@ -158,8 +163,7 @@ final class IndicatorController {
         // The system can take the event stream mid-drag (screen lock, a dialog) and the mouse-up never comes:
         // without this, `show` would ignore every update from then on.
         if let press, now - press.at > Self.stuckPressGrace, NSEvent.pressedMouseButtons & 1 == 0 {
-            self.press = nil
-            model.endDrag()
+            dropPress()
             hideDeadline = now + Self.visibleDuration
         }
         guard press == nil, now >= hideDeadline else { return }
@@ -385,7 +389,7 @@ private final class IndicatorModel: ObservableObject {
 
     func set(levels newLevels: [LevelRow], metrics newMetrics: LevelsMetrics) {
         if content != .levels { content = .levels }
-        levels = newLevels
+        if !Self.same(levels, newLevels) { levels = newLevels }
         if levelMetrics != newMetrics { levelMetrics = newMetrics }
     }
 
@@ -413,6 +417,13 @@ private final class IndicatorModel: ObservableObject {
     private static func same(_ a: [IndicatorTile], _ b: [IndicatorTile]) -> Bool {
         a.count == b.count && zip(a, b).allSatisfy { x, y in
             x.id == y.id && x.isFocused == y.isFocused && x.isVisible == y.isVisible
+                && x.icons.count == y.icons.count && zip(x.icons, y.icons).allSatisfy { $0 === $1 }
+        }
+    }
+
+    private static func same(_ a: [LevelRow], _ b: [LevelRow]) -> Bool {
+        a.count == b.count && zip(a, b).allSatisfy { x, y in
+            x.id == y.id && x.isActive == y.isActive
                 && x.icons.count == y.icons.count && zip(x.icons, y.icons).allSatisfy { $0 === $1 }
         }
     }
