@@ -3,22 +3,30 @@ import RamblaCore
 
 /// Persists the strips to ~/Library/Application Support/Rambla/state.json.
 enum StateStore {
-    static var url: URL {
+    /// Test mode only (`--only-bundle` with `--state-file`): the file the live tests restart Rambla with, read and
+    /// written instead of the user's. Without it, test mode reads and writes no layout at all.
+    @MainActor static var testFile: URL?
+
+    /// The file the strips are saved to: the user's, or in test mode the tests' own (`testFile`).
+    @MainActor static var url: URL {
+        if let testFile { return testFile }
         let dir = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/Rambla", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent("state.json")
     }
 
-    static func save(_ state: SavedState) {
+    @MainActor static func save(_ state: SavedState) {
         guard let data = try? JSONEncoder().encode(state) else { return }
         try? data.write(to: url, options: .atomic)
     }
 
-    static func load() -> SavedState? {
+    @MainActor static func load() -> SavedState? {
         guard let data = try? Data(contentsOf: url),
               var state = try? JSONDecoder().decode(SavedState.self, from: data).upgraded() else { return nil }
-        // A hand-edited or corrupt file must not break the strip invariants the operations rely on.
+        // A hand-edited or corrupt file must not break the strip invariants the operations rely on. A strip below
+        // level 0 has no place in a stack: it is left out.
+        state.strips.removeAll { $0.level < 0 }
         for index in state.strips.indices {
             state.strips[index].strip.columns = state.strips[index].strip.columns.compactMap { column in
                 guard !column.windows.isEmpty else { return nil }
@@ -61,17 +69,20 @@ extension WindowManager {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1, execute: item)
     }
 
+    /// Whether the layout is read at launch and saved: always, except in test mode, where only a file of the tests'
+    /// own is (`StateStore.testFile`), never the user's.
+    var keepsState: Bool { onlyBundles == nil || StateStore.testFile != nil }
+
     func saveNow() {
         // No window known at all (Accessibility lists none while the screen is locked) is no layout: keep the file's.
-        guard onlyBundles == nil, !windows.isEmpty else { return }
+        guard keepsState, !windows.isEmpty else { return }
         var refs: [RamblaCore.WindowRef] = []
         var saved: [SavedStrip] = []
         for (key, strip) in strips where !strip.columns.isEmpty {
             guard let spaceKey = spaceKeys[key.stack] else { continue }
-            // A desktop not rebuilt yet keeps its saved arrangement in the file: a window that went there meanwhile
-            // (moved to it from Mission Control, say) joins it when the desktop is rebuilt. A stack is rebuilt through
-            // its level 0.
-            if !restoredKeys.contains(key.stack.level(0)),
+            // A desktop not rebuilt yet keeps its saved stack in the file, every level of it: a window that went there
+            // meanwhile (moved to it from Mission Control, say) joins it when the desktop is rebuilt.
+            if !restoredStacks.contains(key.stack),
                !archive.stack(displayUUID: key.displayUUID, spaceKey: spaceKey).isEmpty { continue }
             let mine = strip.allWindows.compactMap(ref)
             saved.append(SavedStrip(displayUUID: key.displayUUID, spaceKey: spaceKey, strip: strip, session: StateStore.session,
@@ -90,69 +101,99 @@ extension WindowManager {
         windows[id].map { RamblaCore.WindowRef(id: id, bundleID: $0.bundleID ?? "", title: $0.title) }
     }
 
-    /// The first time a display and Space are in view this session, rebuild their strip from the archive; the windows
-    /// it does not know are added afterwards in x order. Windows are matched the way the session the strip was saved in
-    /// allows (`StateMatcher`; `alive` holds every window that exists). A display that comes back takes back, for
-    /// `returnWindow`, the windows of the strips archived when it was unplugged, from the strips they joined meanwhile,
-    /// as long as they are on screen and the user did not float them.
-    func restoreFromSavedState(keys: [StripKey], candidates: [WindowRecord], visible: Set<WindowID>, alive: Set<WindowID>) {
+    /// The first time a display and Space are in view this session, rebuild their stack from the archive, every level
+    /// of it at once; the windows it does not know are added afterwards in x order. Windows are matched level by level
+    /// from the bottom, so none lands on two levels, the way the session each strip was saved in allows
+    /// (`StateMatcher.restoredLevels`; `alive` holds every window that exists). A display that comes back takes back,
+    /// for `returnWindow`, the windows of the strips archived when it was unplugged, from the strips they joined
+    /// meanwhile, as long as they are on screen and the user did not float them. The stack shows the level it showed
+    /// when it was saved, as far as that level is still there; the rest of the reconcile lays that level out and parks
+    /// the others, once the windows the stack does not know have joined it.
+    func restoreFromSavedState(stacks: [StackKey], candidates: [WindowRecord], visible: Set<WindowID>,
+                               alive: Set<WindowID>) {
         let now = CFAbsoluteTimeGetCurrent()
-        for key in keys where !restoredKeys.contains(key) {
+        for stack in stacks where !restoredStacks.contains(stack) {
             // A display that has just appeared may be gone in a moment (`DisplayPresence`): wait until it stays.
-            guard presence.isSettled(key.displayUUID, now: now), let spaceKey = spaceKeys[key.stack],
-                  let display = displays.first(where: { $0.uuid == key.displayUUID }) else { continue }
-            let returning = returningDisplays[key.displayUUID] != nil
-            guard let saved = archive.stack(displayUUID: key.displayUUID, spaceKey: spaceKey).first
-                ?? (returning && !display.spaceKeys.isEmpty
-                    ? archive.strayStack(displayUUID: key.displayUUID, spaces: display.spaceKeys).first : nil) else {
-                // Nothing saved for it, unless macOS has not listed a returning display's desktops yet: its strip may
+            guard presence.isSettled(stack.displayUUID, now: now), let spaceKey = spaceKeys[stack],
+                  let display = displays.first(where: { $0.uuid == stack.displayUUID }) else { continue }
+            let returning = returningDisplays[stack.displayUUID] != nil
+            var saved = archive.stack(displayUUID: stack.displayUUID, spaceKey: spaceKey)
+            if saved.isEmpty, returning, !display.spaceKeys.isEmpty {
+                saved = archive.strayStack(displayUUID: stack.displayUUID, spaces: display.spaceKeys)
+            }
+            guard !saved.isEmpty else {
+                // Nothing saved for it, unless macOS has not listed a returning display's desktops yet: its strips may
                 // be under another key, so look again with the next change.
-                if !returning || !display.spaceKeys.isEmpty { restoredKeys.insert(key) }
+                if !returning || !display.spaceKeys.isEmpty { restoredStacks.insert(stack) }
                 continue
             }
-            // Apps are still listing their windows, or still opening after a Mac restart: rebuilt now, the strip would
-            // get only the first ones.
-            guard !waitingForWindowLists, !waitsForApps(saved, now: now) else { continue }
-            let takesBack = returning && saved.unplugged
-            let pool: [WindowRecord]
-            if takesBack {
-                pool = windows.values.filter { $0.kind == .tile && visible.contains($0.id) && !floating.contains($0.id) }
-            } else {
-                // The windows no other strip holds, those that already joined this one included. Without one of this
-                // display among them, wait for it instead of using up the arrangement (Accessibility lists no window
-                // while the screen is locked).
-                let placed = Set(strips.filter { $0.key != key }.values.flatMap(\.allWindows))
-                pool = candidates.filter { !placed.contains($0.id) } + (strips[key]?.allWindows ?? []).compactMap { windows[$0] }
-                guard pool.contains(where: {
-                    $0.kind == .tile && Displays.best(for: whereShown($0), in: displays)?.uuid == key.displayUUID
-                }) else { continue }
+            // Apps are still listing their windows, or still opening after a Mac restart: rebuilt now, the strips would
+            // get only the first ones. One level that waits holds the whole stack.
+            guard !waitingForWindowLists, !saved.contains(where: { waitsForApps($0, now: now) }) else { continue }
+            let takesBack = returning && saved.contains(where: \.unplugged)
+            // The windows no other stack holds, those that already joined this one included. Without one of this
+            // display among them, wait for it instead of using up the arrangement (Accessibility lists no window while
+            // the screen is locked). The levels taking their windows back find them anywhere on screen.
+            let own = strips.filter { $0.key.stack == stack }.sorted { $0.key.level < $1.key.level }
+                .flatMap { $0.value.allWindows }
+            let placed = Set(strips.filter { $0.key.stack != stack }.values.flatMap(\.allWindows))
+            let free = candidates.filter { !placed.contains($0.id) } + own.compactMap { windows[$0] }
+            guard takesBack || free.contains(where: {
+                $0.kind == .tile && Displays.best(for: whereShown($0), in: displays)?.uuid == stack.displayUUID
+            }) else { continue }
+            let onScreen = !takesBack ? [] : windows.values.filter {
+                $0.kind == .tile && visible.contains($0.id) && !floating.contains($0.id)
             }
             // Taking windows back from other strips goes by id, or after a Mac restart by a title only one window has.
-            let map = StateMatcher.match(saved: saved.refs, live: pool.compactMap { ref($0.id) }, session: saved.session,
-                                         current: StateStore.session, alive: alive,
-                                         byTitle: !takesBack || saved.session != StateStore.session, uniqueTitles: takesBack)
-            var restored = saved.strip.remapped(map)
-            guard !restored.columns.isEmpty else {
+            let levels = StateMatcher.restoredLevels(saved, free: free.compactMap { ref($0.id) },
+                                                     onScreen: onScreen.compactMap { ref($0.id) }, returning: returning,
+                                                     current: StateStore.session, alive: alive)
+            guard !levels.isEmpty else {
                 // None of its windows is here. A display that is coming back tries again with the next change. Any
-                // other Space starts as it is, with other windows: its live strip replaces the archived one when saved.
-                if !takesBack { restoredKeys.insert(key) }
+                // other Space starts as it is, with other windows: its live strips replace the archived ones when
+                // saved.
+                if !takesBack { restoredStacks.insert(stack) }
                 continue
             }
-            restoredKeys.insert(key)
-            _ = archive.takeStack(displayUUID: saved.displayUUID, spaceKey: saved.spaceKey)
-            for id in restored.allWindows {
-                for other in Array(strips.keys) where other != key && strips[other]!.contains(id) {
-                    strips[other]!.remove(window: id)
+            restoredStacks.insert(stack)
+            _ = archive.takeStack(displayUUID: stack.displayUUID, spaceKey: saved[0].spaceKey)
+            let restored = Set(levels.values.flatMap(\.allWindows))
+            // A window that comes back to another level of this stack takes along what is known of it being hidden.
+            for (level, strip) in levels {
+                for id in strip.allWindows {
+                    guard let from = key(containing: id), from.stack == stack, from.level != level else { continue }
+                    carryHidden([id], from: from, to: stack.level(level))
                 }
             }
-            if let current = strips[key] {
-                for id in current.allWindows where !restored.contains(id) {
-                    restored.insert(window: id, width: current.location(of: id).map { current.columns[$0.column].width } ?? .fraction(0.5), at: .end)
-                }
+            // The windows leave the strips they joined meanwhile; those a level does not know stay, at its end.
+            let rebuilt = Set(levels.keys.map(stack.level))
+            for other in Array(strips.keys) where !rebuilt.contains(other) {
+                for id in strips[other]!.allWindows where restored.contains(id) { strips[other]!.remove(window: id) }
             }
-            strips[key] = restored
-            Log.info(takesBack ? "Display \(key.displayUUID.prefix(8)) is back: \(restored.allWindows.count) windows in their places"
-                               : "Restored \(restored.allWindows.count) windows on display \(key.displayUUID.prefix(8))")
+            for (level, var strip) in levels {
+                let key = stack.level(level)
+                if let current = strips[key] {
+                    for id in current.allWindows where !restored.contains(id) {
+                        let width = current.location(of: id).map { current.columns[$0.column].width } ?? .fraction(0.5)
+                        strip.insert(window: id, width: width, at: .end)
+                    }
+                }
+                strips[key] = strip
+            }
+            // Level 0 is always there, and so is every level up to the highest one restored: the empty ones in between
+            // stay, as they do while Rambla runs. The level in view is the one the strip saved last remembers.
+            let top = levels.keys.max()!
+            for level in 0...top where strips[stack.level(level)] == nil { strips[stack.level(level)] = Strip() }
+            let latest = saved.max { ($0.lastSeen ?? .distantPast) < ($1.lastSeen ?? .distantPast) }
+            activeLevels[stack] = StripLevels.restoredActive(latest?.activeLevel, top: top)
+            let uuid = stack.displayUUID.prefix(8)
+            for level in levels.keys.sorted() {
+                let count = strips[stack.level(level)]!.allWindows.count
+                let onLevel = level > 0 ? ", level \(level)" : ""
+                let tookBack = returning && saved.first(where: { $0.level == level })?.unplugged == true
+                Log.info(tookBack ? "Display \(uuid) is back: \(count) windows in their places\(onLevel)"
+                                  : "Restored \(count) windows on display \(uuid)\(onLevel)")
+            }
         }
         // Each saved floating window floats one live window, once, among those no strip took (so not while strips wait
         // for the apps). Titles only count while apps are still bringing their windows back after Rambla starts.

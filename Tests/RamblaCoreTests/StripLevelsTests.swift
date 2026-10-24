@@ -43,3 +43,9 @@ import Testing
     #expect(StripLevels.restoredActive(1, top: 2) == 1)
     #expect(StripLevels.restoredActive(3, top: 1) == 1)
 }
+
+@Test func restoredActiveNeverGoesBelowZero() {
+    // Only a hand-edited file can say so: the bottom level is the nearest one there is.
+    #expect(StripLevels.restoredActive(-1, top: 2) == 0)
+    #expect(StripLevels.restoredActive(-4, top: 0) == 0)
+}

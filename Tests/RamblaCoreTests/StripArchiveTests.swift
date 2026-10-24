@@ -276,3 +276,77 @@ private func ref(_ id: WindowID, _ app: String = "app") -> WindowRef {
     #expect(stack.map(\.activeLevel) == [1, 1])
     #expect(stack.map(\.strip.allWindows) == [[1], [2]])
 }
+
+// MARK: - Rebuilding a saved stack
+
+// A stack comes back level by level from the bottom, each level with the windows that no level below took.
+
+private func refs(_ titles: [WindowID: String]) -> [WindowRef] {
+    titles.keys.sorted().map { WindowRef(id: $0, bundleID: "app", title: titles[$0]!) }
+}
+
+@Test func aSavedStackComesBackLevelByLevel() {
+    let stack = [saved("A", "s1", [1, 2]), saved("A", "s1", [3], level: 1)]
+    let levels = StateMatcher.restoredLevels(stack, free: [ref(3), ref(1), ref(2)], onScreen: [], returning: false,
+                                             current: "today", alive: [1, 2, 3])
+    #expect(levels.mapValues(\.allWindows) == [0: [1, 2], 1: [3]])
+}
+
+@Test func aWindowComesBackOnOneLevelOnly() {
+    // Two levels name the same window, given in any order: the lower one takes it.
+    let stack = [saved("A", "s1", [5, 6], level: 1), saved("A", "s1", [5])]
+    let levels = StateMatcher.restoredLevels(stack, free: [ref(5), ref(6)], onScreen: [], returning: false,
+                                             current: "today", alive: [5, 6])
+    #expect(levels.mapValues(\.allWindows) == [0: [5], 1: [6]])
+
+    // After a Mac restart only titles count: the one live window with a title of both levels goes to the lower one.
+    let lower = SavedStrip(displayUUID: "A", spaceKey: "s1", strip: strip([1]), session: "yesterday",
+                           refs: refs([1: "Notes"]))
+    let upper = SavedStrip(displayUUID: "A", spaceKey: "s1", strip: strip([2]), session: "yesterday",
+                           refs: refs([2: "Notes"]), level: 1)
+    let restarted = StateMatcher.restoredLevels([upper, lower], free: refs([40: "Notes"]), onScreen: [],
+                                                returning: false, current: "today", alive: [40])
+    #expect(restarted.mapValues(\.allWindows) == [0: [40]])
+}
+
+@Test func aLevelWithNoneOfItsWindowsHereIsLeftOut() {
+    let stack = [saved("A", "s1", [1]), saved("A", "s1", [2], level: 1), saved("A", "s1", [3], level: 2)]
+    let levels = StateMatcher.restoredLevels(stack, free: [ref(1), ref(3)], onScreen: [], returning: false,
+                                             current: "today", alive: [1, 3])
+    #expect(levels.mapValues(\.allWindows) == [0: [1], 2: [3]])
+}
+
+@Test func aHandEditedStackStillComesBackAsLevels() {
+    // A level below 0 is skipped, and so is a second strip of the same level.
+    let stack = [saved("A", "s1", [1], level: -1), saved("A", "s1", [2]), saved("A", "s1", [3])]
+    let levels = StateMatcher.restoredLevels(stack, free: [ref(1), ref(2), ref(3)], onScreen: [], returning: false,
+                                             current: "today", alive: [1, 2, 3])
+    #expect(levels.mapValues(\.allWindows) == [0: [2]])
+}
+
+@Test func unpluggedLevelsTakeTheirWindowsBackWhileTheirDisplayReturns() {
+    // The windows joined the strips of the display they were moved to: only the levels archived when the display was
+    // unplugged take them from there, and only while it is coming back.
+    let stack = [saved("external", "s1", [1], unplugged: true), saved("external", "s1", [2], unplugged: true, level: 1),
+                 saved("external", "s1", [3], level: 2)]
+    let onScreen = [ref(1), ref(2), ref(3)]
+    let back = StateMatcher.restoredLevels(stack, free: [], onScreen: onScreen, returning: true, current: "today",
+                                           alive: [1, 2, 3])
+    #expect(back.mapValues(\.allWindows) == [0: [1], 1: [2]])
+    // Later, every level finds only the windows no other strip holds.
+    let later = StateMatcher.restoredLevels(stack, free: [ref(2)], onScreen: onScreen, returning: false,
+                                            current: "today", alive: [1, 2, 3])
+    #expect(later.mapValues(\.allWindows) == [1: [2]])
+}
+
+@Test func takingBackByTitleNeedsATitleNoOtherWindowHas() {
+    // After a Mac restart a level that takes its windows back recognises one only by a title that is the app's alone.
+    let level = SavedStrip(displayUUID: "external", spaceKey: "s1", strip: strip([1]), session: "yesterday",
+                           refs: refs([1: "Notes"]), unplugged: true, level: 1)
+    let one = StateMatcher.restoredLevels([level], free: [], onScreen: refs([40: "Notes"]), returning: true,
+                                          current: "today", alive: [40])
+    #expect(one.mapValues(\.allWindows) == [1: [40]])
+    let two = StateMatcher.restoredLevels([level], free: [], onScreen: refs([40: "Notes", 41: "Notes"]),
+                                          returning: true, current: "today", alive: [40, 41])
+    #expect(two.isEmpty)
+}

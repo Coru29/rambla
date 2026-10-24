@@ -253,6 +253,33 @@ public enum StateMatcher {
         }
         return mapping
     }
+
+    /// The levels of a saved stack (`saved`, its strips of one display and Space) rebuilt with the live windows, from
+    /// the bottom up: each level takes only windows that no level below took, so no window lands on two levels. While
+    /// its display is `returning`, a level archived when the display was unplugged takes its windows back from
+    /// wherever they are (`onScreen`: every window on screen the user did not float), by id or, after a Mac restart,
+    /// by a title that is its app's alone. Any other level takes them from `free`, the windows no other stack holds,
+    /// as `match` allows. Levels below 0 (only a hand-edited file has them), a second strip of the same level, and the
+    /// levels none of whose windows are here are left out.
+    public static func restoredLevels(_ saved: [SavedStrip], free: [WindowRef], onScreen: [WindowRef], returning: Bool,
+                                      current: String, alive: Set<WindowID>) -> [Int: Strip] {
+        var firsts: [Int: SavedStrip] = [:]
+        for strip in saved where strip.level >= 0 && firsts[strip.level] == nil { firsts[strip.level] = strip }
+        var levels: [Int: Strip] = [:]
+        var taken = Set<WindowID>()
+        for level in firsts.keys.sorted() {
+            let strip = firsts[level]!
+            let takesBack = returning && strip.unplugged
+            let live = (takesBack ? onScreen : free).filter { !taken.contains($0.id) }
+            let map = match(saved: strip.refs, live: live, session: strip.session, current: current, alive: alive,
+                            byTitle: !takesBack || strip.session != current, uniqueTitles: takesBack)
+            let rebuilt = strip.strip.remapped(map)
+            guard !rebuilt.columns.isEmpty else { continue }
+            taken.formUnion(rebuilt.allWindows)
+            levels[level] = rebuilt
+        }
+        return levels
+    }
 }
 
 extension Strip {

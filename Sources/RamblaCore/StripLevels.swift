@@ -24,9 +24,10 @@ public enum StripLevels {
         return highestKept < top ? Array((highestKept + 1)...top) : []
     }
 
-    /// The level a restored stack shows: `saved` (nil means 0), lowered to `top` when it is above it.
+    /// The level a restored stack shows: `saved` (nil means 0), kept within 0...`top`.
     public static func restoredActive(_ saved: Int?, top: Int) -> Int {
-        // Nil: a file from before stacked strips. A saved level above `top` has nothing left to restore.
-        min(saved ?? 0, top)
+        // Nil: a file from before stacked strips. A saved level above `top` has nothing left to restore, and one below
+        // 0 comes only from a hand-edited file.
+        max(0, min(saved ?? 0, top))
     }
 }

@@ -45,6 +45,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return result.isEmpty ? nil : result
     }()
 
+    /// `--state-file <path>`, with `--only-bundle` only: the live tests' own file for the layout, read at launch and
+    /// saved like the user's, so a test can restart Rambla and find its strips again. Normal mode never reads it.
+    private lazy var stateFile: URL? = {
+        guard onlyBundles != nil else { return nil }
+        var args = CommandLine.arguments.dropFirst().makeIterator()
+        while let arg = args.next() {
+            if arg == "--state-file", let value = args.next() {
+                return URL(fileURLWithPath: (value as NSString).expandingTildeInPath)
+            }
+        }
+        return nil
+    }()
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         Log.info("Rambla \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] ?? "?") started")
         menuBar = MenuBarController(statusTitle: String(localized: "Iniciando…"))
@@ -119,7 +132,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Updater.shared.configure(automatic: store.prefs.checkForUpdates)
         lastPrefs = store.prefs
         keepInputTapsInFront()
-        engine.start(prefs: store.prefs, onlyBundles: onlyBundles)
+        engine.start(prefs: store.prefs, onlyBundles: onlyBundles, stateFile: stateFile)
         if !store.prefs.enabled { engine.setPaused(true) }
         refreshMenu(force: true)
     }
