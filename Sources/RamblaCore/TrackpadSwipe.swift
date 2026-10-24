@@ -48,8 +48,9 @@ public enum TrackpadSwipe: Equatable, Sendable {
     }
 }
 
-/// Up and down on the trackpad, like with the mouse buttons. One command per swipe, and a long swipe down opens the
-/// overview in both modes; the rest depends on `mode`:
+/// Up and down on the trackpad, like with the mouse buttons. One action per swipe (in strips mode it is told first,
+/// with `armed`, that a short swipe is ready, for the haptic tap, and then the action, if any), and a long swipe down
+/// opens the overview in both modes; the rest depends on `mode`:
 /// - Width mode: up gives the full width at once; down is decided when the fingers lift (back to the previous width),
 ///   unless they go down `longStart` first; back up before lifting, nothing.
 /// - Strips mode: the first move up or down arms a short swipe, which changes strip when the fingers lift (back below
