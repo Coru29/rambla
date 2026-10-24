@@ -9,8 +9,25 @@ struct IndicatorTile: Identifiable {
     let isVisible: Bool
 }
 
+/// One strip of a stack, as the levels panel draws it.
+struct LevelRow: Identifiable {
+    /// The most icons a row draws; the columns after them are left out.
+    static let maxIcons = 8
+
+    /// The strip's level in its stack.
+    let id: Int
+    /// The app of each column, in the order the columns sit on the strip. Empty for a strip with nothing to show.
+    let icons: [NSImage]
+    /// The strip in view.
+    let isActive: Bool
+}
+
 /// The strip overview: a frosted panel above the Dock with one tile per column. It appears after navigating or
 /// moving columns and fades out on its own. A click on a tile focuses that column; dragging a tile reorders.
+///
+/// The same panel shows the stack of strips when another one comes into view (`showLevels`): one row per strip with
+/// the icons of its apps. That is only to look at and takes no clicks. Whichever of the two was shown last is the
+/// one on screen.
 ///
 /// The panel never takes focus. The only timer exists while it is on screen: it polls the modifier keys at
 /// 10 Hz so the panel stays while the keys of the last shortcut are held.
@@ -64,8 +81,32 @@ final class IndicatorController {
         let visible = screen.visibleFrame
         let metrics = IndicatorMetrics(count: tiles.count, maxWidth: visible.width - 2 * Self.screenMargin)
         model.set(tiles: tiles, metrics: metrics)
+        present(panel, size: metrics.size, on: screen, interactive: true, holding: holding)
+    }
 
-        let size = metrics.size
+    /// Shows (or refreshes) the stack of strips on `screen` in place of the tiles: `rows` from the highest level down,
+    /// one per strip, the one in view highlighted. It fades out 0.8 s after the last call and takes no clicks (they go
+    /// to what lies behind it).
+    func showLevels(_ rows: [LevelRow], on screen: NSScreen) {
+        guard !rows.isEmpty else {
+            hide()
+            return
+        }
+        // The tile under the mouse button goes away with its row: what the button does next is not for the new content.
+        press = nil
+        model.endDrag()
+        let panel = panel ?? makePanel()
+        let visible = screen.visibleFrame
+        let metrics = LevelsMetrics(rows: rows, maxHeight: visible.height - Self.bottomOffset - Self.screenMargin)
+        model.set(levels: rows, metrics: metrics)
+        present(panel, size: metrics.size, on: screen, interactive: false, holding: nil)
+    }
+
+    /// Puts the panel, `size` big, at the bottom center of `screen` above the Dock and starts the count to its fade.
+    /// `interactive`: it takes the mouse; otherwise the mouse goes through it.
+    private func present(_ panel: OverlayPanel, size: CGSize, on screen: NSScreen, interactive: Bool,
+                         holding: NSEvent.ModifierFlags?) {
+        let visible = screen.visibleFrame
         let x = (visible.midX - size.width / 2).rounded()
         let y = (visible.minY + Self.bottomOffset).rounded()
         let frame = CGRect(x: x, y: y, width: size.width, height: size.height)
@@ -73,6 +114,7 @@ final class IndicatorController {
             panel.setFrame(frame, display: true)
             panel.invalidateShadow()
         }
+        panel.ignoresMouseEvents = !interactive
         cancelFade()
         if !panel.isVisible { panel.orderFrontRegardless() }
         isShown = true
@@ -173,7 +215,7 @@ final class IndicatorController {
         background.layer?.cornerRadius = Self.cornerRadius
         background.layer?.masksToBounds = true
 
-        let hosting = OverlayHostingView(rootView: IndicatorContent(model: model))
+        let hosting = OverlayHostingView(rootView: PanelContent(model: model))
         hosting.sizingOptions = []
         hosting.frame = background.bounds
         hosting.autoresizingMask = [.width, .height]
@@ -190,7 +232,9 @@ final class IndicatorController {
     // MARK: - Mouse
 
     private func mouseDown(at point: CGPoint) {
-        guard let index = model.metrics.index(atX: point.x), model.tiles.indices.contains(index) else { return }
+        // The levels are only to look at: the tiles the model still holds are not what is on screen.
+        guard model.content == .tiles,
+              let index = model.metrics.index(atX: point.x), model.tiles.indices.contains(index) else { return }
         cancelFade()
         press = (index, point.x, CFAbsoluteTimeGetCurrent())
         startTimer()
@@ -269,12 +313,64 @@ private struct IndicatorMetrics: Equatable {
     }
 }
 
+/// Sizes of the levels panel, shared by the SwiftUI drawing and the panel's frame.
+private struct LevelsMetrics: Equatable {
+    static let baseRow: CGFloat = 38
+    static let minimumRow: CGFloat = 16
+    static let rowSpacing: CGFloat = 6
+    static let padding: CGFloat = 10
+    /// A row is as wide as this many icons at least, so that "Vacía" always fits.
+    static let minimumSlots = 3
+
+    let count: Int
+    /// How many icons fit across a row: those of the longest row, and no fewer than `minimumSlots`.
+    let slots: Int
+    /// 38 pt, shrunk only when that many rows would not fit the screen.
+    let row: CGFloat
+    /// The tallest the panel can be: rows past it are cut off.
+    let maxHeight: CGFloat
+
+    init(rows: [LevelRow], maxHeight: CGFloat) {
+        count = rows.count
+        slots = max(Self.minimumSlots, min(rows.map(\.icons.count).max() ?? 0, LevelRow.maxIcons))
+        let stacked = CGFloat(max(count, 1))
+        let fitting = ((maxHeight - 2 * Self.padding - (stacked - 1) * Self.rowSpacing) / stacked).rounded(.down)
+        row = min(Self.baseRow, max(Self.minimumRow, fitting))
+        self.maxHeight = maxHeight
+    }
+
+    /// What is inside a row scales with its height.
+    private var unit: CGFloat { row / Self.baseRow }
+    var icon: CGFloat { (28 * unit).rounded() }
+    var iconSpacing: CGFloat { 6 * unit }
+    /// Between the edge of a row and its first icon.
+    var inset: CGFloat { 5 * unit }
+    var cornerRadius: CGFloat { 10 * unit }
+    var fontSize: CGFloat { 13 * unit }
+
+    var rowWidth: CGFloat {
+        2 * inset + CGFloat(slots) * icon + CGFloat(slots - 1) * iconSpacing
+    }
+
+    var size: CGSize {
+        let stacked = CGFloat(max(count, 1))
+        let height = 2 * Self.padding + stacked * row + (stacked - 1) * Self.rowSpacing
+        return CGSize(width: 2 * Self.padding + rowWidth, height: min(height, maxHeight))
+    }
+}
+
 // MARK: - Model
 
 @MainActor
 private final class IndicatorModel: ObservableObject {
+    /// What the panel shows: the tiles of one strip, or the rows of a stack.
+    enum Content { case tiles, levels }
+
+    @Published private(set) var content = Content.tiles
     @Published private(set) var tiles: [IndicatorTile] = []
     @Published private(set) var metrics = IndicatorMetrics(count: 0, maxWidth: .infinity)
+    @Published private(set) var levels: [LevelRow] = []
+    @Published private(set) var levelMetrics = LevelsMetrics(rows: [], maxHeight: .infinity)
     /// While a tile is dragged: its index, how far it has moved, and the slot it would drop into.
     @Published private(set) var dragIndex: Int?
     @Published private(set) var dragOffset: CGFloat = 0
@@ -282,8 +378,15 @@ private final class IndicatorModel: ObservableObject {
 
     /// Key repeat calls `show` many times a second: only publish what actually changed.
     func set(tiles newTiles: [IndicatorTile], metrics newMetrics: IndicatorMetrics) {
+        if content != .tiles { content = .tiles }
         if !Self.same(tiles, newTiles) { tiles = newTiles }
         if metrics != newMetrics { metrics = newMetrics }
+    }
+
+    func set(levels newLevels: [LevelRow], metrics newMetrics: LevelsMetrics) {
+        if content != .levels { content = .levels }
+        levels = newLevels
+        if levelMetrics != newMetrics { levelMetrics = newMetrics }
     }
 
     func beginDrag(at index: Int) {
@@ -316,6 +419,18 @@ private final class IndicatorModel: ObservableObject {
 }
 
 // MARK: - Views
+
+/// What the panel shows right now.
+private struct PanelContent: View {
+    @ObservedObject var model: IndicatorModel
+
+    var body: some View {
+        switch model.content {
+        case .tiles: IndicatorContent(model: model)
+        case .levels: LevelsContent(rows: model.levels, metrics: model.levelMetrics)
+        }
+    }
+}
 
 private struct IndicatorContent: View {
     @ObservedObject var model: IndicatorModel
@@ -408,5 +523,56 @@ private struct IconStack: View {
             .resizable()
             .interpolation(.high)
             .frame(width: size, height: size)
+    }
+}
+
+/// The stack of strips: a row per strip, the highest on top.
+private struct LevelsContent: View {
+    let rows: [LevelRow]
+    let metrics: LevelsMetrics
+
+    var body: some View {
+        VStack(spacing: LevelsMetrics.rowSpacing) {
+            ForEach(rows) { row in
+                LevelRowView(row: row, metrics: metrics)
+            }
+        }
+        .padding(LevelsMetrics.padding)
+        .frame(width: metrics.size.width, height: metrics.size.height, alignment: .top)
+    }
+}
+
+/// One strip: the icons of its columns from the left, or "Vacía".
+private struct LevelRowView: View {
+    let row: LevelRow
+    let metrics: LevelsMetrics
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: metrics.cornerRadius, style: .continuous)
+        ZStack(alignment: .leading) {
+            shape.fill(Color.white.opacity(row.isActive ? 0.2 : 0.09))
+            if row.icons.isEmpty {
+                Text("Vacía")
+                    .font(.system(size: metrics.fontSize))
+                    .foregroundStyle(Color.white.opacity(0.7))
+                    .padding(.leading, 2 * metrics.inset)
+            } else {
+                HStack(spacing: metrics.iconSpacing) {
+                    ForEach(Array(row.icons.prefix(LevelRow.maxIcons).enumerated()), id: \.offset) { _, icon in
+                        Image(nsImage: icon)
+                            .resizable()
+                            .interpolation(.high)
+                            .frame(width: metrics.icon, height: metrics.icon)
+                    }
+                }
+                .padding(.leading, metrics.inset)
+            }
+        }
+        // The strip in view at full strength and outlined, like the focused tile; the others dimmed.
+        .opacity(row.isActive ? 1 : 0.45)
+        .overlay {
+            if row.isActive { shape.strokeBorder(Color.accentColor, lineWidth: 2) }
+        }
+        .frame(width: metrics.rowWidth, height: metrics.row)
     }
 }

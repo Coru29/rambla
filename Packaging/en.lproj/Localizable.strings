@@ -105,10 +105,18 @@
 /* Rambla/Onboarding/WelcomeWindowController.swift */
 "Bienvenida a Rambla" = "Welcome to Rambla";
 
+/* Rambla/Overlay/IndicatorController.swift */
+"Vacía" = "Empty";
+
 /* Rambla/Overlay/OverlayCoordinator.swift */
+"Abrí acá lo que quieras." = "Open anything here.";
+"Abrí acá lo que quieras, o traé la ventana enfocada con %@." = "Open anything here, or bring the focused window with %@.";
+"Abrí acá lo que quieras. Para volver, deslizá hacia arriba o usá %@." = "Open anything here. To go back, swipe up or use %@.";
+"Abrí acá lo que quieras, o traé la ventana enfocada con %@. Para volver, deslizá hacia arriba o usá %@." = "Open anything here, or bring the focused window with %@. To go back, swipe up or use %@.";
 "Arrastrá una ventana hasta acá desde otra pantalla." = "Drag a window here from another display.";
 "Con %@ mandás acá la ventana enfocada, o arrastrá una desde otra pantalla." = "Press %@ to send the focused window here, or drag one from another display.";
 "Esta pantalla no tiene ventanas" = "This display has no windows";
+"Tira vacía" = "Empty strip";
 
 /* Rambla/Settings/SettingsWindowController.swift */
 "Configuración de Rambla" = "Rambla Settings";

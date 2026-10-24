@@ -1,5 +1,6 @@
 import AppKit
 import RamblaCore
+import UniformTypeIdentifiers
 
 /// Feeds the overlays (strip indicator, tab bars, focus border, dimming, overview) from the engine's state.
 @MainActor
@@ -20,11 +21,15 @@ final class OverlayCoordinator {
     private var indicatorKey: StripKey?
     private var icons: [pid_t: NSImage] = [:]
     private var tints: [pid_t: NSColor] = [:]
+    /// Stands in for the icon of an app that has none.
+    private lazy var genericIcon = NSWorkspace.shared.icon(for: .application)
 
     init(engine: WindowManager) {
         self.engine = engine
         engine.overlayHook = { [weak self] in self?.refresh() }
         engine.indicatorHook = { [weak self] key, modifiers in self?.showIndicator(key, holding: modifiers) }
+        engine.levelHook = { [weak self] stack in self?.showLevels(of: stack) }
+        engine.emptyLevelHook = { [weak self] stack in self?.showEmptyStripHint(of: stack) }
         engine.overviewHook = { [weak self] key in self?.toggleOverview(key) }
         engine.overviewAction = { [weak self] action in self?.overview.perform(action) ?? false }
     }
@@ -107,6 +112,57 @@ final class OverlayCoordinator {
         guard strip.columns[source].pinned == nil, strip.columns[target].pinned == nil else { return }
         engine.moveColumn(in: key, from: source, to: target)
         showIndicator(key, holding: nil)
+    }
+
+    // MARK: - Strip levels
+
+    /// The strips of a stack as the levels panel draws them, the highest first: the icons of the apps of each strip's
+    /// columns in visual order, each from the first window of its column that is not hidden. A level without a strip
+    /// is an empty row.
+    private func levelRows(of stack: StackKey) -> [LevelRow] {
+        let active = engine.activeLevel(of: stack)
+        return (0...engine.topLevel(of: stack)).reversed().map { level in
+            let key = stack.level(level)
+            let strip = engine.strips[key] ?? Strip()
+            let hidden = engine.hidden[key] ?? []
+            // One icon per column, so that a strip with windows never reads as empty: an app with no icon gets the
+            // generic one.
+            let icons = strip.visualOrder(hidden: hidden).map { index -> NSImage in
+                let window = strip.columns[index].windows.first { !hidden.contains($0) }
+                return window.flatMap { icon(for: $0) } ?? genericIcon
+            }
+            return LevelRow(id: level, icons: icons, isActive: level == active)
+        }
+    }
+
+    /// Another strip of `stack` came into view: shows the stack on its display, unless the indicator is off.
+    private func showLevels(of stack: StackKey) {
+        guard engine.prefs.indicatorEnabled, let display = engine.display(forStack: stack) else { return }
+        indicator.showLevels(levelRows(of: stack), on: display.screen)
+    }
+
+    /// An empty strip came into view and Rambla holds the keyboard, with nothing on screen to show for it: the hint
+    /// says how to fill it and how to leave it.
+    private func showEmptyStripHint(of stack: StackKey) {
+        guard let display = engine.display(forStack: stack) else { return }
+        hint.show(String(localized: "Tira vacía"), detail: emptyStripDetail(), on: display.screen)
+    }
+
+    /// The hint's second line: bring the focused window with the shortcut that sends it to the strip above, go back
+    /// with the one that goes to the strip below. A shortcut that is not bound leaves its clause out.
+    private func emptyStripDetail() -> String {
+        let send = engine.prefs.shortcuts(for: .sendStripUp).first.map { KeyNames.display($0) }
+        let back = engine.prefs.shortcuts(for: .stripDown).first.map { KeyNames.display($0) }
+        switch (send, back) {
+        case let (send?, back?):
+            return String(localized: "Abrí acá lo que quieras, o traé la ventana enfocada con \(send). Para volver, deslizá hacia arriba o usá \(back).")
+        case let (send?, nil):
+            return String(localized: "Abrí acá lo que quieras, o traé la ventana enfocada con \(send).")
+        case let (nil, back?):
+            return String(localized: "Abrí acá lo que quieras. Para volver, deslizá hacia arriba o usá \(back).")
+        case (nil, nil):
+            return String(localized: "Abrí acá lo que quieras.")
+        }
     }
 
     // MARK: - Overview

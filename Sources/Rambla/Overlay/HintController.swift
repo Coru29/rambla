@@ -1,8 +1,9 @@
 import AppKit
 import SwiftUI
 
-/// A short message in the middle of a display that fades out on its own, for something Rambla cannot do there: the
-/// overview of a display without windows says how to bring one. Click-through, like the focus border.
+/// A short message in the middle of a display that fades out on its own, for something Rambla has nothing to show for:
+/// the overview of a display without windows, and a strip that came into view empty, say how to bring a window.
+/// Click-through, like the focus border.
 @MainActor
 final class HintController {
     private static let visibleDuration: TimeInterval = 2.5
