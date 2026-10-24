@@ -90,7 +90,7 @@ La dirección sigue la opción natural de los botones.
   - abajo, el ancho anterior al soltar;
   - bien abajo, la vista general.
 
-La opción vale para el trackpad y para los botones del mouse. El interruptor actual de gestos verticales sigue apagándolos todos.
+La opción vale para el trackpad y para los botones del mouse. El interruptor actual de gestos verticales apaga solo los del trackpad: los botones del mouse se apagan con su propio interruptor.
 
 ### Atajos nuevos (editables)
 

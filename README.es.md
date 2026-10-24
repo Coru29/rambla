@@ -39,7 +39,7 @@ Cada ventana es una columna de una tira horizontal que sigue más allá de los b
 - Opcionales: **borde en la ventana enfocada**, **atenuar las inactivas**, el foco sigue al mouse y el mouse sigue al foco.
 - **Reglas por app**: mosaico o flotante, ancho inicial y dónde se abren. Además, se puede activar o desactivar por pantalla.
 - **Recuerda el layout** al reiniciar, y al volver a conectar una pantalla sus ventanas vuelven a su lugar. Puede arrancar con la Mac.
-- **Convive con [Rectangle](https://rectangleapp.com)**: los atajos usan ⌃⌘, así que no chocan con los ⌃⌥ del set normal de Rectangle (con su set Spectacle chocan un par, y Rambla te avisa). Si Rectangle (u otra app) mueve una ventana, esa ventana sale de la tira y queda donde la pusieron. La página Mac de la configuración avisa si algún atajo choca con tu Rectangle.
+- **Convive con [Rectangle](https://rectangleapp.com)**: los atajos usan ⌃⌘, y ⌃⌥⌘ con ↑ y ↓ los de cambiar de tira, así que no chocan con el set normal de Rectangle, que usa ⌃⌥, y ⌃⌥⌘ solo con ← y → (con su set Spectacle chocan un par, y Rambla te avisa). Si Rectangle (u otra app) mueve una ventana, esa ventana sale de la tira y queda donde la pusieron. La página Mac de la configuración avisa si algún atajo choca con tu Rectangle.
 - **Automatización**: enlaces `rambla://`, comando de terminal `rambla` y exportación de scripts para Raycast.
 - **Español e inglés**: la interfaz sigue el idioma de tu Mac.
 - **Liviana**: Swift nativo (AppKit, con la configuración en SwiftUI), sin Electron y basada en eventos. En reposo usa cerca de 0 % de CPU y ~12 MB de memoria.

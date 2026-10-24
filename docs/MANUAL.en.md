@@ -153,7 +153,7 @@ A column can hold several windows.
 
 **Floating windows and stacked strips.** If you use several stacked strips ([chapter 12](#12-stacked-strips)), not every floating window behaves the same when you change strips:
 
-- The ones that float because of an app rule, dialogs and panels **are seen on every strip**.
+- The ones that float because of an app rule, dialogs, panels, windows that cannot be resized, Picture in Picture and Quick Look **are seen on every strip**.
 - The ones that float because of ⌃⌘T, and the ones Rambla left floating because another app moved them (Rectangle), **go with their strip**: they are parked with it and come back to their place when you return.
 
 ## 10. Mouse and trackpad
@@ -176,7 +176,7 @@ A column can hold several windows.
 
 With **Natural direction** (on by default), the content follows your fingers: move them down and the strip above appears, like dragging a page down to see what is above. Without it, it is the other way around. The long swipes do not change with this option.
 
-macOS opens Mission Control with the swipe up, and its three-finger option keeps the four-finger one on too: Settings → Trackpad & Mouse warns you and turns it off with **Turn Off in macOS** (Mission Control keeps working with three fingers and ⌃↑). If you do not want these gestures, turn off **Swipes up and down** on the same page.
+macOS opens Mission Control with the swipe up, and its three-finger option keeps the four-finger one on too: Settings → Trackpad & Mouse warns you and turns it off with **Turn Off in macOS** (Mission Control keeps working with three fingers and ⌃↑). If you do not want these gestures, turn off **Swipes up and down** on the same page. That switch is for the trackpad only: the mouse button gestures have their own, below.
 
 **Move the strip with the mouse wheel.** Hold **⌃⌘** and turn the wheel: each notch focuses the next column. With a Magic Mouse, or two fingers on a trackpad, holding ⌃⌘ slides the strip like the gesture, and it settles when you let go. Without the keys, the wheel scrolls as usual. You can change the keys in Settings → Trackpad & Mouse.
 
@@ -204,7 +204,7 @@ With a single button (the middle one, say), a click without moving still works a
 - **Recommended**: keep "Displays have separate Spaces" on (the macOS default). With two monitors, ideally place the second one **above or below** the main one in System Settings → Displays → Arrange. Side by side works too: windows peek at most halfway toward the other monitor, and those beyond that side are parked on the opposite edge (they still come and go through their own side).
 - **Full-screen** windows (green button) leave the strip while they are full screen and come back to their place when you exit.
 - **Minimized** windows and windows of **hidden** apps (⌘H) leave their place without taking space and reappear in the same spot, even if you plug in another display or open the lid meanwhile.
-- If you **unplug a display** (taking a laptop off its dock, for example) and more than 15 seconds go by, its windows join the strip of the display macOS moves them to (if you close the Mac's lid, the ones on its screen join right away; with stacked strips, each strip joins the one in the same place, as [chapter 12](#12-stacked-strips) explains). **When you plug it back in, they go back to their places**, in the same order and with their widths: the ones on screen at that moment (a minimized one, or one on another desktop, stays where it is). Windows you opened meanwhile stay where they are. Until it returns, Rambla remembers its arrangement for up to a month, even across restarts; after the Mac restarts, it recognizes each window by its title.
+- If you **unplug a display** (taking a laptop off its dock, for example) and more than 15 seconds go by, its windows join the strip of the display macOS moves them to. If you close the Mac's lid, the ones on its screen join right away. With stacked strips, each strip joins the one in the same place, as [chapter 12](#12-stacked-strips) explains. **When you plug it back in, they go back to their places**, in the same order and with their widths. The ones that go back are those on screen at that moment: a minimized one, or one on another desktop, stays where it is. Windows you opened meanwhile stay where they are. Until it returns, Rambla remembers its arrangement for up to a month, even across restarts; after the Mac restarts, it recognizes each window by its title.
 
 ## 12. Stacked strips
 
@@ -224,7 +224,7 @@ You switch between them with a swipe, a shortcut or the overview. The switch is 
 Try this:
 
 1. Press **⌃⌥⌘↑**. An empty strip appears above, and the windows you had leave the view: they are still on the strip below.
-2. Open an app or a window. It appears on the new strip.
+2. Open an app that is not open yet. It appears on the new strip, and so do its new windows (⌘N). An app that already has windows below, though, takes you down to them.
 3. Press **⌃⌥⌘↓** to go back to the strip below, and **⌃⌥⌘↑** to go back up to the one that kept its window.
 
 ### How they come and go
@@ -261,9 +261,9 @@ When you switch strips, a panel with all the strips of the display shows up for 
 
 Rambla does not leave you typing into a window you cannot see, and it does not change your strip because of something macOS did on its own. This is how it behaves when the focus comes from outside:
 
-- **You choose a window of another strip** (from the Window menu, with ⌘`, in Mission Control, or by bringing it back from the Dock): Rambla goes to that strip and shows it.
+- **You choose a window of another strip** (from the Window menu, with ⌘`, in Mission Control, or by bringing it back from the Dock): Rambla goes to that strip and shows it. Mission Control has one exception (see [Limits](#limits)).
 - **You reach an app with ⌘Tab, the Dock or a notification:** it works like macOS's own desktops. If the app has windows on the strip you see, you stay on that strip and Rambla focuses the last of those windows you used. If they are all on another strip, it goes to that strip.
-- **macOS moves the focus by itself,** because you closed or minimized a window, or hid or quit an app: Rambla does not change strips. It focuses the last window you used of that app on the strip you see; if there is none, the last of any app. If the strip ended up empty, Rambla takes the keyboard, as on an empty strip.
+- **macOS moves the focus by itself,** because you closed or minimized a window, or hid or quit an app: Rambla does not change strips. It focuses the last window you used, on the strip you see, of the app macOS handed the focus to; if there is none, the last of any app. If the strip ended up empty, Rambla takes the keyboard, as on an empty strip.
 - **A new window opens:** it joins the strip you see on the display where it appears, even if its app has windows on another strip.
 
 ### The overview with several strips
@@ -271,7 +271,7 @@ Rambla does not leave you typing into a window you cannot see, and it does not c
 With more than one strip, **⌃⌘O** (or a long swipe down) shows **one row per strip** of the display, the highest on top. Each row is like the usual overview. The bar for what is on screen shows only on the strip you see, and the rows shrink to fit. A strip without windows is an **Empty** card that cannot be chosen. With a single strip, it looks as it always did.
 
 - **Choosing** a window of another row (with a click, or with the arrows and ↩) takes you to that strip and focuses it.
-- **↑ and ↓** go through the windows of a stack and, past its edge, to the row above or below. The shortcuts that change strips (⌃⌥⌘↑ / ⌃⌥⌘↓) and a short swipe up or down do the same with the selection, and do not change the strip behind.
+- **↑ and ↓** go through the windows of a stack and, past its edge, to the row above or below. The shortcuts that change strips (⌃⌥⌘↑ / ⌃⌥⌘↓) and a short swipe up or down take the selection straight to the row above or below, without going through the stack. They do not change the strip behind.
 - **To send a column to another strip**, with its stack or tabs: drag it to another row, or choose it and press **⇧↑ / ⇧↓** (⌃⌥⌘⇧↑ / ⌃⌥⌘⇧↓ too). It lands after that strip's focused column, or where you drop it if you dragged it. From the highest strip, ⇧↑ sends it to a new strip above.
 - **New strip.** While you drag a column, a **New strip** row appears on top: drop it there and a strip is created with that column. It is not offered for the only column of the top strip, neither when dragging nor with ⇧↑. If the top strip is empty, just drop it there.
 
@@ -279,24 +279,24 @@ With more than one strip, **⌃⌘O** (or a long swipe down) shows **one row per
 
 When you reach an empty strip:
 
-- The **Empty strip** hint shows up for a moment. It says you can open anything there, how to bring a window from the nearest strip that has some and how to go back to it (with a swipe and with a shortcut). It names the shortcuts you have set, and if one is unassigned, that part is left out. It shows even if the strip indicator is off.
+- The **Empty strip** hint shows up for a moment. It says you can open anything there, how to bring a window from the nearest strip that has some and how to go back to it. To go back it names the shortcut, and the swipe only when the trackpad's swipe switches strips: with the trackpad and its **Swipes up and down** on, and **Switches strips** chosen. It names the shortcuts you have set, and if one is unassigned, that part is left out; with neither a shortcut nor the swipe, it does not say how to go back. It shows even if the strip indicator is off.
 - Rambla **keeps the keyboard**, showing nothing. That way, what you type does not reach a window you cannot see. As soon as you open an app or choose a window, the keyboard goes back to it.
 - If that strip is the highest one and you leave it, it goes away.
 
 ### Floating windows
 
-- The ones that float because of an **app rule** (a calculator or a small chat, say), **dialogs** and **panels** do not belong to any strip: they are seen on all of them.
-- The ones that float because of **⌃⌘T**, and the ones Rambla left floating because another app moved them (Rectangle), **go with the strip of their display**: when you switch, they are parked with the strip you leave, and they come back to their place when you return to it.
-- With a floating window focused, **⌃⌥⌘⇧↑ / ⌃⌥⌘⇧↓** takes it along with you: the strip changes and it stays in view.
+- The ones that float because of an **app rule** (a calculator or a small chat, say), **dialogs**, **panels**, windows that **cannot be resized**, **Picture in Picture** and **Quick Look** do not belong to any strip: they are seen on all of them.
+- The ones that float because of **⌃⌘T**, and the ones Rambla left floating because another app moved them (Rectangle), **go with the strip of their display**. When you switch, they are parked with the strip you leave, and they come back to their place when you return to it.
+- With one of those floating windows focused, **⌃⌥⌘⇧↑ / ⌃⌥⌘⇧↓** takes it along with you: the strip changes and it stays in view.
 - **Rearrange Windows** puts the ones Rambla left floating back on the strip they came from, not the one you are looking at.
-- If Rambla restarts or pauses, or you use **Bring All Windows on Screen**, the ones that were parked with a strip come back to their place, in view, and become part of the strip you see.
+- If Rambla restarts or pauses, or you use **Bring All Windows on Screen**, the ones that were parked with a strip come back to their place, in view. From then on they are part of the strip you see.
 
 ### Displays and restarts
 
 - **Every display and every desktop (Space) has its own strips** and its own strip in view. When you return to a desktop, you see the strip you left.
 - **Displays do not change together.** The short swipe acts on the display under the pointer, and the shortcuts on the strip of the focused window (or of the display under the pointer, if no window is focused). Full width still acts on the focused column, wherever the pointer is.
 - **A window that changes display or desktop** goes to the strip in view there. That happens if you send it with ⌃⌘N, drag it to another display or move it to another desktop from Mission Control.
-- **If you unplug a display** (or close the Mac's lid), each of its strips joins the one in the same place, counting from the bottom, on the display where macOS puts the windows; if it does not exist, it is created. The ones not in view are parked. **When you plug it back in,** each strip gets its windows back and the display shows the strip it had. If the window you were typing in ends up on a strip you do not see, the keyboard goes to a window in view.
+- **If you unplug a display** (or close the Mac's lid), each of its strips joins the one in the same place, counting from the bottom, on the display where macOS puts the windows. If that strip does not exist, it is created. The ones not in view are parked. **When you plug it back in,** each strip gets its windows back and the display shows the strip it had. If the window you were typing in ends up on a strip you do not see, the keyboard goes to a window in view.
 - **When Rambla or the Mac restarts,** the strips are put back together, each window on its own, and each display shows the one it had in view. The rest are parked. The strips of an unplugged display or of a desktop you have not visited are kept for up to a month, as always.
 - **When you quit Rambla or pause it,** the windows of all the strips come back into view, so none is lost. When you open it again or resume it, each one goes back to its strip.
 
@@ -304,8 +304,9 @@ When you reach an empty strip:
 
 - **Mission Control and App Exposé show the windows of every strip**, because they are on the same desktop. Choosing one there takes you to its strip.
 - **One exception in Mission Control:** if you choose the window of an app that was not in front and that app also has windows on the strip you see, Rambla takes it as a ⌘Tab. You stay on this strip, with the last window of that app you used here. To go to the other strip, use a swipe, a shortcut or the overview.
-- **With displays on both sides of a display** (three in a row, the middle one) there is no free edge to park at. The windows of the other strips sit on the neighbor display on the nearer side. Parked columns already had this limit. With two displays it does not happen.
+- **With a display that has another on each side** (the middle one of three in a row) there is no free edge to park at. The windows of the other strips sit on the neighbor display on the nearer side. Parked columns already had this limit. With two displays it does not happen.
 - **Dialogs and panels are seen on every strip**: they belong to none.
+- **When you unplug a display,** the windows of its strips you do not see can show on the remaining display for up to 15 seconds (2 with the Mac's lid closed). Then they join their strip and, if it is not the one in view, they are parked.
 
 ## 13. Visual aids
 
