@@ -222,6 +222,9 @@ extension WindowManager {
         for (savedID, liveID) in matches {
             pendingFloating.remove(savedID)
             markFloating(liveID)
+            // Rambla may have stopped without bringing it back from where it parked it with a strip (a crash, Force
+            // Quit): one that lies mostly off every display comes into view.
+            bringInIfOffScreen(liveID)
         }
     }
 }

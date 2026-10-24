@@ -176,10 +176,14 @@ final class WindowManager {
     /// drag). Unlike the ones the user floats, they are not saved, and "Reacomodar ventanas" puts them back.
     var autoFloated: Set<WindowID> = []
     /// Floating windows (the user's ⌃⌘T ones and the ones Rambla floated after another app moved them) parked with a
-    /// level that went out of view, with the frame each had then. The frame is kept from the top-left corner of the
-    /// display of that level's stack (`FloatShelf.offset`), so a window comes back to its place on its display even if
-    /// the displays moved meanwhile. In memory only: quitting and pausing bring every one back (`gatherAll`).
-    var floatShelf: [StripKey: [WindowID: CGRect]] = [:]
+    /// level that went out of view, with the frame each had then and the frame of its display then
+    /// (`FloatShelf.Parked`): each comes back to that frame, or to the same place on its display if the displays
+    /// changed meanwhile. In memory only: quitting and pausing bring every one back (`gatherAll`).
+    var floatShelf: [StripKey: [WindowID: FloatShelf.Parked]] = [:]
+    /// Floating windows let go from their shelf because they left the desktop of their level (the user took them to
+    /// another one in Mission Control, or they are on all of them now), with what the shelf knew of them: each one goes
+    /// to its place where it is as soon as it shows (`placeFloatsAway`), as a window out of sight may not take a move.
+    var floatsAway: [WindowID: FloatShelf.Parked] = [:]
     /// A floating window the user is dragging, while the left button is down: a level switch leaves it in view, and a
     /// parked one stays where the drag takes it until the button is released.
     private(set) var draggedFloat: WindowID?
@@ -585,6 +589,7 @@ final class WindowManager {
         placedAtUnpluggedLevel[id] = nil
         // A floating window parked with a level out of view leaves its shelf.
         takeFromFloatShelf(id)
+        floatsAway[id] = nil
         if draggedFloat == id { draggedFloat = nil }
         for key in Array(hidden.keys) { hidden[key]?.remove(id) }
         animator.cancel(id)
@@ -629,11 +634,19 @@ final class WindowManager {
         focusedWindow = id
         // A floating window parked with a level out of view (`floatShelf`) is out of view with it: it is routed like
         // the windows of that level. One parked with the level in view (it was hidden when that level came back)
-        // floats in view, and the next pass brings it back to its place.
+        // floats in view, and the next pass brings it back to its place. So does one on another desktop (taken there
+        // in Mission Control while parked, or now on all of them): it is no longer that level's.
         var parkedWith = id.flatMap(floatShelfKey(holding:))
-        if let shelf = parkedWith, isCurrent(shelf) {
-            parkedWith = nil
-            scheduleReconcile()
+        if let id, let shelf = parkedWith {
+            if isCurrent(shelf) {
+                parkedWith = nil
+                scheduleReconcile()
+            } else if !inGrace, !isTuckedAway(id),
+                      FloatShelf.isAway(spaces: Private.spaces(for: [id])[id] ?? [], from: shelf.spaceID) {
+                letGo(id, from: shelf)
+                parkedWith = nil
+                scheduleReconcile()
+            }
         }
         if let id, key(containing: id) == nil, parkedWith == nil, floating.contains(id) || windows[id]?.kind == .float {
             // A floating window can end up under the strip (a swipe focuses the column it lands on). When its app
@@ -1218,9 +1231,9 @@ final class WindowManager {
         guard let shelf = floatShelf.removeValue(forKey: key) else { return }
         let display = displays.first { $0.uuid == key.displayUUID }
         var frames: [WindowID: CGRect] = [:]
-        for (id, offset) in shelf {
+        for (id, parked) in shelf {
             requested[id] = nil
-            if let display, windows[id] != nil { frames[id] = floatReturnFrame(offset, on: display) }
+            if let display, windows[id] != nil { frames[id] = floatReturnFrame(parked, on: display) }
         }
         write(frames, verify: true)
         let place = display == nil ? "where macOS put them" : "in their places"
@@ -1422,14 +1435,14 @@ final class WindowManager {
     }
 
     /// Parks floating windows with `key`, the level that just left the view (`floatShelf`): each one goes straight to a
-    /// side edge of its display, as the windows of that level do (`floatParkingFrame`), and its shelf keeps the place
-    /// it had there for when the level comes back. `leaving` comes from `floatsInView`.
-    func parkFloats(_ leaving: [WindowID: CGRect], with key: StripKey) {
+    /// side edge of its display, as the windows of that level do (`floatParkingFrame`), and its shelf keeps the frame
+    /// it had for when the level comes back. `leaving` comes from `floatsInView`.
+    func parkFloats(_ leaving: [WindowID: FloatShelf.Parked], with key: StripKey) {
         guard !leaving.isEmpty, let display = display(forStack: key.stack) else { return }
         var frames: [WindowID: CGRect] = [:]
-        for (id, offset) in leaving {
-            floatShelf[key, default: [:]][id] = offset
-            let park = floatParkingFrame(offset, on: display)
+        for (id, parked) in leaving {
+            floatShelf[key, default: [:]][id] = parked
+            let park = floatParkingFrame(parked, on: display)
             frames[id] = park
             requested[id] = park
         }
@@ -1447,7 +1460,7 @@ final class WindowManager {
         guard let shelf = floatShelf[key], let display = display(forStack: key.stack) else { return [] }
         let onScreen = shown ?? Self.windowIDs(onScreenOnly: true)
         var frames: [WindowID: CGRect] = [:]
-        for (id, offset) in shelf {
+        for (id, parked) in shelf {
             guard windows[id] != nil, floating.contains(id) else {
                 floatShelf[key]?[id] = nil
                 continue
@@ -1455,7 +1468,7 @@ final class WindowManager {
             guard onScreen.contains(id) else { continue }
             floatShelf[key]?[id] = nil
             requested[id] = nil
-            frames[id] = floatReturnFrame(offset, on: display)
+            frames[id] = floatReturnFrame(parked, on: display)
         }
         if floatShelf[key]?.isEmpty == true { floatShelf[key] = nil }
         guard !frames.isEmpty else { return [] }
@@ -1465,17 +1478,35 @@ final class WindowManager {
         return Array(frames.keys)
     }
 
-    /// Where a floating window kept at `offset` on `display` parks (`FloatShelf.parkingFrame`), with the other displays
-    /// and the sliver of the strips' windows.
-    func floatParkingFrame(_ offset: CGRect, on display: DisplayInfo) -> CGRect {
-        FloatShelf.parkingFrame(offset: offset, display: display.frame, others: otherDisplays(than: display),
+    /// Where a parked floating window waits on `display` (`FloatShelf.parkingFrame`), with the other displays and the
+    /// sliver of the strips' windows.
+    func floatParkingFrame(_ parked: FloatShelf.Parked, on display: DisplayInfo) -> CGRect {
+        FloatShelf.parkingFrame(parked, display: display.frame, others: otherDisplays(than: display),
                                 sliver: Self.sliver).integral(keepingSize: true)
     }
 
-    /// Where a floating window kept at `offset` on `display` comes back (`FloatShelf.returnFrame`).
-    func floatReturnFrame(_ offset: CGRect, on display: DisplayInfo) -> CGRect {
-        FloatShelf.returnFrame(offset: offset, display: display.frame, visible: display.visible,
-                               displays: displays.map(\.frame)).integral(keepingSize: true)
+    /// Where a parked floating window comes back on `display` (`FloatShelf.returnFrame`): the frame it had, unless the
+    /// display changed meanwhile.
+    func floatReturnFrame(_ parked: FloatShelf.Parked, on display: DisplayInfo) -> CGRect {
+        let frame = FloatShelf.returnFrame(parked, display: display.frame, visible: display.visible,
+                                           displays: displays.map(\.frame))
+        return frame == parked.frame ? frame : frame.integral(keepingSize: true)
+    }
+
+    /// Brings a floating window into view when most of it lies off every display (`FloatShelf.inView`), onto the
+    /// display it is mostly on, else the first one, as "Traer todas las ventanas" would. A saved one restored after
+    /// Rambla stopped without bringing it back (a crash, Force Quit) may still be parked on an edge.
+    func bringInIfOffScreen(_ id: WindowID) {
+        guard let record = windows[id] else { return }
+        let frame = whereShown(record)
+        guard let display = Displays.best(for: frame, in: displays) ?? displays.first else { return }
+        let target = FloatShelf.inView(frame, visible: display.visible, displays: displays.map(\.frame))
+        guard target != frame else { return }
+        let rounded = target.integral(keepingSize: true)
+        Log.info("Floating window \(id) lies off every display at \(Self.describe(frame)): "
+                 + "it comes into view at \(Self.describe(rounded))")
+        requested[id] = nil
+        write([id: rounded], verify: true)
     }
 
     func applyAll(animate: Bool) {
@@ -1539,28 +1570,36 @@ final class WindowManager {
             requested[id] = nil
         }
         // The floating windows parked with a level out of view come back to their places first, as plain floating
-        // windows from now on. Those of a display that is gone stay where macOS put them; like every floating window,
-        // one that lies mostly off every display is brought in below.
+        // windows from now on, and so do those let go on another desktop that have not shown there yet. Those of a
+        // display that is gone stay where macOS put them; like every floating window, one that lies mostly off every
+        // display is brought in below.
+        func bringBack(_ id: WindowID, _ parked: FloatShelf.Parked, on display: DisplayInfo?) -> Bool {
+            requested[id] = nil
+            guard let display, let pid = windows[id]?.pid else { return false }
+            let frame = floatReturnFrame(parked, on: display)
+            if synchronously {
+                windows[id]?.frame = frame
+                workers[pid]?.setFrameSynchronously(id, frame)
+            } else {
+                write([id: frame], verify: true)
+            }
+            return true
+        }
         for (key, shelf) in floatShelf {
             let display = displays.first { $0.uuid == key.displayUUID }
             var back = 0
-            for (id, offset) in shelf {
-                requested[id] = nil
-                guard let display, let pid = windows[id]?.pid else { continue }
-                let frame = floatReturnFrame(offset, on: display)
-                if synchronously {
-                    windows[id]?.frame = frame
-                    workers[pid]?.setFrameSynchronously(id, frame)
-                } else {
-                    write([id: frame], verify: true)
-                }
-                back += 1
-            }
+            for (id, parked) in shelf where bringBack(id, parked, on: display) { back += 1 }
             guard back > 0 else { continue }
             Log.info("Brought back \(back) floating windows with strip level \(key.level) of display "
                      + "\(key.displayUUID.prefix(8))")
         }
+        for (id, parked) in floatsAway {
+            // On the display it is on, where it still waits at its parking spot.
+            let display = windows[id].flatMap { Displays.best(for: whereShown($0), in: displays) } ?? displays.first
+            _ = bringBack(id, parked, on: display)
+        }
         floatShelf.removeAll()
+        floatsAway.removeAll()
         for (key, strip) in strips {
             let display = displays.first(where: { $0.uuid == key.displayUUID })
             for id in strip.allWindows { gather(id, onto: display) }
@@ -1590,9 +1629,13 @@ final class WindowManager {
         windows[id]?.frame = frame
         guard !isPaused else { return }
         guard let key = key(containing: id) else {
-            // A floating window: one the user drags stays in view through a level switch, and one parked with a level
-            // out of view goes back to its parking spot.
-            if mouseDown, floating.contains(id) { draggedFloat = id }
+            // A floating window: one the user drags stays in view through a level switch, and where one let go on
+            // another desktop goes is the user's from then on. One parked with a level out of view goes back to its
+            // parking spot.
+            if mouseDown, floating.contains(id) {
+                draggedFloat = id
+                floatsAway[id] = nil
+            }
             if let shelf = floatShelfKey(holding: id) {
                 parkedFloatMoved(id, frame, from: previous, mouseDown: mouseDown, with: shelf)
             }
@@ -1674,12 +1717,12 @@ final class WindowManager {
         // now): a later pass parks it again. Parked with the level in view (it was hidden when that level came back),
         // it comes back to its place with the next pass.
         guard !mouseDown, isCurrentStack(key.stack), let display = display(forStack: key.stack),
-              let offset = floatShelf[key]?[id] else { return }
+              let parked = floatShelf[key]?[id] else { return }
         guard !isCurrent(key) else {
             scheduleReconcile()
             return
         }
-        let park = floatParkingFrame(offset, on: display)
+        let park = floatParkingFrame(parked, on: display)
         // Exactly where Rambla parked it: its own move, reported late.
         if frame.approximatelyEquals(park, tolerance: 2) { return }
         let reference = requested[id] ?? previous ?? frame
@@ -1704,17 +1747,32 @@ final class WindowManager {
     /// view (hidden when it came back, or a stack rebuilt with another level in view) come back to their places. Either
     /// way, only once they show (`visible`): a window that is minimized, or of a hidden app, waits on its shelf. One
     /// being dragged stays under the pointer.
+    ///
+    /// One that left the desktop of its level is let go (`letGoFloatsAway`): out of sight on a desktop in view while
+    /// macOS files it under another one, or on screen while its display shows another desktop.
     private func settleFloatShelves(inView keys: [StripKey], visible: Set<WindowID>) {
         let dragging = dragTracker.isMouseDown ? draggedFloat : nil
-        for key in Array(floatShelf.keys) where isCurrentStack(key.stack) {
-            if keys.contains(key) {
-                bringBackFloats(of: key, shown: visible)
+        var maybeAway: [WindowID] = []
+        for key in Array(floatShelf.keys) {
+            guard isCurrentStack(key.stack), let display = display(forStack: key.stack) else {
+                // Its display shows another desktop: one of them on screen there may be on that desktop.
+                if enabledDisplays.contains(where: { $0.uuid == key.displayUUID }) {
+                    maybeAway += (floatShelf[key] ?? [:]).keys.filter { visible.contains($0) && $0 != dragging }
+                }
                 continue
             }
-            guard let display = display(forStack: key.stack) else { continue }
+            let inView = keys.contains(key)
+            if inView { bringBackFloats(of: key, shown: visible) }
             var drifted: [WindowID: CGRect] = [:]
-            for (id, offset) in floatShelf[key] ?? [:] where id != dragging && visible.contains(id) {
-                let park = floatParkingFrame(offset, on: display)
+            for (id, parked) in floatShelf[key] ?? [:] where id != dragging {
+                guard visible.contains(id) else {
+                    // Out of sight, and not because it is minimized, its app hidden or in full screen: it may be on
+                    // another desktop.
+                    if !isTuckedAway(id), windows[id]?.traits.isFullscreen != true { maybeAway.append(id) }
+                    continue
+                }
+                guard !inView else { continue }
+                let park = floatParkingFrame(parked, on: display)
                 if !(requested[id]?.approximatelyEquals(park, tolerance: 0.5) ?? false)
                     || !(windows[id]?.frame.approximatelyEquals(park, tolerance: 2) ?? false) {
                     drifted[id] = park
@@ -1723,6 +1781,64 @@ final class WindowManager {
             }
             write(drifted, verify: true)
         }
+        letGoFloatsAway(maybeAway)
+        placeFloatsAway(visible: visible)
+    }
+
+    /// Of `ids`, parked floating windows that may have left the desktop of their level, those macOS files under another
+    /// desktop, or under several (assigned to all of them), are let go: the user took them there in Mission Control,
+    /// as strip windows follow (`followToItsSpace`). Only outside the grace of a display or desktop change, when macOS
+    /// files windows under other desktops by itself: the reconcile after it looks again.
+    private func letGoFloatsAway(_ ids: [WindowID]) {
+        guard !ids.isEmpty else { return }
+        guard !inGrace else {
+            checkDisplaysAgain(after: graceUntil - CFAbsoluteTimeGetCurrent() + 0.1)
+            return
+        }
+        let spaces = Private.spaces(for: ids)
+        for id in ids {
+            guard let key = floatShelfKey(holding: id),
+                  FloatShelf.isAway(spaces: spaces[id] ?? [], from: key.spaceID) else { continue }
+            letGo(id, from: key)
+        }
+    }
+
+    /// `id`, parked with `key`, left the desktop of that level: it leaves its shelf and floats where it is now, at its
+    /// place as soon as it shows (`placeFloatsAway`).
+    private func letGo(_ id: WindowID, from key: StripKey) {
+        guard let taken = takeFromFloatShelf(id) else { return }
+        floatsAway[id] = taken.parked
+        requested[id] = nil
+        Log.info("Floating window \(id), parked with strip level \(key.level), is on another desktop now: "
+                 + "it floats there")
+    }
+
+    /// The floating windows let go on another desktop (`floatsAway`) that show now go to their places there, on the
+    /// display they show on (`floatReturnFrame`). Outside the grace of a display or desktop change, as macOS may still
+    /// be moving them, and not while one is dragged.
+    private func placeFloatsAway(visible: Set<WindowID>) {
+        guard !floatsAway.isEmpty else { return }
+        let dragging = dragTracker.isMouseDown ? draggedFloat : nil
+        var frames: [WindowID: CGRect] = [:]
+        var waiting = false
+        for (id, parked) in floatsAway {
+            guard let record = windows[id], floating.contains(id) else {
+                floatsAway[id] = nil
+                continue
+            }
+            guard visible.contains(id), id != dragging,
+                  let display = Displays.best(for: whereShown(record), in: displays) ?? displays.first else { continue }
+            guard !inGrace else {
+                waiting = true
+                continue
+            }
+            frames[id] = floatReturnFrame(parked, on: display)
+            floatsAway[id] = nil
+        }
+        if waiting { checkDisplaysAgain(after: graceUntil - CFAbsoluteTimeGetCurrent() + 0.1) }
+        guard !frames.isEmpty else { return }
+        write(frames, verify: true)
+        Log.info("Put \(frames.count) floating windows let go on another desktop at their places there")
     }
 
     func adoptSize(_ id: WindowID, frame: CGRect, in key: StripKey) {

@@ -184,40 +184,42 @@ extension WindowManager {
     }
 
     /// Takes `id` off the shelf it is parked on (`floatShelf`), if any, and drops a shelf left empty. Returns that
-    /// level and the place the window had on its display.
+    /// level and what the shelf knew of the window.
     @discardableResult
-    func takeFromFloatShelf(_ id: WindowID) -> (key: StripKey, offset: CGRect)? {
-        guard let key = floatShelfKey(holding: id), let offset = floatShelf[key]?.removeValue(forKey: id) else {
+    func takeFromFloatShelf(_ id: WindowID) -> (key: StripKey, parked: FloatShelf.Parked)? {
+        guard let key = floatShelfKey(holding: id), let parked = floatShelf[key]?.removeValue(forKey: id) else {
             return nil
         }
         if floatShelf[key]?.isEmpty == true { floatShelf[key] = nil }
-        return (key, offset)
+        return (key, parked)
     }
 
     /// The floating windows in view on the display of `stack`, which the level in view takes along when it leaves
-    /// (`FloatShelf.leaving`), with the place each one has on that display (`FloatShelf.offset`). Only the user's
-    /// floating windows and Rambla's own (`floating`): those of app rules, dialogs and panels stay in view on every
-    /// level. `carried`, the focused one sent along to the level that comes, stays in view too. Where each one is comes
-    /// from the WindowServer now: one moved since the last reconcile may be on another display.
-    func floatsInView(of stack: StackKey, except carried: WindowID?) -> [WindowID: CGRect] {
+    /// (`FloatShelf.leaving`), each with its frame and that display's (`FloatShelf.Parked`). Only the user's floating
+    /// windows and Rambla's own (`floating`): those of app rules, dialogs and panels stay in view on every level, and
+    /// so does one on every desktop. `carried`, the focused one sent along to the level that comes, stays in view too.
+    /// Where each one is comes from the WindowServer now: one moved since the last reconcile may be on another display.
+    func floatsInView(of stack: StackKey, except carried: WindowID?) -> [WindowID: FloatShelf.Parked] {
         guard !floating.isEmpty, let display = display(forStack: stack) else { return [:] }
         let shown = Self.windowFrames(onScreenOnly: true)
         func shownFrame(_ id: WindowID) -> CGRect? {
             shown[id].flatMap { $0 == .zero ? nil : $0 } ?? windows[id]?.frame
         }
-        let parked = Set(floatShelf.values.flatMap(\.keys))
+        let parked = Set(floatShelf.values.flatMap(\.keys)).union(floatsAway.keys)
         let dragging = dragTracker.isMouseDown ? draggedFloat : nil
+        let spaces = Private.spaces(for: floating.filter { shown[$0] != nil && !parked.contains($0) }.sorted())
         let candidates = floating.sorted().compactMap { id -> FloatShelf.Window? in
             guard let record = windows[id], let frame = shownFrame(id) else { return nil }
             return FloatShelf.Window(
                 id: id, display: Displays.best(for: frame, in: displays)?.uuid, isOnScreen: shown[id] != nil,
                 isMinimized: record.traits.isMinimized,
                 appIsHidden: NSRunningApplication(processIdentifier: record.pid)?.isHidden == true,
-                isDragged: id == dragging, isParked: parked.contains(id))
+                isDragged: id == dragging, isParked: parked.contains(id),
+                isOnSeveralSpaces: (spaces[id]?.count ?? 0) > 1)
         }
-        var leaving: [WindowID: CGRect] = [:]
+        var leaving: [WindowID: FloatShelf.Parked] = [:]
         for id in FloatShelf.leaving(candidates, display: display.uuid, carried: carried) {
-            if let frame = shownFrame(id) { leaving[id] = FloatShelf.offset(of: frame, on: display.frame) }
+            if let frame = shownFrame(id) { leaving[id] = FloatShelf.Parked(frame: frame, display: display.frame) }
         }
         return leaving
     }

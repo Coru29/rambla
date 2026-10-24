@@ -216,6 +216,7 @@ extension WindowManager {
         autoFloated.remove(id)
         // One parked with a level out of view (it has the focus there for a moment) joins the level in view instead.
         takeFromFloatShelf(id)
+        floatsAway[id] = nil
         var strip = strips[key] ?? Strip()
         let available = display.visible.width - 2 * prefs.outerGap
         strip.insert(window: id, width: .points(min(max(frame.width, available * 0.25), available)), at: .afterFocused)
@@ -282,7 +283,7 @@ extension WindowManager {
             }
         let object: [String: Any] = [
             "paused": isPaused, "focused": focusedWindow as Any, "floating": Array(floating),
-            "floatShelf": floatShelfList,
+            "floatShelf": floatShelfList, "floatsAway": floatsAway.keys.sorted(),
             "displays": displays.map { ["uuid": $0.uuid, "frame": rectJSON($0.frame), "visible": rectJSON($0.visible),
                                         "space": $0.currentSpace as Any] },
             "stacks": stacks,
