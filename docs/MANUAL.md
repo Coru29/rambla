@@ -253,7 +253,7 @@ Al cambiar de tira, aparece un momento un panel con todas las tiras de la pantal
 
 ### Mandar ventanas a otra tira
 
-- Con **⌃⌥⌘⇧↑ / ⌃⌥⌘⇧↓**, la ventana enfocada (sola, no toda su columna) va a la tira de arriba o de abajo. Queda al lado de la columna enfocada de esa tira y con su ancho, y vos te vas con ella. Si estás en la tira más alta y la mandás hacia arriba, se crea una tira nueva.
+- Con **⌃⌥⌘⇧↑ / ⌃⌥⌘⇧↓**, la ventana enfocada (sola, no toda su columna) va a la tira de arriba o de abajo. Queda al lado de la columna enfocada de esa tira y con su ancho, y vos te vas con ella. Si estás en la tira más alta y la mandás hacia arriba, se crea una tira nueva, salvo que sea la única ventana de esa tira: entonces no pasa nada.
 - Desde la vista general podés mandar columnas enteras, con su pila o sus pestañas (más abajo).
 - Si la tira de la que salió queda vacía, valen las reglas de arriba.
 

@@ -47,7 +47,7 @@ La tira de arriba es de Rambla: se cambia con el mismo gesto de 4 dedos y no dep
 
 - **Pila de tiras:** cada par (pantalla, escritorio) tiene una pila de tiras numeradas desde abajo. La 0 es la tira de siempre.
 - **Tira activa:** por cada par se ve una sola tira, la activa. Cada tira conserva su foco, su scroll y sus columnas fijadas.
-- **Tira vacía nueva:** arriba de la tira más alta con ventanas siempre se puede subir a una tira vacía nueva. Existe recién cuando subís ahí o mandás una ventana ahí.
+- **Tira vacía nueva:** arriba de la tira más alta con ventanas siempre se puede subir a una tira vacía nueva. Existe recién cuando subís ahí o mandás una ventana ahí, salvo que sea la única ventana de esa tira: entonces no pasa nada.
 - **Tiras vacías que desaparecen:** una tira vacía que está arriba de todas las que tienen ventanas desaparece en cuanto deja de ser la activa.
 - **Tiras vacías que se conservan:** las vacías de abajo o del medio se conservan. Así "trabajo abajo, casa arriba" no se da vuelta cuando una de las dos queda vacía un rato. La 0 existe siempre.
 - **Bordes de la pila:** no se sube desde una tira vacía que ya es la más alta, ni se baja desde la 0.

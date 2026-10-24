@@ -253,7 +253,7 @@ When you switch strips, a panel with all the strips of the display shows up for 
 
 ### Sending windows to another strip
 
-- With **⌃⌥⌘⇧↑ / ⌃⌥⌘⇧↓**, the focused window (on its own, not its whole column) goes to the strip above or below. It lands next to that strip's focused column, with its width, and you go with it. If you send it up from the highest strip, a new strip is created.
+- With **⌃⌥⌘⇧↑ / ⌃⌥⌘⇧↓**, the focused window (on its own, not its whole column) goes to the strip above or below. It lands next to that strip's focused column, with its width, and you go with it. If you send it up from the highest strip, a new strip is created, unless it is that strip's only window: then nothing happens.
 - From the overview you can send whole columns, with their stack or tabs (below).
 - If the strip it came from ends up empty, the rules above apply.
 
