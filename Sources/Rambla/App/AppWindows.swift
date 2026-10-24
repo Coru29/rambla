@@ -23,9 +23,15 @@ enum AppWindows {
         }
     }
 
-    /// Call from `windowWillClose`: back to a menu bar app, unless another of Rambla's windows stays open.
+    /// Call from `windowWillClose`: back to a menu bar app, unless another of Rambla's windows stays open. The main
+    /// menu goes with the last window. On an empty strip Rambla holds the keyboard itself (`takeKeyboardFocus`), and a
+    /// main menu left installed would answer ⌘Q there by quitting Rambla, and ⌘H by hiding its overlays. The status
+    /// bar menu is another one and keeps working; the next `present` installs the main menu again.
     static func willClose(_ window: NSWindow) {
-        if !hasOpenWindow(besides: window) { NSApp.setActivationPolicy(.accessory) }
+        if !hasOpenWindow(besides: window) {
+            NSApp.setActivationPolicy(.accessory)
+            NSApp.mainMenu = nil
+        }
     }
 
     /// A titled window other than `closing` is open, or minimized in the Dock. Alerts (panels) and the borderless
@@ -39,7 +45,8 @@ enum AppWindows {
     // MARK: - Main menu
 
     /// A regular app needs a menu bar: ⌘W closes the window, ⌘Q quits and ⌘C / ⌘V work in the text fields.
-    /// The menu bar agent has none of that until one of its windows opens.
+    /// The menu bar agent has none of that until one of its windows opens, and again none once the last one closes
+    /// (`willClose`).
     private static func installMainMenuIfNeeded() {
         guard NSApp.mainMenu == nil else { return }
         let mainMenu = NSMenu()

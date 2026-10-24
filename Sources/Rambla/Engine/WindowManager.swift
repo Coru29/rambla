@@ -786,7 +786,7 @@ final class WindowManager {
             focusSettled(id, in: key)
         case .lateReport:
             Log.info("\(report) right after a level switch: maybe a late report, left alone for now")
-            recheckLateReport(arrival, at: (switchedAt ?? now) + FocusRoute.lateReportWindow)
+            recheckLateReport(arrival, leaving: previous, at: (switchedAt ?? now) + FocusRoute.lateReportWindow)
             overlayHook?()
         case .switchLevel where dragTracker.isMouseDown:
             Log.info("\(report): its level comes into view once the mouse button is released")
@@ -809,8 +809,10 @@ final class WindowManager {
     /// without that rule if it still has the focus on a level out of view, its app still in front: then it was no late
     /// report, but the user's choice (⌘` twice across strips, or the Window menu, right after a switch), and the
     /// keyboard must not stay out of sight. A late report is over by then: the window Rambla focused, or Rambla itself
-    /// on an empty strip, has taken the focus.
-    private func recheckLateReport(_ arrival: FocusArrival, at deadline: CFAbsoluteTime) {
+    /// on an empty strip, has taken the focus. `previous`, the window that had the focus before the report, goes on to
+    /// `route` as it was: if it went away since (minimized, or its app hidden), macOS moved the focus by itself, which
+    /// is no choice of the user's either.
+    private func recheckLateReport(_ arrival: FocusArrival, leaving previous: WindowID?, at deadline: CFAbsoluteTime) {
         lateReportCheck?.cancel()
         let item = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated {
@@ -825,7 +827,7 @@ final class WindowManager {
                       !self.isCurrent(key), self.isCurrentStack(key.stack) else { return }
                 Log.info("Window \(id) of strip level \(key.level) still has the focus after the level switch: "
                          + "no late report")
-                self.route(arrival, in: key, leaving: nil, lateReports: false)
+                self.route(arrival, in: key, leaving: previous, lateReports: false)
             }
         }
         lateReportCheck = item
@@ -1947,7 +1949,9 @@ final class WindowManager {
     /// Of `ids`, parked floating windows that may have left the desktop of their level, those macOS files under another
     /// desktop, or under several (assigned to all of them), are let go: the user took them there in Mission Control,
     /// as strip windows follow (`followToItsSpace`). Only outside the grace of a display or desktop change, when macOS
-    /// files windows under other desktops by itself: the reconcile after it looks again.
+    /// files windows under other desktops by itself: the reconcile after it looks again. The one with the focus, when
+    /// it is not shown (`isShown`), does not keep the keyboard out of sight: it goes on to a window in view, as in
+    /// `focusChanged`.
     private func letGoFloatsAway(_ ids: [WindowID]) {
         guard !ids.isEmpty else { return }
         guard !inGrace else {
@@ -1959,6 +1963,11 @@ final class WindowManager {
             guard let key = floatShelfKey(holding: id),
                   FloatShelf.isAway(spaces: spaces[id] ?? [], from: key.spaceID) else { continue }
             letGo(id, from: key)
+            if id == focusedWindow, !isShown(id, on: spaces[id] ?? []) {
+                let inView = displays.first { $0.uuid == key.displayUUID }.flatMap(currentKey)
+                handKeyboardOn(from: id, to: inView.flatMap { isCurrent($0) ? $0 : nil },
+                               report: "Floating window \(id), which has the focus, is on a desktop not shown")
+            }
         }
     }
 
