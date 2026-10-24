@@ -7,8 +7,13 @@
 /// app has windows in the level in view: the last one used of those gets the focus instead. When macOS moves the focus
 /// by itself, because the focused window closed or was minimized or an app was hidden or quit, the level in view stays.
 public enum FocusRoute: Equatable, Sendable {
-    /// In view, or a late report right after Rambla switched: nothing special to do.
+    /// In view: nothing special to do.
     case none
+    /// Right after Rambla switched the level in view, perhaps the late report of the app that was in front
+    /// (`lateReportWindow`): nothing changes for now, so the switch does not bounce back. Only for now: should the
+    /// window still have the focus once a report could no longer be late, it was none, and it is decided again without
+    /// this rule (`sinceOwnSwitch: nil`), as the keyboard must not stay in a window out of sight.
+    case lateReport
     /// Go to the window's level.
     case switchLevel
     /// Focus this window of the level in view instead.
@@ -27,7 +32,7 @@ public enum FocusRoute: Equatable, Sendable {
     /// bringing it back from the Dock, which wins over its app's activation and is never a late report.
     /// `appWindowsInView`: that app's windows in the level in view, most recently used first; `windowsInView`: every
     /// window there, most recently used first. `sinceOwnSwitch`: seconds since Rambla itself switched this stack's
-    /// level (nil: long ago).
+    /// level (nil: long ago, or a decision taken again once a late report could no longer be one).
     public static func decide(windowLevel: Int, active: Int, byActivation: Bool, afterLoss: Bool, chosen: Bool = false,
                               appWindowsInView: [WindowID], windowsInView: [WindowID],
                               sinceOwnSwitch: Double?) -> FocusRoute {
@@ -38,7 +43,7 @@ public enum FocusRoute: Equatable, Sendable {
             return .redirect(window)
         }
         if chosen { return .switchLevel }
-        if !byActivation, let since = sinceOwnSwitch, since < lateReportWindow { return .none }
+        if !byActivation, let since = sinceOwnSwitch, since < lateReportWindow { return .lateReport }
         if byActivation, let window = appWindowsInView.first { return .redirect(window) }
         return .switchLevel
     }

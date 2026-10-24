@@ -30,14 +30,16 @@ extension WindowManager {
     // MARK: - Switching
 
     /// Brings `level` of `stack` into view, a new empty one when it has no strip yet, and focuses `window` (one of that
-    /// level's, in its strip or floating and parked with it) or else the level's focused window. The windows that
-    /// arrive jump to their places first, behind the ones that leave, which then jump to their parking spots: nothing
-    /// crosses the display and nothing in between shows. The floating windows go the same way (`floatShelf`): those
-    /// parked with the level that comes into view come back to their places, and those in view on its display go with
-    /// the level that leaves, all but `carried`, the focused one that `sendFocusedWindow` takes along, which keeps the
-    /// focus. On a level with nothing to focus Rambla takes the keyboard, so nothing typed reaches a window out of
-    /// sight. `routed`: the switch follows a focus from outside Rambla (`FocusRoute`), so the pointer stays where it
-    /// is: "mouse follows focus" is for the focus Rambla gives through its own shortcuts.
+    /// level's, in its strip or floating and parked with it) or else the level's focused window, unless that one is
+    /// hidden (minimized, its app hidden): then the one used last there that shows. The windows that arrive jump to
+    /// their places first, the column that gets the focus already in view, behind the ones that leave, which then jump
+    /// to their parking spots: nothing crosses the display, nothing in between shows, and nothing moves a second time.
+    /// The floating windows go the same way (`floatShelf`): those parked with the level that comes into view come back
+    /// to their places, and those in view on its display go with the level that leaves, all but `carried`, the focused
+    /// one that `sendFocusedWindow` takes along, which keeps the focus. On a level with nothing that shows to focus
+    /// Rambla takes the keyboard, so nothing typed reaches a window out of sight. `routed`: the switch follows a focus
+    /// from outside Rambla (`FocusRoute`), so the pointer stays where it is: "mouse follows focus" is for the focus
+    /// Rambla gives through its own shortcuts.
     func switchLevel(of stack: StackKey, to level: Int, focusing window: WindowID? = nil, routed: Bool = false,
                      carrying carried: WindowID? = nil) {
         guard isRunning, !isPaused, isCurrentStack(stack), level >= 0, level <= topLevel(of: stack) + 1 else { return }
@@ -49,25 +51,36 @@ extension WindowManager {
             return
         }
         let chosenFloat = window.flatMap { floatShelf[new]?[$0] != nil ? $0 : nil }
+        let focusedFloat = carried ?? chosenFloat
         // Found before anything moves, so that the floating windows coming back with the new level are not among them.
         let leaving = floatsInView(of: stack, except: carried)
+        // The window of the level's strip that gets the focus, found before anything moves too: the one asked for, else
+        // the strip's focused window, else, when that one is hidden or there is none (a strip read from an older file
+        // may have no focused column), the one used last that shows.
+        let focused = focusedFloat == nil ? chosen ?? shownWindow(of: new) : nil
         activeLevels[stack] = level
         levelSwitchedAt[stack] = CFAbsoluteTimeGetCurrent()
         if strips[new] == nil { strips[new] = Strip() }
-        apply(new, animate: false)
+        // Laid out with that window's column in view at once: revealed afterwards, the strip would move a second time.
+        if let focused {
+            strips[new]!.focus(window: focused)
+            reveal(new, animate: false)
+        } else {
+            apply(new, animate: false)
+        }
         let back = bringBackFloats(of: new)
         shelve(stack.level(old))
         parkFloats(leaving, with: stack.level(old))
         dropEmptyLevels(of: stack)
-        if let float = carried ?? chosenFloat {
-            focusFloat(float, routed: routed)
-        } else if let focused = chosen ?? strips[new]?.focusedWindow ?? strips[new]?.columns.first?.activeWindow {
-            // A strip read from an older file may have no focused column: its first one then.
+        if let focusedFloat {
+            focusFloat(focusedFloat, routed: routed)
+        } else if let focused {
             focus(window: focused, in: new, routed: routed)
         } else if let float = FocusRoute.byLastUse(back.sorted(), lastUsed: lastFocusedAt).first {
-            // No window of its strip, but floating windows came back with it: the one used last.
+            // No window of its strip that shows, but floating windows came back with it: the one used last.
             focusFloat(float, routed: routed)
         } else {
+            // Nothing there shows (no window, or only hidden ones): as on an empty strip.
             takeKeyboardFocus()
             emptyLevelHook?(stack)
         }
@@ -105,8 +118,9 @@ extension WindowManager {
     // MARK: - Sending windows
 
     /// Sends the focused window, alone, to the level above or below (a new one above the top), next to that level's
-    /// focused column and with its width, and follows it there. A floating one (`floating`) goes along instead: the
-    /// level of its display changes, and it stays in view with the focus.
+    /// focused column and with its width, and follows it there. The only window of the top level stays where it is
+    /// rather than go up to a new level and leave an empty one below (`StripLevels.sendTarget`). A floating one
+    /// (`floating`) goes along instead: the level of its display changes, and it stays in view with the focus.
     func sendFocusedWindow(up: Bool) {
         guard isRunning, !isPaused else { return }
         if let id = focusedWindow, floating.contains(id), key(containing: id) == nil,
@@ -115,8 +129,9 @@ extension WindowManager {
             return
         }
         guard let key = activeStripKey(), let id = strips[key]?.focusedWindow,
-              let level = StripLevels.target(from: key.level, up: up, top: topLevel(of: key.stack),
-                                             occupied: occupiedLevels(of: key.stack)) else { return }
+              let level = StripLevels.sendTarget(from: key.level, up: up, top: topLevel(of: key.stack),
+                                                 occupied: occupiedLevels(of: key.stack),
+                                                 alone: strips[key]?.allWindows == [id]) else { return }
         let target = key.stack.level(level)
         let width = strips[key]!.location(of: id).map { strips[key]!.columns[$0.column].width } ?? .fraction(0.5)
         strips[key]!.remove(window: id)

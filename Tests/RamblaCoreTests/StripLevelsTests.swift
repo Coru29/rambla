@@ -19,6 +19,22 @@ import Testing
     #expect(StripLevels.target(from: 2, up: false, top: 2, occupied: []) == 1)
 }
 
+@Test func theOnlyWindowOfTheTopLevelIsNotSentUp() {
+    // Up to a new level, it would leave an empty level below it, and with the key held a pile of them.
+    #expect(StripLevels.sendTarget(from: 1, up: true, top: 1, occupied: [0, 1], alone: true) == nil)
+    #expect(StripLevels.sendTarget(from: 0, up: true, top: 0, occupied: [0], alone: true) == nil)
+    // With another window there, it opens the new level as before.
+    #expect(StripLevels.sendTarget(from: 1, up: true, top: 1, occupied: [0, 1], alone: false) == 2)
+}
+
+@Test func sendingGoesWhereSwitchingGoesOtherwise() {
+    // Alone too: up to a level that is already there, and down.
+    #expect(StripLevels.sendTarget(from: 0, up: true, top: 1, occupied: [0, 1], alone: true) == 1)
+    #expect(StripLevels.sendTarget(from: 1, up: false, top: 1, occupied: [1], alone: true) == 0)
+    // Nowhere at either end, as for switching.
+    #expect(StripLevels.sendTarget(from: 0, up: false, top: 1, occupied: [0, 1], alone: false) == nil)
+}
+
 @Test func emptyLevelsAboveEverythingAreDropped() {
     #expect(StripLevels.droppable(top: 2, occupied: [0], active: 0) == [1, 2])
     #expect(StripLevels.droppable(top: 2, occupied: [0], active: 2) == [])

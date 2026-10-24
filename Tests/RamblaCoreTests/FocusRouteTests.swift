@@ -35,14 +35,25 @@ struct FocusRouteTests {
         #expect(decide() == .switchLevel)
     }
 
-    @Test func aLateReportRightAfterOwnSwitchIsIgnored() {
+    @Test func aLateReportRightAfterOwnSwitchIsLeftAloneForNow() {
         // The app that was in front reports focus on its window, now out of view, before the new one takes over.
-        #expect(decide(app: [5], all: [5], sinceOwnSwitch: 0.2) == .none)
+        #expect(decide(app: [5], all: [5], sinceOwnSwitch: 0.2) == .lateReport)
         #expect(decide(app: [5], all: [5], sinceOwnSwitch: 0.8) == .switchLevel)
         #expect(decide(sinceOwnSwitch: FocusRoute.lateReportWindow) == .switchLevel)
         // An activation is the user's: right after a switch too, it follows the activation rules.
         #expect(decide(byActivation: true, app: [5], all: [5], sinceOwnSwitch: 0.2) == .redirect(5))
         #expect(decide(byActivation: true, all: [3], sinceOwnSwitch: 0.2) == .switchLevel)
+    }
+
+    @Test func aLateReportIsOnlyProvisional() {
+        // In view it is no late report: nothing to wait for.
+        #expect(decide(level: 0, sinceOwnSwitch: 0.1) == .none)
+        // The window still has the focus once a report could no longer be late (⌘` twice across strips, the Window menu
+        // right after a switch): decided again without the rule, the user chose it, and its level comes into view…
+        #expect(decide(app: [5], all: [5], sinceOwnSwitch: 0.2) == .lateReport)
+        #expect(decide(app: [5], all: [5], sinceOwnSwitch: nil) == .switchLevel)
+        // …or, with nothing that holds it, too: the keyboard never stays in a window out of sight.
+        #expect(decide(sinceOwnSwitch: nil) == .switchLevel)
     }
 
     @Test func aCloseKeepsTheSameAppWhenItCan() {

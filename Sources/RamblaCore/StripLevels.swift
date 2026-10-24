@@ -17,6 +17,14 @@ public enum StripLevels {
         return occupied.contains(active) ? active + 1 : nil
     }
 
+    /// Where sending a window from `active` goes: where a move goes (`target`), except that the only window of the top
+    /// level (`alone`: it is the only one of `active`) does not go up to a new level. That would only leave an empty
+    /// level below the new one, which stays, and with the key held a pile of them; the overview refuses the same move.
+    public static func sendTarget(from active: Int, up: Bool, top: Int, occupied: Set<Int>, alone: Bool) -> Int? {
+        guard let level = target(from: active, up: up, top: top, occupied: occupied) else { return nil }
+        return alone && level > top ? nil : level
+    }
+
     /// The levels to remove, ascending: those above both the highest occupied level and `active`. Never 0.
     public static func droppable(top: Int, occupied: Set<Int>, active: Int) -> [Int] {
         // Level 0 always stays, empty or not, so with no windows anywhere only the levels above it can go.

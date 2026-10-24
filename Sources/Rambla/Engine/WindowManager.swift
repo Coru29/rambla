@@ -128,6 +128,10 @@ final class WindowManager {
     /// A window of a level out of view that got the focus while the mouse button was down (a click on its sliver): its
     /// level comes into view once the button is released, so nothing moves under a click or a drag.
     private var pendingLevelSwitch: WindowID?
+    /// Rambla resumed, or manages a display again: while it did not, no level was parked there and the user may have
+    /// focused any window. The next reconcile brings the focused window's level into view if it is out of view, before
+    /// it parks anything.
+    private var focusMayBeOutOfView = false
     private var observers: [(NotificationCenter, NSObjectProtocol)] = []
 
     private(set) lazy var animator = Animator { [weak self] frames, verify in
@@ -203,8 +207,8 @@ final class WindowManager {
     /// A report of focus on one of its windows this soon after its app was activated came with that activation.
     private static let activationWindow: CFAbsoluteTime = 0.5
     /// When the focused window (in a level in view, or floating on a display in view) last closed or was minimized,
-    /// or an app was last hidden or quit: macOS then moves the focus by itself, which never changes the level in view
-    /// (`FocusRoute`).
+    /// or the app that had the focus was last hidden or quit (`hadTheFocus`): macOS then moves the focus by itself,
+    /// which never changes the level in view (`FocusRoute`).
     private var lastLossAt: CFAbsoluteTime?
     /// When each window last had the focus in a level in view, or floating in view: a window that gets the focus
     /// instead of one out of view is the most recently used, and so is a floating window that comes back with its
@@ -215,6 +219,9 @@ final class WindowManager {
     private var backFromDock: [WindowID: CFAbsoluteTime] = [:]
     /// When Rambla last switched the level in view of each stack: a report of focus right after can be a late one.
     var levelSwitchedAt: [StackKey: CFAbsoluteTime] = [:]
+    /// The check that routes again, once a report could no longer be late, a focus left alone as a possible late one
+    /// (`recheckLateReport`). One at a time: only the focused window can still need it.
+    private var lateReportCheck: DispatchWorkItem?
     /// A focus that came before `displays` showed its window's Space (⌘Tab to an app on another desktop: only the next
     /// reconcile reads the Space change), and how it came. That reconcile routes it.
     private var focusAwaitingSpace: FocusArrival?
@@ -280,6 +287,7 @@ final class WindowManager {
         } else {
             isPaused = false
             Log.info("Resumed")
+            focusMayBeOutOfView = true
             rescanAll()
             scheduleReconcile()
         }
@@ -293,8 +301,12 @@ final class WindowManager {
         if old.appRules != newPrefs.appRules {
             for (id, record) in windows { windows[id]?.kind = classify(record.traits) }
         }
-        if old.disabledDisplays != newPrefs.disabledDisplays {
-            gatherAll(synchronously: false)
+        let wasOff = Set(old.disabledDisplays), isOff = Set(newPrefs.disabledDisplays)
+        if wasOff != isOff {
+            // Only the displays Rambla stops or starts managing: the strips out of view on the others stay out of
+            // sight, and so do the floating windows parked with them.
+            gatherAll(synchronously: false, only: wasOff.symmetricDifference(isOff))
+            if !wasOff.isSubset(of: isOff) { focusMayBeOutOfView = true }
         }
         scheduleReconcile()
     }
@@ -310,11 +322,13 @@ final class WindowManager {
             register(app)
         }
         observe(ws, NSWorkspace.didTerminateApplicationNotification) { [weak self] note in
-            // A quit moves the focus by itself, often to a window of the next app.
-            self?.lastLossAt = CFAbsoluteTimeGetCurrent()
-            if let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication {
-                self?.unregister(app.processIdentifier)
+            guard let self, let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else {
+                return
             }
+            // Quitting the app that has the focus moves it by itself, often to a window of the next app. Asked before
+            // its windows go.
+            if hadTheFocus(app.processIdentifier) { lastLossAt = CFAbsoluteTimeGetCurrent() }
+            unregister(app.processIdentifier)
         }
         observe(ws, NSWorkspace.didActivateApplicationNotification) { [weak self] note in
             guard let self, let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
@@ -328,10 +342,15 @@ final class WindowManager {
                 focusChanged(nil)
             }
         }
-        observe(ws, NSWorkspace.didHideApplicationNotification) { [weak self] _ in
-            // Hiding an app moves the focus by itself, to a window of the next app.
-            self?.lastLossAt = CFAbsoluteTimeGetCurrent()
-            self?.scheduleReconcile()
+        observe(ws, NSWorkspace.didHideApplicationNotification) { [weak self] note in
+            guard let self else { return }
+            // Hiding the app that has the focus moves it by itself, to a window of the next app; hiding the others
+            // (⌥⌘H) does not.
+            if let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+               hadTheFocus(app.processIdentifier) {
+                lastLossAt = CFAbsoluteTimeGetCurrent()
+            }
+            scheduleReconcile()
         }
         observe(ws, NSWorkspace.didUnhideApplicationNotification) { [weak self] note in
             guard let self else { return }
@@ -470,6 +489,12 @@ final class WindowManager {
         worker.stop()
         for (id, record) in windows where record.pid == pid { removeWindow(id) }
         scheduleReconcile()
+    }
+
+    /// The app `pid` has the focus: the focused window is one of its own, or it is the app in front. Hiding or quitting
+    /// it moves the focus by itself, which is a loss (`lastLossAt`); hiding or quitting another app is none.
+    private func hadTheFocus(_ pid: pid_t) -> Bool {
+        focusedWindow.flatMap { windows[$0]?.pid } == pid || frontmostPID == pid
     }
 
     /// Every app lists its windows again; saved strips wait for the answers of those that answered before, or of all
@@ -645,11 +670,20 @@ final class WindowManager {
             if isCurrent(shelf) {
                 parkedWith = nil
                 scheduleReconcile()
-            } else if !inGrace, !isTuckedAway(id),
-                      FloatShelf.isAway(spaces: Private.spaces(for: [id])[id] ?? [], from: shelf.spaceID) {
+            } else if !inGrace, !isTuckedAway(id), let spaces = Private.spaces(for: [id])[id],
+                      FloatShelf.isAway(spaces: spaces, from: shelf.spaceID) {
                 letGo(id, from: shelf)
                 parkedWith = nil
                 scheduleReconcile()
+                // On a desktop no display shows (⌘Tab to its app with macOS's "switch to a Space with open windows"
+                // off): the keyboard does not stay in it, out of sight, as when the focused window goes out of view.
+                if !isShown(id, on: spaces) {
+                    focusAwaitingSpace = nil
+                    let inView = displays.first { $0.uuid == shelf.displayUUID }.flatMap(currentKey)
+                    handKeyboardOn(from: id, to: inView.flatMap { isCurrent($0) ? $0 : nil },
+                                   report: "Floating window \(id), which has the focus, is on a desktop not shown")
+                    return
+                }
             }
         }
         if let id, key(containing: id) == nil, parkedWith == nil, floating.contains(id) || windows[id]?.kind == .float {
@@ -721,8 +755,10 @@ final class WindowManager {
     /// outside Rambla (Mission Control, ⌘Tab, a click on its sliver, or macOS after a window closed): `FocusRoute` says
     /// whether its level comes into view, a window of the level in view gets the focus instead, or Rambla takes the
     /// keyboard, so the keyboard never types into a window that cannot be seen. `previous`: the window that had the
-    /// focus before, if known.
-    private func route(_ arrival: FocusArrival, in key: StripKey, leaving previous: WindowID?) {
+    /// focus before, if known. `lateReports`: false once a focus left alone as a possible late report has outlasted
+    /// the time one could be late (`recheckLateReport`).
+    private func route(_ arrival: FocusArrival, in key: StripKey, leaving previous: WindowID?,
+                       lateReports: Bool = true) {
         let id = arrival.window
         let now = CFAbsoluteTimeGetCurrent()
         let active = key.stack.level(activeLevel(of: key.stack))
@@ -736,22 +772,22 @@ final class WindowManager {
         }
         let inView = windowsInView(of: active)
         let pid = windows[id]?.pid
+        let switchedAt = levelSwitchedAt[key.stack]
         let decision = FocusRoute.decide(
             windowLevel: key.level, active: active.level, byActivation: arrival.byActivation, afterLoss: afterLoss,
             chosen: arrival.chosen, appWindowsInView: inView.filter { windows[$0]?.pid == pid }, windowsInView: inView,
-            sinceOwnSwitch: levelSwitchedAt[key.stack].map { now - $0 })
+            sinceOwnSwitch: lateReports ? switchedAt.map { now - $0 } : nil)
         let cause = afterLoss ? " as something in view went away"
             : arrival.chosen ? " as it came back from the Dock"
             : arrival.byActivation ? " as its app came to the front" : ""
         let report = "Window \(id) of strip level \(key.level) got the focus\(cause)"
         switch decision {
         case .none:
-            if key == active {
-                focusSettled(id, in: key)
-            } else {
-                Log.info("\(report) right after a level switch: a late report, left alone")
-                overlayHook?()
-            }
+            focusSettled(id, in: key)
+        case .lateReport:
+            Log.info("\(report) right after a level switch: maybe a late report, left alone for now")
+            recheckLateReport(arrival, at: (switchedAt ?? now) + FocusRoute.lateReportWindow)
+            overlayHook?()
         case .switchLevel where dragTracker.isMouseDown:
             Log.info("\(report): its level comes into view once the mouse button is released")
             pendingLevelSwitch = id
@@ -768,13 +804,51 @@ final class WindowManager {
         }
     }
 
+    /// `arrival` came right after Rambla switched its stack's level, and was left alone as a possible late report
+    /// (`FocusRoute.lateReport`). At `deadline`, when a report could no longer be late, its window is routed again
+    /// without that rule if it still has the focus on a level out of view, its app still in front: then it was no late
+    /// report, but the user's choice (⌘` twice across strips, or the Window menu, right after a switch), and the
+    /// keyboard must not stay out of sight. A late report is over by then: the window Rambla focused, or Rambla itself
+    /// on an empty strip, has taken the focus.
+    private func recheckLateReport(_ arrival: FocusArrival, at deadline: CFAbsoluteTime) {
+        lateReportCheck?.cancel()
+        let item = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.lateReportCheck = nil
+                let id = arrival.window
+                guard self.isRunning, !self.isPaused, self.focusedWindow == id, self.pendingLevelSwitch != id,
+                      let pid = self.windows[id]?.pid,
+                      NSWorkspace.shared.frontmostApplication?.processIdentifier == pid,
+                      let key = self.key(containing: id)
+                        ?? self.floatShelfKey(holding: id).flatMap({ self.isCurrent($0) ? nil : $0 }),
+                      !self.isCurrent(key), self.isCurrentStack(key.stack) else { return }
+                Log.info("Window \(id) of strip level \(key.level) still has the focus after the level switch: "
+                         + "no late report")
+                self.route(arrival, in: key, leaving: nil, lateReports: false)
+            }
+        }
+        lateReportCheck = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + max(0, deadline - CFAbsoluteTimeGetCurrent()) + 0.05,
+                                      execute: item)
+    }
+
     /// What can take the focus in view: the windows of `active`, a level in view, that are on screen, the last used
-    /// first.
+    /// first. For a level out of view of a stack in view, those that show once it comes into view: its parked windows
+    /// are on screen too, on their sliver, and the minimized ones and those of hidden apps are not.
     private func windowsInView(of active: StripKey) -> [WindowID] {
         let shown = Self.windowIDs(onScreenOnly: true)
         return FocusRoute.byLastUse((strips[active]?.allWindows ?? []).filter {
             shown.contains($0) && windows[$0]?.traits.isMinimized != true
         }, lastUsed: lastFocusedAt)
+    }
+
+    /// The window of `key`, a level of a stack in view, that gets the focus when the level comes into view or takes
+    /// the keyboard back: its focused window when that one shows (`windowsInView`), else the one used last there that
+    /// does. Nil when none shows (all minimized, or of hidden apps) or the level has none.
+    func shownWindow(of key: StripKey) -> WindowID? {
+        let shown = windowsInView(of: key)
+        return strips[key]?.focusedWindow.flatMap { shown.contains($0) ? $0 : nil } ?? shown.first
     }
 
     /// `id`, the focused window, is on `key`, a level out of view, by Rambla's own doing: rebuilt there from the saved
@@ -785,11 +859,17 @@ final class WindowManager {
     /// on the level the window was on, `from`, when that is still in view, else on the one in view of its stack now.
     private func focusWentOutOfView(_ id: WindowID, to key: StripKey, from: StripKey?) {
         let stack = from.flatMap { isCurrent($0) ? $0.stack : nil } ?? key.stack
-        let active = stack.level(activeLevel(of: stack))
-        let inView = windowsInView(of: active)
+        handKeyboardOn(from: id, to: stack.level(activeLevel(of: stack)),
+                       report: "Window \(id), which has the focus, is now out of view on strip level \(key.level)")
+    }
+
+    /// `id` has the focus where it cannot be seen. As after a loss (`FocusRoute`), the last used window in view of
+    /// `active`, a level in view, gets it, one of the same app first; Rambla takes the keyboard when there is none, or
+    /// no such level.
+    private func handKeyboardOn(from id: WindowID, to active: StripKey?, report: String) {
+        let inView = active.map { windowsInView(of: $0) } ?? []
         let pid = windows[id]?.pid
-        let report = "Window \(id), which has the focus, is now out of view on strip level \(key.level)"
-        if let window = inView.first(where: { windows[$0]?.pid == pid }) ?? inView.first {
+        if let active, let window = inView.first(where: { windows[$0]?.pid == pid }) ?? inView.first {
             Log.info("\(report): window \(window), in view, gets it instead")
             focus(window: window, in: active, routed: true)
         } else {
@@ -806,9 +886,8 @@ final class WindowManager {
         guard isRunning, !isPaused, let id = focusedWindow, let home = key(containing: id), !isCurrent(home),
               isCurrentStack(home.stack) else { return }
         let active = home.stack.level(activeLevel(of: home.stack))
-        let inView = windowsInView(of: active)
         let report = "Window \(id), which has the focus, went to strip level \(home.level), out of view"
-        if let window = strips[active]?.focusedWindow.flatMap({ inView.contains($0) ? $0 : nil }) ?? inView.first {
+        if let window = shownWindow(of: active) {
             Log.info("\(report): window \(window), in view, gets it instead")
             focus(window: window, in: active, routed: true)
         } else {
@@ -832,6 +911,12 @@ final class WindowManager {
         guard !Self.isOnScreen(id) else { return false }
         let spaces = Private.spaces(for: [id])[id] ?? []
         return spaces.isEmpty || spaces.contains(space)
+    }
+
+    /// `id`, a window macOS files under `spaces`, can be seen: it is on screen, or on a desktop a display shows now,
+    /// as the WindowServer has it (macOS may be switching to that desktop for it, after ⌘Tab to its app).
+    private func isShown(_ id: WindowID, on spaces: [UInt64]) -> Bool {
+        Self.isOnScreen(id) || Private.displaySpaces().contains { spaces.contains($0.current) }
     }
 
     /// The level of `id`, a window of `key` (in its strip, or floating and parked with it) that got the focus from
@@ -1020,11 +1105,16 @@ final class WindowManager {
         markReappearing(HiddenWindows.returned(before: hiddenBefore, now: hidden))
 
         // Windows that stopped being tileable (rules changed) leave their strips. A window in native full screen keeps
-        // its column, hidden like a minimized one, so it comes back to its place when it leaves full screen.
+        // its column, hidden like a minimized one, so it comes back to its place when it leaves full screen. One that
+        // leaves while parked (on a level out of view, or in a column off screen) comes into view: no strip lays it out
+        // any more, and "Traer todas las ventanas" would not find it on its sliver.
         for key in Array(strips.keys) {
             for id in strips[key]!.allWindows {
                 guard let record = windows[id], record.kind != .tile, !record.traits.isFullscreen else { continue }
+                var parked = !isCurrent(key)
+                if case .parked? = results[key]?.placements[id] { parked = true }
                 strips[key]!.remove(window: id)
+                if parked { bringInIfOffScreen(id) }
             }
         }
 
@@ -1040,11 +1130,17 @@ final class WindowManager {
         // A rebuilt stack shows again the level it showed when it was saved: from here on, that level is the one in
         // view, laid out below with the windows that join it, while the others are parked.
         keys = currentKeys
+        // After a pause, or once a display is managed again, the focused window can be on a level out of view: that
+        // level comes into view in this pass, before anything is parked, so the keyboard never ends up out of sight.
+        let broughtIn = focusMayBeOutOfView ? bringFocusedLevelIntoView() : nil
+        focusMayBeOutOfView = false
+        if broughtIn != nil { keys = currentKeys }
         managed = Set(strips.values.flatMap(\.allWindows))
         let orphans = windows.values
             .filter { $0.kind == .tile && visible.contains($0.id) && !managed.contains($0.id) && !floating.contains($0.id) }
             .sorted { $0.frame.minX < $1.frame.minX }
         var revealKeys: Set<StripKey> = []
+        if let broughtIn { revealKeys.insert(broughtIn) }
         // The focused window was hidden (full screen, minimized, its app hidden) and is back: the strip may have scrolled
         // meanwhile, so bring it into view instead of laying it out wherever its column is now.
         if let focused = focusedWindow, let key = key(containing: focused), keys.contains(key),
@@ -1093,6 +1189,7 @@ final class WindowManager {
         }
         // The same for the floating windows parked with those levels (`floatShelf`).
         settleFloatShelves(inView: keys, visible: visible)
+        if let broughtIn { levelHook?(broughtIn.stack) }
         // A focus that came before this pass read its window's Space (⌘Tab to an app on another desktop) is routed now
         // that its stack is in view, if the window still has it. It is dropped once the focus moved on, or too late.
         // A floating window parked with a level out of view is routed as a window of that level.
@@ -1117,6 +1214,23 @@ final class WindowManager {
         // Strips that wait for the apps' window lists need a reconcile once the wait is over, whichever came first.
         if waitingForWindowLists { checkDisplaysAgain(after: awaitingUntil - CFAbsoluteTimeGetCurrent() + 0.05) }
         onStateChanged?()
+    }
+
+    /// Rambla resumed, or manages a display again (`focusMayBeOutOfView`), and the focused window is on a level out of
+    /// view of a stack in view (in its strip, or floating and parked with it): the user focused it while nothing was
+    /// parked there, so its level, rather than another window, comes into view. That level becomes the one in view, its
+    /// strip focused on the window, for the reconcile to lay it out with its column revealed and park the others; the
+    /// floating windows in view stay, as after a pause they belong to the strip in view. Returns that level.
+    private func bringFocusedLevelIntoView() -> StripKey? {
+        guard let id = focusedWindow, pendingLevelSwitch != id,
+              let home = key(containing: id) ?? floatShelfKey(holding: id), !isCurrent(home),
+              isCurrentStack(home.stack) else { return nil }
+        Log.info("Window \(id), which has the focus, is on strip level \(home.level), out of view: "
+                 + "that level comes into view")
+        activeLevels[home.stack] = home.level
+        if strips[home]?.contains(id) == true { strips[home]!.focus(window: id) }
+        lastFocusedAt[id] = CFAbsoluteTimeGetCurrent()
+        return home
     }
 
     /// The windows of a display that has returned and not settled yet that macOS already put back on it: those of every
@@ -1516,9 +1630,10 @@ final class WindowManager {
         return frame == parked.frame ? frame : frame.integral(keepingSize: true)
     }
 
-    /// Brings a floating window into view when most of it lies off every display (`FloatShelf.inView`), onto the
-    /// display it is mostly on, else the first one, as "Traer todas las ventanas" would. A saved one restored after
-    /// Rambla stopped without bringing it back (a crash, Force Quit) may still be parked on an edge.
+    /// Brings a window that no strip lays out into view when most of it lies off every display (`FloatShelf.inView`),
+    /// onto the display it is mostly on, else the first one, as "Traer todas las ventanas" would a floating one. A
+    /// saved floating one restored after Rambla stopped without bringing it back (a crash, Force Quit) may still be
+    /// parked on an edge, and so may one that left its strip while parked, as it is no longer tiled (an app rule).
     func bringInIfOffScreen(_ id: WindowID) {
         guard let record = windows[id] else { return }
         let frame = whereShown(record)
@@ -1526,7 +1641,7 @@ final class WindowManager {
         let target = FloatShelf.inView(frame, visible: display.visible, displays: displays.map(\.frame))
         guard target != frame else { return }
         let rounded = target.integral(keepingSize: true)
-        Log.info("Floating window \(id) lies off every display at \(Self.describe(frame)): "
+        Log.info("Window \(id), in no strip, lies off every display at \(Self.describe(frame)): "
                  + "it comes into view at \(Self.describe(rounded))")
         requested[id] = nil
         write([id: rounded], verify: true)
@@ -1569,9 +1684,22 @@ final class WindowManager {
         scheduleReconcile()
     }
 
-    /// Moves every window that is parked or sticking out of its display back into the visible area.
-    func gatherAll(synchronously: Bool) {
-        animator.cancelAll()
+    /// Moves every window that is parked or sticking out of its display back into the visible area. With `only`, just
+    /// those of these displays (the ones Rambla stops or starts managing): the strips of the others, and the floating
+    /// windows parked with them, stay as they are, out of sight where they are out of view.
+    func gatherAll(synchronously: Bool, only: Set<String>? = nil) {
+        /// The windows of display `uuid` are gathered: those of every display, or of the ones in `only`.
+        func gathers(_ uuid: String?) -> Bool {
+            guard let only else { return true }
+            return uuid.map(only.contains) ?? false
+        }
+        if let only {
+            for (key, strip) in strips where only.contains(key.displayUUID) {
+                strip.allWindows.forEach(animator.cancel)
+            }
+        } else {
+            animator.cancelAll()
+        }
         // Every window Rambla knows a place for: the strips' (an unplugged display's too, whose display is gone) and the
         // floating ones (a strip window Rambla parked and another app then moved stays half off screen).
         var gathered = Set<WindowID>()
@@ -1608,10 +1736,11 @@ final class WindowManager {
             }
             return true
         }
-        for (key, shelf) in floatShelf {
+        for (key, shelf) in floatShelf where gathers(key.displayUUID) {
             let display = displays.first { $0.uuid == key.displayUUID }
             var back = 0
             for (id, parked) in shelf where bringBack(id, parked, on: display) { back += 1 }
+            floatShelf[key] = nil
             guard back > 0 else { continue }
             Log.info("Brought back \(back) floating windows with strip level \(key.level) of display "
                      + "\(key.displayUUID.prefix(8))")
@@ -1619,24 +1748,31 @@ final class WindowManager {
         for (id, parked) in floatsAway {
             // On the display it is on, where it still waits at its parking spot.
             let display = windows[id].flatMap { Displays.best(for: whereShown($0), in: displays) } ?? displays.first
+            guard gathers(display?.uuid) else { continue }
             _ = bringBack(id, parked, on: display)
+            floatsAway[id] = nil
         }
-        floatShelf.removeAll()
-        floatsAway.removeAll()
-        for (key, strip) in strips {
+        for (key, strip) in strips where gathers(key.displayUUID) {
             let display = displays.first(where: { $0.uuid == key.displayUUID })
             for id in strip.allWindows { gather(id, onto: display) }
         }
-        // A floating window only when most of it is off every display: one the user left across two stays there.
-        for id in floating {
-            guard let frame = requested[id] ?? windows[id]?.frame else { continue }
+        // A floating window only when most of it is off every display: one the user left across two stays there. One
+        // still parked with a level of a display left as it is stays parked.
+        let stillParked = Set(floatShelf.values.flatMap(\.keys)).union(floatsAway.keys)
+        for id in floating where !stillParked.contains(id) {
+            guard let frame = requested[id] ?? windows[id]?.frame,
+                  gathers((Displays.best(for: frame, in: displays) ?? displays.first)?.uuid) else { continue }
             let shown = displays.reduce(0.0) { sum, display in
                 let part = frame.intersection(display.frame)
                 return sum + (part.isNull ? 0 : part.width * part.height)
             }
             if shown < frame.width * frame.height / 2 { gather(id, onto: nil) }
         }
-        results.removeAll()
+        if let only {
+            results = results.filter { !only.contains($0.key.displayUUID) }
+        } else {
+            results.removeAll()
+        }
         overlayHook?()
     }
 
