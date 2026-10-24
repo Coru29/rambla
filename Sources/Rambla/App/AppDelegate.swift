@@ -51,9 +51,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard onlyBundles != nil else { return nil }
         var args = CommandLine.arguments.dropFirst().makeIterator()
         while let arg = args.next() {
-            if arg == "--state-file", let value = args.next() {
-                return URL(fileURLWithPath: (value as NSString).expandingTildeInPath)
+            guard arg == "--state-file", let value = args.next() else { continue }
+            let path = (value as NSString).expandingTildeInPath
+            // `open` starts Rambla in /, so a relative path would not name the file the test means.
+            guard (path as NSString).isAbsolutePath else {
+                Log.error("--state-file needs an absolute path, not \(value): the layout is neither read nor saved")
+                return nil
             }
+            return URL(fileURLWithPath: path)
         }
         return nil
     }()

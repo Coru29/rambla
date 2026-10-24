@@ -132,14 +132,20 @@ public struct StripArchive: Equatable, Sendable {
         return stack(displayUUID: displayUUID, spaceKey: only)
     }
 
-    /// The level of the unplugged strip saved in `session` that holds `id`, so a window of an unplugged display joins
-    /// the same level on the display it is on now. Ids name the same window only within their session. A window that
-    /// went through two unplugged displays is in two strips, and the one seen last knows where it was.
-    public func unpluggedLevel(of id: WindowID, session: String) -> Int? {
+    /// The unplugged strip saved in `session` that holds `id`: its level and display say where a window of an unplugged
+    /// display was, so it joins the same level on the display it is on now. Ids name the same window only within their
+    /// session. A window that went through two unplugged displays is in two strips, and the one seen last knows where
+    /// it was.
+    public func unpluggedStrip(holding id: WindowID, session: String) -> SavedStrip? {
         let holding = strips.filter { strip in
             strip.unplugged && strip.session == session && strip.refs.contains { $0.id == id }
         }
-        return holding.max { ($0.lastSeen ?? .distantPast) < ($1.lastSeen ?? .distantPast) }?.level
+        return holding.max { ($0.lastSeen ?? .distantPast) < ($1.lastSeen ?? .distantPast) }
+    }
+
+    /// The level of the unplugged strip saved in `session` that holds `id` (`unpluggedStrip(holding:session:)`).
+    public func unpluggedLevel(of id: WindowID, session: String) -> Int? {
+        unpluggedStrip(holding: id, session: session)?.level
     }
 
     /// The display is back and had its chance to take its windows back: from now on its strips are matched like any

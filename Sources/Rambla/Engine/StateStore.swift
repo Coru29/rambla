@@ -16,9 +16,23 @@ enum StateStore {
         return dir.appendingPathComponent("state.json")
     }
 
+    /// The last save failed: a failure is logged once, and again only after a save has worked.
+    @MainActor private static var saveFailed = false
+
     @MainActor static func save(_ state: SavedState) {
         guard let data = try? JSONEncoder().encode(state) else { return }
-        try? data.write(to: url, options: .atomic)
+        let file = url
+        do {
+            // The tests' own file may be in a folder that does not exist yet.
+            try FileManager.default.createDirectory(at: file.deletingLastPathComponent(),
+                                                    withIntermediateDirectories: true)
+            try data.write(to: file, options: .atomic)
+            saveFailed = false
+        } catch {
+            guard !saveFailed else { return }
+            saveFailed = true
+            Log.error("Could not save the layout to \(file.path): \(error.localizedDescription)")
+        }
     }
 
     @MainActor static func load() -> SavedState? {
@@ -156,7 +170,8 @@ extension WindowManager {
                 continue
             }
             restoredStacks.insert(stack)
-            _ = archive.takeStack(displayUUID: stack.displayUUID, spaceKey: saved[0].spaceKey)
+            let taken = archive.takeStack(displayUUID: stack.displayUUID, spaceKey: saved[0].spaceKey)
+            forgetUnpluggedPlacements(in: taken)
             let restored = Set(levels.values.flatMap(\.allWindows))
             // A window that comes back to another level of this stack takes along what is known of it being hidden.
             for (level, strip) in levels {

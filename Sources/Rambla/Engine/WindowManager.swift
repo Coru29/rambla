@@ -116,6 +116,12 @@ final class WindowManager {
     /// Windows that macOS put back on a display that has just returned, which takes them back once it settles: left
     /// there meanwhile, instead of pulled into the strips they joined while it was away and then flown back.
     private var heldForReturn: Set<WindowID> = []
+    /// Windows that, as orphans, joined the level they had on a display that was unplugged, and that display. A window
+    /// goes back to its level that way only the first time it is an orphan after its display left: it may be moved
+    /// after that, and an orphan again later (put back by "Reacomodar ventanas", its desktop removed, a rule changed)
+    /// it joins the level in view instead of jumping back. Forgotten once that display's strips are taken back or
+    /// settled, so its windows find their levels again the next time it leaves.
+    private var placedAtUnpluggedLevel: [WindowID: String] = [:]
     private var graceUntil: CFAbsoluteTime = 0
     private var reconcileScheduled = false
     var pendingReveal: StripKey?
@@ -567,6 +573,7 @@ final class WindowManager {
         hiddenSince[id] = nil
         lastFocusedAt[id] = nil
         backFromDock[id] = nil
+        placedAtUnpluggedLevel[id] = nil
         for key in Array(hidden.keys) { hidden[key]?.remove(id) }
         animator.cancel(id)
         for key in strips.keys where strips[key]!.contains(id) {
@@ -731,17 +738,18 @@ final class WindowManager {
         }, lastUsed: lastFocusedAt)
     }
 
-    /// `id`, the focused window, went to `key`, a level out of view, by Rambla's own doing: rebuilt there from the
-    /// saved stack, taken back there by its display, or back on the level it had on a display that was unplugged.
-    /// Nothing typed may reach it there, and the level in view does not change for it: as after a loss (`FocusRoute`),
-    /// the last used window in view gets the focus, one of the same app first, or Rambla takes the keyboard. In view
-    /// means on the level the window was on, `from`, when that is in view, else on the one in view of its stack now.
+    /// `id`, the focused window, is on `key`, a level out of view, by Rambla's own doing: rebuilt there from the saved
+    /// stack, taken back there by its display, or back on the level it had on a display that was unplugged; or its
+    /// level left the view under it, as a rebuilt stack shows again the level it showed when it was saved. Nothing
+    /// typed may reach it there, and the level in view does not change for it: as after a loss (`FocusRoute`), the
+    /// last used window in view gets the focus, one of the same app first, or Rambla takes the keyboard. In view means
+    /// on the level the window was on, `from`, when that is still in view, else on the one in view of its stack now.
     private func focusWentOutOfView(_ id: WindowID, to key: StripKey, from: StripKey?) {
         let stack = from.flatMap { isCurrent($0) ? $0.stack : nil } ?? key.stack
         let active = stack.level(activeLevel(of: stack))
         let inView = windowsInView(of: active)
         let pid = windows[id]?.pid
-        let report = "Window \(id), which has the focus, went to strip level \(key.level), out of view"
+        let report = "Window \(id), which has the focus, is now out of view on strip level \(key.level)"
         if let window = inView.first(where: { windows[$0]?.pid == pid }) ?? inView.first {
             Log.info("\(report): window \(window), in view, gets it instead")
             focus(window: window, in: active, routed: true)
@@ -965,8 +973,10 @@ final class WindowManager {
         var managed = Set(strips.values.flatMap(\.allWindows))
         let candidates = windows.values
             .filter { $0.kind != .ignore && visible.contains($0.id) && !managed.contains($0.id) && !floating.contains($0.id) }
-        // Where the focused window was before stacks are rebuilt and new windows join them.
+        // Where the focused window was, and which levels were in view, before stacks are rebuilt and new windows join
+        // them.
         let focusedKeyBefore = focusedWindow.flatMap { key(containing: $0) }
+        let keysBefore = keys
         restoreFromSavedState(stacks: keys.map(\.stack), candidates: candidates, visible: visible, alive: existing)
         // A rebuilt stack shows again the level it showed when it was saved: from here on, that level is the one in
         // view, laid out below with the windows that join it, while the others are parked.
@@ -989,10 +999,16 @@ final class WindowManager {
             guard let display = Displays.best(for: whereShown(record), in: settled),
                   let inView = currentKey(of: display), keys.contains(inView),
                   restoredStacks.contains(inView.stack) || !waitingForWindowLists else { continue }
-            // A window of a display that was unplugged joins the level it was on there, created with the levels below
-            // it if they are missing, and parked at the end of this pass if that level is not in view. Any other window
-            // joins the level in view.
-            let level = archive.unpluggedLevel(of: record.id, session: StateStore.session) ?? inView.level
+            // A window of a display that was unplugged joins the level it was on there, the first time it is an orphan
+            // since that display left (`placedAtUnpluggedLevel`), created with the levels below it if they are missing,
+            // and parked at the end of this pass if that level is not in view. Any other window joins the level in
+            // view.
+            var level = inView.level
+            if let holder = archive.unpluggedStrip(holding: record.id, session: StateStore.session),
+               placedAtUnpluggedLevel[record.id] != holder.displayUUID {
+                level = max(0, holder.level)
+                placedAtUnpluggedLevel[record.id] = holder.displayUUID
+            }
             let key = inView.stack.level(level)
             for below in 0..<level where strips[inView.stack.level(below)] == nil {
                 strips[inView.stack.level(below)] = Strip()
@@ -1026,11 +1042,12 @@ final class WindowManager {
                 focusAwaitingSpace = nil
             }
         }
-        // The focused window that this pass put on a level out of view (rebuilt there, taken back there by its display,
-        // or back on the level it had on a display that was unplugged) does not keep the keyboard out of sight, unless
-        // its level is to come into view once the mouse button is released.
-        if let id = focusedWindow, let home = key(containing: id), home != focusedKeyBefore, !isCurrent(home),
-           isCurrentStack(home.stack), pendingLevelSwitch != id {
+        // The focused window that this pass put out of view does not keep the keyboard out of sight, unless its level
+        // is to come into view once the mouse button is released. It went to a level out of view (rebuilt there, taken
+        // back there by its display, or back on the level it had on a display that was unplugged), or its level left
+        // the view under it (a rebuilt stack shows again the level it showed when it was saved).
+        if let id = focusedWindow, let home = key(containing: id), !isCurrent(home), isCurrentStack(home.stack),
+           pendingLevelSwitch != id, home != focusedKeyBefore || keysBefore.contains(home) {
             focusWentOutOfView(id, to: home, from: focusedKeyBefore)
         }
         // Strips that wait for the apps' window lists need a reconcile once the wait is over, whichever came first.
@@ -1093,6 +1110,7 @@ final class WindowManager {
             } else if until <= now {
                 returningDisplays[uuid] = nil
                 archive.settle(displayUUID: uuid)
+                placedAtUnpluggedLevel = placedAtUnpluggedLevel.filter { $0.value != uuid }
             } else {
                 checkDisplaysAgain(after: until - now + 0.1)
             }
@@ -1171,6 +1189,16 @@ final class WindowManager {
         strips[key] = nil
         results[key] = nil
         hidden[key] = nil
+    }
+
+    /// Strips of a display taken back from the archive (`restoreFromSavedState`): the windows that went back to their
+    /// levels from them, as orphans, may do so again the next time that display leaves (`placedAtUnpluggedLevel`).
+    func forgetUnpluggedPlacements(in taken: [SavedStrip]) {
+        for strip in taken {
+            for ref in strip.refs where placedAtUnpluggedLevel[ref.id] == strip.displayUUID {
+                placedAtUnpluggedLevel[ref.id] = nil
+            }
+        }
     }
 
     /// Windows that move to another strip take along what is known of them being hidden (minimized, their app hidden):

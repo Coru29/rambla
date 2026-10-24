@@ -254,6 +254,20 @@ private func ref(_ id: WindowID, _ app: String = "app") -> WindowRef {
     #expect(reversed.unpluggedLevel(of: 7, session: "S") == 0)
 }
 
+@Test func theUnpluggedStripHoldingAWindowSaysWhereItWas() {
+    // Its level and its display, from the strip seen last: the engine lets a window go back to that level once per
+    // display that left.
+    var archive = StripArchive()
+    archive.store(saved("first", "s1", [7], session: "S", unplugged: true, level: 1), at: now - day)
+    archive.store(saved("second", "s2", [7], session: "S", unplugged: true, level: 2), at: now)
+    let holder = archive.unpluggedStrip(holding: 7, session: "S")
+    #expect(holder?.displayUUID == "second")
+    #expect(holder?.level == 2)
+    #expect(archive.unpluggedLevel(of: 7, session: "S") == 2)
+    #expect(archive.unpluggedStrip(holding: 7, session: "T") == nil)                // another session's ids
+    #expect(archive.unpluggedStrip(holding: 8, session: "S") == nil)                // in no strip
+}
+
 @Test func mergedKeepsLevelsApart() {
     var archive = StripArchive()
     archive.store(saved("A", "s1", [9]), at: now)               // level 0: a live strip replaces it
