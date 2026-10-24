@@ -30,12 +30,16 @@ extension WindowManager {
     // MARK: - Switching
 
     /// Brings `level` of `stack` into view, a new empty one when it has no strip yet, and focuses `window` (one of that
-    /// level's) or else the level's focused window. The windows that arrive jump to their places first, behind the ones
-    /// that leave, which then jump to their parking spots: nothing crosses the display and nothing in between shows. On
-    /// an empty level Rambla takes the keyboard, so nothing typed reaches a window out of sight. `routed`: the switch
-    /// follows a focus from outside Rambla (`FocusRoute`), so the pointer stays where it is: "mouse follows focus" is
-    /// for the focus Rambla gives through its own shortcuts.
-    func switchLevel(of stack: StackKey, to level: Int, focusing window: WindowID? = nil, routed: Bool = false) {
+    /// level's, in its strip or floating and parked with it) or else the level's focused window. The windows that
+    /// arrive jump to their places first, behind the ones that leave, which then jump to their parking spots: nothing
+    /// crosses the display and nothing in between shows. The floating windows go the same way (`floatShelf`): those
+    /// parked with the level that comes into view come back to their places, and those in view on its display go with
+    /// the level that leaves, all but `carried`, the focused one that `sendFocusedWindow` takes along, which keeps the
+    /// focus. On a level with nothing to focus Rambla takes the keyboard, so nothing typed reaches a window out of
+    /// sight. `routed`: the switch follows a focus from outside Rambla (`FocusRoute`), so the pointer stays where it
+    /// is: "mouse follows focus" is for the focus Rambla gives through its own shortcuts.
+    func switchLevel(of stack: StackKey, to level: Int, focusing window: WindowID? = nil, routed: Bool = false,
+                     carrying carried: WindowID? = nil) {
         guard isRunning, !isPaused, isCurrentStack(stack), level >= 0, level <= topLevel(of: stack) + 1 else { return }
         let old = activeLevel(of: stack)
         let new = stack.level(level)
@@ -44,15 +48,25 @@ extension WindowManager {
             if let chosen { focus(window: chosen, in: new, routed: routed) }
             return
         }
+        let chosenFloat = window.flatMap { floatShelf[new]?[$0] != nil ? $0 : nil }
+        // Found before anything moves, so that the floating windows coming back with the new level are not among them.
+        let leaving = floatsInView(of: stack, except: carried)
         activeLevels[stack] = level
         levelSwitchedAt[stack] = CFAbsoluteTimeGetCurrent()
         if strips[new] == nil { strips[new] = Strip() }
         apply(new, animate: false)
+        let back = bringBackFloats(of: new)
         shelve(stack.level(old))
+        parkFloats(leaving, with: stack.level(old))
         dropEmptyLevels(of: stack)
-        // A strip read from an older file may have no focused column: its first one then.
-        if let focused = chosen ?? strips[new]?.focusedWindow ?? strips[new]?.columns.first?.activeWindow {
+        if let float = carried ?? chosenFloat {
+            focusFloat(float, routed: routed)
+        } else if let focused = chosen ?? strips[new]?.focusedWindow ?? strips[new]?.columns.first?.activeWindow {
+            // A strip read from an older file may have no focused column: its first one then.
             focus(window: focused, in: new, routed: routed)
+        } else if let float = FocusRoute.byLastUse(back.sorted(), lastUsed: lastFocusedAt).first {
+            // No window of its strip, but floating windows came back with it: the one used last.
+            focusFloat(float, routed: routed)
         } else {
             takeKeyboardFocus()
             emptyLevelHook?(stack)
@@ -91,9 +105,16 @@ extension WindowManager {
     // MARK: - Sending windows
 
     /// Sends the focused window, alone, to the level above or below (a new one above the top), next to that level's
-    /// focused column and with its width, and follows it there.
+    /// focused column and with its width, and follows it there. A floating one (`floating`) goes along instead: the
+    /// level of its display changes, and it stays in view with the focus.
     func sendFocusedWindow(up: Bool) {
-        guard isRunning, !isPaused, let key = activeStripKey(), let id = strips[key]?.focusedWindow,
+        guard isRunning, !isPaused else { return }
+        if let id = focusedWindow, floating.contains(id), key(containing: id) == nil,
+           floatShelfKey(holding: id) == nil {
+            takeFloatAlong(id, up: up)
+            return
+        }
+        guard let key = activeStripKey(), let id = strips[key]?.focusedWindow,
               let level = StripLevels.target(from: key.level, up: up, top: topLevel(of: key.stack),
                                              occupied: occupiedLevels(of: key.stack)) else { return }
         let target = key.stack.level(level)
@@ -140,12 +161,88 @@ extension WindowManager {
         scheduleSave()
     }
 
+    /// The focused window floats in view, one the user floated or one Rambla floated after another app moved it: the
+    /// level of its display steps up or down (a new one above the top, as for any window sent) and the window goes
+    /// along, in view with the focus, instead of being parked with the level that leaves.
+    private func takeFloatAlong(_ id: WindowID, up: Bool) {
+        guard let record = windows[id] else { return }
+        let frame = Self.windowFrames(onScreenOnly: true)[id].flatMap { $0 == .zero ? nil : $0 } ?? record.frame
+        guard let best = Displays.best(for: frame, in: displays),
+              let display = enabledDisplays.first(where: { $0.uuid == best.uuid }),
+              let current = currentKey(of: display),
+              let level = StripLevels.target(from: current.level, up: up, top: topLevel(of: current.stack),
+                                             occupied: occupiedLevels(of: current.stack)) else { return }
+        Log.info("Floating window \(id) goes along to strip level \(level)")
+        switchLevel(of: current.stack, to: level, carrying: id)
+    }
+
+    // MARK: - Floating windows
+
+    /// The level a floating window is parked with (`floatShelf`), if it is.
+    func floatShelfKey(holding id: WindowID) -> StripKey? {
+        floatShelf.first { $0.value[id] != nil }?.key
+    }
+
+    /// Takes `id` off the shelf it is parked on (`floatShelf`), if any, and drops a shelf left empty. Returns that
+    /// level and the place the window had on its display.
+    @discardableResult
+    func takeFromFloatShelf(_ id: WindowID) -> (key: StripKey, offset: CGRect)? {
+        guard let key = floatShelfKey(holding: id), let offset = floatShelf[key]?.removeValue(forKey: id) else {
+            return nil
+        }
+        if floatShelf[key]?.isEmpty == true { floatShelf[key] = nil }
+        return (key, offset)
+    }
+
+    /// The floating windows in view on the display of `stack`, which the level in view takes along when it leaves
+    /// (`FloatShelf.leaving`), with the place each one has on that display (`FloatShelf.offset`). Only the user's
+    /// floating windows and Rambla's own (`floating`): those of app rules, dialogs and panels stay in view on every
+    /// level. `carried`, the focused one sent along to the level that comes, stays in view too. Where each one is comes
+    /// from the WindowServer now: one moved since the last reconcile may be on another display.
+    func floatsInView(of stack: StackKey, except carried: WindowID?) -> [WindowID: CGRect] {
+        guard !floating.isEmpty, let display = display(forStack: stack) else { return [:] }
+        let shown = Self.windowFrames(onScreenOnly: true)
+        func shownFrame(_ id: WindowID) -> CGRect? {
+            shown[id].flatMap { $0 == .zero ? nil : $0 } ?? windows[id]?.frame
+        }
+        let parked = Set(floatShelf.values.flatMap(\.keys))
+        let dragging = dragTracker.isMouseDown ? draggedFloat : nil
+        let candidates = floating.sorted().compactMap { id -> FloatShelf.Window? in
+            guard let record = windows[id], let frame = shownFrame(id) else { return nil }
+            return FloatShelf.Window(
+                id: id, display: Displays.best(for: frame, in: displays)?.uuid, isOnScreen: shown[id] != nil,
+                isMinimized: record.traits.isMinimized,
+                appIsHidden: NSRunningApplication(processIdentifier: record.pid)?.isHidden == true,
+                isDragged: id == dragging, isParked: parked.contains(id))
+        }
+        var leaving: [WindowID: CGRect] = [:]
+        for id in FloatShelf.leaving(candidates, display: display.uuid, carried: carried) {
+            if let frame = shownFrame(id) { leaving[id] = FloatShelf.offset(of: frame, on: display.frame) }
+        }
+        return leaving
+    }
+
+    /// Gives the keyboard to a floating window in view and brings it to the front. With "mouse follows focus" on, the
+    /// pointer goes to it too, unless the focus came from outside Rambla (`routed`).
+    func focusFloat(_ id: WindowID, routed: Bool) {
+        revealSuppressedFor = nil   // no reveal follows; an older suppression must not outlive this focus
+        focusedWindow = id
+        worker(for: id)?.focus(id)
+        if !routed, prefs.mouseFollowsFocus, let frame = windows[id]?.frame {
+            CGWarpMouseCursorPosition(CGPoint(x: frame.midX, y: frame.midY))
+            CGAssociateMouseAndMouseCursorPosition(1)
+        }
+        overlayHook?()
+    }
+
     // MARK: - Helpers
 
     /// Removes the empty levels of `stack` that are no longer needed: those above every level with windows and above
-    /// the one in view (`StripLevels.droppable`). Level 0 and the level in view always stay.
+    /// the one in view (`StripLevels.droppable`). Level 0 and the level in view always stay. A level with floating
+    /// windows parked with it (`floatShelf`) is not empty: they come back with it.
     func dropEmptyLevels(of stack: StackKey) {
-        for level in StripLevels.droppable(top: topLevel(of: stack), occupied: occupiedLevels(of: stack),
+        let parked = Set(floatShelf.filter { $0.key.stack == stack && !$0.value.isEmpty }.map(\.key.level))
+        for level in StripLevels.droppable(top: topLevel(of: stack), occupied: occupiedLevels(of: stack).union(parked),
                                            active: activeLevel(of: stack)) {
             dropLevel(stack.level(level))
         }

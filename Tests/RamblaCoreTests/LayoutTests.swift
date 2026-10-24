@@ -1047,6 +1047,21 @@ import CoreGraphics
         #expect(Layout.shelved(input(centered)).placements[1] == parked(999, 0, 1000, 800))
     }
 
+    @Test func shelvedFrameParksOnTheSideOfTheWindowsCenter() {
+        // The rule `shelved` parks a strip's windows by, and the floating windows that go with it.
+        let left = CGRect(x: 0, y: 50, width: 400, height: 300)
+        #expect(Layout.shelvedFrame(for: left, display: vp, others: [], sliver: 1)
+                == CGRect(x: -399, y: 50, width: 400, height: 300))
+        // Centered exactly on the display's center is not left of it: the right edge.
+        let centered = CGRect(x: 300, y: 50, width: 400, height: 300)
+        #expect(Layout.shelvedFrame(for: centered, display: vp, others: [], sliver: 1)
+                == CGRect(x: 999, y: 50, width: 400, height: 300))
+        // A neighbor on that side sends it to the other edge.
+        let neighbor = CGRect(x: 1000, y: 0, width: 800, height: 600)
+        #expect(Layout.shelvedFrame(for: centered, display: vp, others: [neighbor], sliver: 1)
+                == CGRect(x: -399, y: 50, width: 400, height: 300))
+    }
+
     @Test func shelvedAvoidsANeighborDisplay() {
         // A display touching the right edge takes that edge, so every window parks on the left one.
         let right = Layout.shelved(input(fittingColumns(), others: [CGRect(x: 1000, y: 0, width: 800, height: 600)]))

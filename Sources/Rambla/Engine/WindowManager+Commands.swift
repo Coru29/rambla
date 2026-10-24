@@ -214,6 +214,8 @@ extension WindowManager {
               let display = Displays.best(for: frame, in: enabledDisplays), let key = currentKey(of: display) else { return }
         floating.remove(id)
         autoFloated.remove(id)
+        // One parked with a level out of view (it has the focus there for a moment) joins the level in view instead.
+        takeFromFloatShelf(id)
         var strip = strips[key] ?? Strip()
         let available = display.visible.width - 2 * prefs.outerGap
         strip.insert(window: id, width: .points(min(max(frame.width, available * 0.25), available)), at: .afterFocused)
@@ -271,8 +273,16 @@ extension WindowManager {
                 ["display": stack.displayUUID, "space": stack.spaceID, "active": activeLevel(of: stack),
                  "top": topLevel(of: stack)]
             }
+        // The floating windows parked with each level out of view.
+        let floatShelfList = floatShelf.keys
+            .sorted { ($0.displayUUID, $0.spaceID, $0.level) < ($1.displayUUID, $1.spaceID, $1.level) }
+            .map { key -> [String: Any] in
+                ["display": key.displayUUID, "space": key.spaceID, "level": key.level,
+                 "windows": (floatShelf[key] ?? [:]).keys.sorted()]
+            }
         let object: [String: Any] = [
             "paused": isPaused, "focused": focusedWindow as Any, "floating": Array(floating),
+            "floatShelf": floatShelfList,
             "displays": displays.map { ["uuid": $0.uuid, "frame": rectJSON($0.frame), "visible": rectJSON($0.visible),
                                         "space": $0.currentSpace as Any] },
             "stacks": stacks,
