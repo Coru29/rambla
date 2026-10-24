@@ -6,6 +6,10 @@
 /// next one, so a new level can always be opened there, but it goes as soon as it is left. Below a level with windows
 /// it stays, so that "work below, home above" does not flip over when one of the two is empty for a while.
 public enum StripLevels {
+    /// The highest level a saved stack keeps (`SavedState.removeStripsOutOfRange`): far more than anyone stacks. Only a
+    /// hand-edited or corrupt file goes higher, and restoring such a level would create every empty strip below it.
+    public static let highestSaved = 63
+
     /// Where a move from `active` goes. Levels 0...`top` exist; `occupied` are the ones with at least one window.
     /// Up: the next level, or a new one above `top` when `active` is the top and has windows. Down: the previous one.
     /// Nil at either end.

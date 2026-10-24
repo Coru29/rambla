@@ -240,6 +240,23 @@ private func savedColumn(_ windows: [WindowID], _ width: ColumnWidth = .fraction
     #expect(again.activeLevel == nil)
 }
 
+@Test func savedStripsAtLevelsNoStackHasAreLeftOut() {
+    // Only a hand-edited or corrupt file has them: a strip below the bottom, or so high that restoring it would create
+    // every empty strip in between.
+    func saved(_ level: Int) -> SavedStrip {
+        SavedStrip(displayUUID: "A", spaceKey: "s1", strip: Strip(columns: [savedColumn([WindowID(level + 10)])]),
+                   level: level)
+    }
+    let top = StripLevels.highestSaved
+    var state = SavedState(strips: [-1, 0, 1, top, top + 1, 10_000].map(saved))
+    #expect(top == 63)
+    #expect(state.removeStripsOutOfRange() == 3)
+    #expect(state.strips.map(\.level) == [0, 1, 63])
+    // A file with nothing out of range is left as it is.
+    #expect(state.removeStripsOutOfRange() == 0)
+    #expect(state.strips.map(\.level) == [0, 1, 63])
+}
+
 @Test func matcherCanLeaveTitlesOut() {
     // After the first moments of a session, a new window that happens to share a saved title must not inherit its
     // place (a floating "zsh" would make every new Terminal window float).

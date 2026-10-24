@@ -78,7 +78,7 @@ private func ref(_ id: WindowID, _ app: String = "app") -> WindowRef {
     let state = archive.merged(into: SavedState(refs: [ref(4), ref(1)], strips: [saved("laptop", "s9", [1, 4])]), at: now)
     #expect(state.strips.count == 2)
     #expect(state.refs.map(\.id).sorted() == [1, 4, 5])
-    #expect(state.strips.last?.unplugged == true)
+    #expect(state.strips.first { $0.displayUUID == "external" }?.unplugged == true)
 }
 
 @Test func archivedStripsKeepTheirOwnWindows() throws {
@@ -91,7 +91,8 @@ private func ref(_ id: WindowID, _ app: String = "app") -> WindowRef {
     let archive = StripArchive(loading: SavedState(session: "last week", refs: [docs], strips: [old]), at: now)
     let live = SavedStrip(displayUUID: "L", spaceKey: "s1", strip: strip([812]), session: "today", refs: [inbox])
     let state = archive.merged(into: SavedState(session: "today", refs: [inbox], strips: [live]), at: now)
-    #expect(state.strips.map(\.refs) == [[inbox], [docs]])
+    #expect(state.strips.first { $0.displayUUID == "L" }?.refs == [inbox])
+    #expect(state.strips.first { $0.displayUUID == "D" }?.refs == [docs])
 
     let reloaded = try #require(StripArchive(loading: state, at: now).stack(displayUUID: "D", spaceKey: "s5").first)
     #expect(reloaded.refs == [docs])
@@ -277,6 +278,18 @@ private func ref(_ id: WindowID, _ app: String = "app") -> WindowRef {
     #expect(state.strips.map(\.level) == [0, 1])
     #expect(state.strips.map(\.strip.allWindows) == [[1], [8]])
     #expect(Set(state.refs.map(\.id)) == [1, 8])                                   // no ref for the replaced one
+}
+
+@Test func savedStripsGoByDisplayDesktopAndLevel() {
+    // An older Rambla keeps the first strip it reads for each display and desktop: that one has to be level 0.
+    let archive = StripArchive(loading: SavedState(strips: [saved("B", "s1", [9], level: 1), saved("A", "s2", [8])]),
+                               at: now)
+    let live = SavedState(strips: [saved("B", "s1", [5], level: 2), saved("A", "s1", [3], level: 1),
+                                   saved("B", "s1", [4]), saved("A", "s1", [2])])
+    let state = archive.merged(into: live, at: now)
+    #expect(state.strips.map { "\($0.displayUUID) \($0.spaceKey) \($0.level)" }
+            == ["A s1 0", "A s1 1", "A s2 0", "B s1 0", "B s1 1", "B s1 2"])
+    #expect(state.strips.map(\.strip.allWindows) == [[2], [3], [8], [4], [9], [5]])
 }
 
 @Test func aSavedStackSurvivesTheFileLevelByLevel() throws {

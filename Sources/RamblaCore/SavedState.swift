@@ -154,10 +154,11 @@ public struct StripArchive: Equatable, Sendable {
         for index in strips.indices where strips[index].displayUUID == displayUUID { strips[index].unplugged = false }
     }
 
-    /// What to save: the live strips, seen `now`, then the archived ones that no live strip replaces (a live strip
-    /// replaces only the one of its display, Space and level) and that are not older than `maxAge`. Each strip keeps
-    /// its own refs; `refs` also lists every window once, the live ones first, for the floating windows and for older
-    /// versions of Rambla.
+    /// What to save: the live strips, seen `now`, and the archived ones that no live strip replaces (a live strip
+    /// replaces only the one of its display, Space and level) and that are not older than `maxAge`, listed by display,
+    /// Space and level: an older Rambla, which keeps the first strip it reads for each display and Space, gets level 0.
+    /// Each strip keeps its own refs; `refs` also lists every window once, the live ones first, for the floating
+    /// windows and for older versions of Rambla.
     public func merged(into live: SavedState, at now: Date) -> SavedState {
         var state = live
         state.strips = live.strips.map { strip in
@@ -174,6 +175,11 @@ public struct StripArchive: Equatable, Sendable {
             state.strips.append(strip)
             for ref in strip.refs where known.insert(ref.id).inserted { state.refs.append(ref) }
         }
+        // Ties (only a hand-edited file has two strips of one level) keep their order: the first one still wins.
+        state.strips = state.strips.enumerated().sorted {
+            ($0.element.displayUUID, $0.element.spaceKey, $0.element.level, $0.offset)
+                < ($1.element.displayUUID, $1.element.spaceKey, $1.element.level, $1.offset)
+        }.map(\.element)
         return state
     }
 }
@@ -210,6 +216,15 @@ public struct SavedState: Codable, Equatable, Sendable {
         if version < 2 { state.floating = [] }
         state.version = Self.currentVersion
         return state
+    }
+
+    /// Leaves out the strips no stack has a place for: below level 0, or above `StripLevels.highestSaved`. Only a
+    /// hand-edited or corrupt file has them. Their windows join the strips like any new window. Returns how many went.
+    @discardableResult
+    public mutating func removeStripsOutOfRange() -> Int {
+        let before = strips.count
+        strips.removeAll { !(0...StripLevels.highestSaved).contains($0.level) }
+        return before - strips.count
     }
 }
 

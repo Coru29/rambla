@@ -39,8 +39,12 @@ enum StateStore {
         guard let data = try? Data(contentsOf: url),
               var state = try? JSONDecoder().decode(SavedState.self, from: data).upgraded() else { return nil }
         // A hand-edited or corrupt file must not break the strip invariants the operations rely on. A strip below
-        // level 0 has no place in a stack: it is left out.
-        state.strips.removeAll { $0.level < 0 }
+        // level 0, or above the highest a stack keeps, has no place in a stack: it is left out.
+        let outOfRange = state.removeStripsOutOfRange()
+        if outOfRange > 0 {
+            Log.error("The saved layout has \(outOfRange) strips below level 0 or above level "
+                      + "\(StripLevels.highestSaved): they are left out")
+        }
         for index in state.strips.indices {
             state.strips[index].strip.columns = state.strips[index].strip.columns.compactMap { column in
                 guard !column.windows.isEmpty else { return nil }
