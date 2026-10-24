@@ -21,9 +21,9 @@ public enum FocusRoute: Equatable, Sendable {
     /// Nothing in view to give the focus to: Rambla takes the keyboard (as on an empty strip).
     case takeKeyboard
 
-    /// Seconds after Rambla switches a stack's level during which a report of focus on a window of another level is
-    /// late: the app that was in front reports its window, now out of view, before the next one takes over. Also how
-    /// long after a loss a focus that lands out of view is macOS's doing.
+    /// Seconds after Rambla switches a stack's level during which a report of focus on a window of another level can be
+    /// late (`lateReport`): the app that was in front reports its window, now out of view, before the next one takes
+    /// over. Also how long after a loss a focus that lands out of view is macOS's doing.
     public static let lateReportWindow = 0.6
 
     /// `windowLevel`: where the focused window is; `active`: the level in view. `byActivation`: its app was just
