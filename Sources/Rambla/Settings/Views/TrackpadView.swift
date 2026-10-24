@@ -56,13 +56,14 @@ struct TrackpadView: View {
                 .disabled(!enabled)
             Toggle("Gestos hacia arriba y abajo", isOn: $store.prefs.trackpad.verticalSwipe)
                 .disabled(!enabled)
-            // The mouse buttons go by it too, so it does not wait for the trackpad's swipe to be on.
+            // The trackpad's swipes up and down and the mouse buttons both go by it: open while either of them is on.
             Picker("Deslizar hacia arriba o abajo", selection: $store.prefs.verticalGesture) {
                 Text("Cambia de tira").tag(VerticalGesture.strips)
                 Text("Cambia el ancho").tag(VerticalGesture.width)
             }
             .pickerStyle(.segmented)
-            .disabled(!store.prefs.trackpad.verticalSwipe)
+            .disabled(!((store.prefs.trackpad.enabled && store.prefs.trackpad.verticalSwipe)
+                        || store.prefs.mouseButtons.enabled))
             Toggle("Respuesta háptica", isOn: $store.prefs.trackpad.haptics)
         } header: {
             Text("Trackpad")

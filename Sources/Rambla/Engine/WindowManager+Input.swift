@@ -96,7 +96,8 @@ extension WindowManager {
     /// the content follows them, so going down shows the strip above. Acts on the stack under the pointer.
     func stripSwipe(fingersUp: Bool, onTrackpad: Bool) {
         guard isRunning, !isPaused, gestureKey == nil, let stack = stackUnderPointer() else { return }
-        let up = stripAbove(fingersUp: fingersUp, onTrackpad: onTrackpad)
+        let natural = onTrackpad ? prefs.trackpad.natural : prefs.mouseButtons.natural
+        let up = StripLevels.stripAbove(fingersUp: fingersUp, natural: natural)
         Log.info("Swipe \(fingersUp ? "up" : "down"): strip \(up ? "above" : "below")")
         // At either end of the stack nothing happens, and nothing more is needed.
         stepLevel(up: up, on: stack)
@@ -105,15 +106,17 @@ extension WindowManager {
     /// The swipe just became a short vertical one: a haptic tap when there is a strip that way (trackpad, haptics on).
     func stripSwipeArmed(fingersUp: Bool) {
         guard isRunning, !isPaused, gestureKey == nil, prefs.trackpad.haptics, let stack = stackUnderPointer() else { return }
-        let up = stripAbove(fingersUp: fingersUp, onTrackpad: true)
+        let up = StripLevels.stripAbove(fingersUp: fingersUp, natural: prefs.trackpad.natural)
         guard StripLevels.target(from: activeLevel(of: stack), up: up, top: topLevel(of: stack),
                                  occupied: occupiedLevels(of: stack)) != nil else { return }
         Haptics.gesture()
     }
 
-    /// A long swipe up: the focused column's full width, or back to its width (like ⌃⌘M).
+    /// A long swipe up: the focused column's full width, or back to its width (like ⌃⌘M). On a strip without a focused
+    /// column (a new empty one in view) nothing happens, not even the tap.
     func toggleWidthBySwipe(onTrackpad: Bool) {
-        guard isRunning, !isPaused, gestureKey == nil, let key = activeStripKey(), var strip = strips[key] else { return }
+        guard isRunning, !isPaused, gestureKey == nil, let key = activeStripKey(), var strip = strips[key],
+              strip.focusedColumn != nil else { return }
         strip.toggleFullWidth()
         // The toggle keeps the width to go back to only while the column has the full width.
         Log.info("Swipe up: \(strip.focusedColumn?.widthBeforeFull != nil ? "full width" : "previous width")")
@@ -207,13 +210,6 @@ extension WindowManager {
     /// Strip points per pointer point, the same way: natural, the strip follows the pointer.
     private var mouseDragScale: Double {
         Self.mouseDragGain * prefs.mouseButtons.sensitivity * (prefs.mouseButtons.natural ? 1 : -1)
-    }
-
-    /// Whether a short vertical swipe goes to the strip above: with the device's natural direction the content follows
-    /// the fingers (or the pointer), so going down shows the strip above; without it, going up does.
-    private func stripAbove(fingersUp: Bool, onTrackpad: Bool) -> Bool {
-        let natural = onTrackpad ? prefs.trackpad.natural : prefs.mouseButtons.natural
-        return natural ? !fingersUp : fingersUp
     }
 
     /// The strip of the display under the pointer, or the active one when the pointer is on no managed display.

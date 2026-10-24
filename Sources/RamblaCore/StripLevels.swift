@@ -24,6 +24,13 @@ public enum StripLevels {
         return highestKept < top ? Array((highestKept + 1)...top) : []
     }
 
+    /// Whether a short swipe up or down goes to the strip above: the fingers (or the pointer) went up when `fingersUp`.
+    /// With the device's natural direction the content follows them, so going down brings the strip above into view;
+    /// without it, going up does.
+    public static func stripAbove(fingersUp: Bool, natural: Bool) -> Bool {
+        natural ? !fingersUp : fingersUp
+    }
+
     /// The level a restored stack shows: `saved` (nil means 0), kept within 0...`top`.
     public static func restoredActive(_ saved: Int?, top: Int) -> Int {
         // Nil: a file from before stacked strips. A saved level above `top` has nothing left to restore, and one below

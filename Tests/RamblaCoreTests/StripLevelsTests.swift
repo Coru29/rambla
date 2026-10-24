@@ -49,3 +49,14 @@ import Testing
     #expect(StripLevels.restoredActive(-1, top: 2) == 0)
     #expect(StripLevels.restoredActive(-4, top: 0) == 0)
 }
+
+@Test func withTheNaturalDirectionGoingDownShowsTheStripAbove() {
+    // The content follows the fingers (or the pointer): what is above comes down into view.
+    #expect(StripLevels.stripAbove(fingersUp: false, natural: true))
+    #expect(!StripLevels.stripAbove(fingersUp: true, natural: true))
+}
+
+@Test func withoutTheNaturalDirectionGoingUpShowsTheStripAbove() {
+    #expect(StripLevels.stripAbove(fingersUp: true, natural: false))
+    #expect(!StripLevels.stripAbove(fingersUp: false, natural: false))
+}
