@@ -218,8 +218,10 @@ $CHECK check-shelved 1
 $CHECK level-of "$SENT" 1
 
 # Another app moving a window that is out of sight (what Rectangle does, or an app restoring its own frame): it goes
-# back to its parking spot, in its own strip, instead of floating.
-$CLI debug-external-move "$SENT" 300 200 700 500; sleep 2; $CHECK settle
+# back to its parking spot, in its own strip, instead of floating. It must be seen away from that spot first: a window
+# that never moved would pass the checks of where it ends.
+$CHECK watch-reparked "$SENT" debug-external-move "$SENT" 300 200 700 500
+sleep 1; $CHECK settle
 $CHECK check-shelved 1
 $CHECK check-not-floating "$SENT"
 $CHECK level-of "$SENT" 1
@@ -230,6 +232,74 @@ pause_rambla
 $CHECK check-gathered
 resume_rambla
 $CHECK check-levels 2 0
+$CHECK check-placed
+$CHECK check-shelved 1
+
+# The app gives the focus to the window of the strip above while Rambla is paused (it is on screen then, like every
+# window): on resuming, that strip comes into view with it, instead of being parked with the keyboard in it.
+SENT_NUMBER=$($CHECK window-number "$SENT")
+pause_rambla
+$CHECK check-gathered
+$CHECK host "focus $SENT_NUMBER"
+$CHECK frontmost-is $HOST_ID
+resume_rambla
+$CHECK check-levels 2 1
+$CHECK check-focused-visible
+$CHECK check-placed
+$CHECK check-shelved 3
+
+# Back down, then up, and right away the app gives the focus to a window of the strip below (⌘` twice across strips,
+# or the Window menu, right after a switch). For a moment it may be the app's late report, so nothing changes; but that
+# window keeps the focus, so its strip comes into view: the keyboard never stays in a window out of sight. The test app
+# is in front, so that this is no activation. Waiting for the strip above to be in view lets Rambla's own focus of its
+# window reach the app first, and takes a fraction of the 0.6 s in which a report can be late.
+$CLI strip-down; $CHECK settle
+$CHECK check-levels 2 0
+$CHECK frontmost-is $HOST_ID
+$CLI strip-up; $CHECK check-levels 2 1
+$CHECK host "focus $BELOW_NUMBER"
+$CHECK check-levels 2 0
+sleep 1; $CHECK settle
+$CHECK check-focused-visible
+$CHECK check-placed
+$CHECK check-shelved 1
+
+# Sending into a strip that has columns: the strip comes into view with the sent window already where it shows, in one
+# move, never laid out where it was and then scrolled to it. The window sent first takes the full width up there, so
+# that the second one lands past the edge of what that strip shows.
+$CLI focus-2; $CHECK settle
+UP1=$($CHECK window-at 1)
+$CLI send-strip-up; $CHECK settle
+$CHECK check-levels 2 1
+$CHECK level-of "$UP1" 1
+$CLI full-width; $CHECK settle
+$CLI strip-down; $CHECK settle
+$CHECK check-levels 2 0
+$CLI focus-last; $CHECK settle
+UP2=$($CHECK window-at 1)
+$CHECK watch-moves-once "$UP2" send-strip-up
+$CHECK settle
+$CHECK check-levels 2 1
+$CHECK level-of "$UP2" 1
+$CHECK check-focused-visible
+$CHECK check-placed
+$CHECK check-shelved 1
+
+# Sending down: the window goes alone to the strip below, which comes into view with it, in one move too. Then the first
+# one goes back down with its width, and the strips are as they were: three windows below, one above.
+$CHECK watch-moves-once "$UP2" send-strip-down
+$CHECK settle
+$CHECK check-levels 2 0
+$CHECK level-of "$UP2" 0
+$CHECK check-focused-visible
+$CHECK check-placed
+$CHECK check-shelved 2
+$CLI strip-up; $CHECK settle
+$CHECK check-levels 2 1
+$CLI full-width; $CHECK settle
+$CLI send-strip-down; $CHECK settle
+$CHECK check-levels 2 0
+$CHECK level-of "$UP1" 0
 $CHECK check-placed
 $CHECK check-shelved 1
 

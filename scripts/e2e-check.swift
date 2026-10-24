@@ -426,6 +426,46 @@ case "watch-enters", "watch-leaves":
     } else {
         fail("window \(id) crossed the display at x: \(trace(frames, on: disp)) (\(entering ? "ends" : "starts") at \(Int(reference.minX)))")
     }
+case "watch-reparked":
+    // ID COMMAND...: the command moves window ID, parked out of sight, away from its parking spot (another app moving
+    // it), and Rambla parks it again: while it runs, the window is seen away from that spot (or at another size), and
+    // it ends back there. A window that never moved would pass a check of where it ends alone.
+    let id = UInt32(args[1])!
+    guard let spot = bounds(id) else { fail("no window \(id)") }
+    func atSpot(_ r: CGRect) -> Bool {
+        abs(r.minX - spot.minX) <= 2 && abs(r.minY - spot.minY) <= 2 && abs(r.width - spot.width) <= 2
+            && abs(r.height - spot.height) <= 2
+    }
+    func describe(_ r: CGRect) -> String { "\(Int(r.minX)),\(Int(r.minY)) \(Int(r.width))x\(Int(r.height))" }
+    let frames = samples(id, running: Array(args.dropFirst(2)))
+    if frames.count < 50 { fail("only \(frames.count) samples of window \(id)") }
+    guard let away = frames.first(where: { !atSpot($0) }) else {
+        fail("window \(id) was never seen away from its parking spot at \(describe(spot)) (\(frames.count) samples): "
+             + "the move did not happen, so nothing shows it was parked again")
+    }
+    guard let last = frames.last, atSpot(last) else {
+        fail("window \(id) was moved to \(describe(away)) and is not back at its parking spot \(describe(spot)): "
+             + "it is at \(frames.last.map(describe) ?? "?")")
+    }
+    pass("window \(id) was moved to \(describe(away)) and parked again at \(describe(spot))")
+case "watch-moves-once":
+    // ID COMMAND...: while the command runs, window ID goes where it goes in a single move: its corner changes at most
+    // once (by more than 2 pt), never to a first place and then on to another (a strip laid out where it was, then
+    // scrolled to the column that gets the focus: a switch in two steps).
+    let id = UInt32(args[1])!
+    let frames = samples(id, running: Array(args.dropFirst(2)))
+    if frames.count < 50 { fail("only \(frames.count) samples of window \(id)") }
+    var places: [CGPoint] = []
+    for frame in frames where places.last.map({ abs($0.x - frame.minX) > 2 || abs($0.y - frame.minY) > 2 }) ?? true {
+        places.append(frame.origin)
+    }
+    let path = places.prefix(12).map { "\(Int($0.x)),\(Int($0.y))" }.joined(separator: " → ")
+        + (places.count > 12 ? " → …" : "")
+    if places.count <= 2 {
+        pass("window \(id) moved at most once: \(path)")
+    } else {
+        fail("window \(id) moved \(places.count - 1) times on the way: \(path)")
+    }
 case "check-levels", "check-levels-on":
     // COUNT ACTIVE [SECONDS]  (check-levels-on: UUID COUNT ACTIVE [SECONDS]): the stack in view on the display of the test
     // windows (or on that one) has COUNT levels, 0 to COUNT - 1, and ACTIVE is the one in view. It is there while the
@@ -598,6 +638,6 @@ case "frontmost-is":
         fail("the app in front is \(front()), not \(want): a focus given to a window of \(want) now would be an activation, not a move between its windows")
     }
 default:
-    print("usage: e2e-check wait-columns N | settle | check-tiles | check-parked | check-focused-visible | check-focused-index N | check-gathered | check-floating ID | check-frame ID X Y | column-order | check-order IDS | check-columns IDS | window-at N | neighbor-right | watch-hidden ID COMMAND... | watch-enters ID right|left COMMAND... | watch-leaves ID right|left COMMAND... | wait-displays N [S] | other-display | wait-columns-on UUID N [S] | watch-until-displays N sliver|half ID | check-levels COUNT ACTIVE [S] | check-levels-on UUID COUNT ACTIVE [S] | check-shelved COUNT [X Y W H] | check-float-parked ID [X Y W H] | level-of ID [LEVEL [S]] | check-not-floating ID | frame-of ID | check-frame-near ID X Y W H | window-number ID | pointer-to-display | check-paused true|false [S] | resume | frontmost-is BUNDLE [S]")
+    print("usage: e2e-check wait-columns N | settle | check-tiles | check-parked | check-focused-visible | check-focused-index N | check-gathered | check-floating ID | check-frame ID X Y | column-order | check-order IDS | check-columns IDS | window-at N | neighbor-right | watch-hidden ID COMMAND... | watch-enters ID right|left COMMAND... | watch-leaves ID right|left COMMAND... | wait-displays N [S] | other-display | wait-columns-on UUID N [S] | watch-until-displays N sliver|half ID | watch-reparked ID COMMAND... | watch-moves-once ID COMMAND... | check-levels COUNT ACTIVE [S] | check-levels-on UUID COUNT ACTIVE [S] | check-shelved COUNT [X Y W H] | check-float-parked ID [X Y W H] | level-of ID [LEVEL [S]] | check-not-floating ID | frame-of ID | check-frame-near ID X Y W H | window-number ID | pointer-to-display | check-paused true|false [S] | resume | frontmost-is BUNDLE [S]")
     exit(2)
 }
