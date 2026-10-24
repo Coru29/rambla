@@ -208,6 +208,26 @@ func pluggedDisplay(_ args: [String], from index: Int) -> [CGRect] {
     return [CGRect(x: v[0], y: v[1], width: v[2], height: v[3])]
 }
 
+// MARK: - Pause
+
+/// Whether the dump says Rambla is paused, once it has said the same for `hold` seconds: a `toggle-pause` sent a moment
+/// ago may not be applied yet. Nil when it says nothing for that long (Rambla is not there to answer).
+func pausedOnceSteady(hold: Double = 1, timeout: Double = 10) -> Bool? {
+    func reading() -> Int { (dump()["paused"] as? Bool).map { $0 ? 1 : 0 } ?? -1 }
+    var value = reading()
+    var since = Date()
+    let end = Date().addingTimeInterval(timeout)
+    while Date() < end, Date().timeIntervalSince(since) < hold {
+        usleep(150_000)
+        let now = reading()
+        if now != value {
+            value = now
+            since = Date()
+        }
+    }
+    return value < 0 ? nil : value == 1
+}
+
 let args = Array(CommandLine.arguments.dropFirst())
 switch args.first {
 case "wait-columns":
@@ -266,11 +286,16 @@ case "check-gathered":
     let d = dump()
     let disp = display(d)
     let ids = ((d["windows"] as? [[String: Any]]) ?? []).compactMap { ($0["id"] as? NSNumber)?.uint32Value }
+    // Nothing to look at (Rambla gave no dump, or knows no window) is no pass.
+    guard !ids.isEmpty else { fail("the dump lists no windows") }
+    var looked = 0
     for id in ids {
         guard let real = bounds(id) else { continue }
+        looked += 1
         if !disp.visible.insetBy(dx: -2, dy: -2).contains(real) { fail("window \(id) at \(real) is outside \(disp.visible)") }
     }
-    pass("all \(ids.count) windows inside the visible area")
+    guard looked > 0 else { fail("none of the \(ids.count) windows in the dump has a window to look at") }
+    pass("all \(looked) windows inside the visible area")
 case "check-floating":
     let id = UInt32(args[1])!
     let d = dump()
@@ -375,6 +400,7 @@ case "watch-until-displays":
 case "neighbor-right":
     // Arguments for `rambla debug-neighbor`: a laptop-sized display right of the strip's one.
     let f = display(dump()).frame
+    guard f.width > 0 else { failAside("no display in the dump") }
     print("\(Int(f.maxX)) \(Int(f.minY)) 1512 \(Int(f.height))")
 case "watch-hidden":
     // ID COMMAND...: while the command runs, the window never shows more than its sliver.
@@ -540,7 +566,38 @@ case "pointer-to-display":
         CGAssociateMouseAndMouseCursorPosition(1)
         pass("the pointer went to the display of the test windows")
     }
+case "check-paused":
+    // true|false [SECONDS]: Rambla is paused (true) or active (false), as a `toggle-pause` leaves it.
+    let want = args[1] == "true", timeout = Double(args.count > 2 ? args[2] : "6")!
+    let there = waitUntil(timeout) { dump()["paused"] as? Bool == want }
+    if there { pass("Rambla is \(want ? "paused" : "active")") } else { fail("Rambla is not \(want ? "paused" : "active"), as it should be") }
+case "resume":
+    // Resumes Rambla if it is paused, for a run that fails between two `toggle-pause`: its preferences keep a pause across
+    // launches, and a reinstall does not undo it. `toggle-pause` only flips, so it is sent only when the dump says paused,
+    // and only once the dump has said so for a second (a toggle sent a moment ago may not be applied yet).
+    guard let paused = pausedOnceSteady() else { fail("Rambla does not answer: it cannot tell whether it is paused") }
+    if paused {
+        _ = run(["toggle-pause"])
+        let resumed = waitUntil { dump()["paused"] as? Bool == false }
+        if resumed { pass("Rambla was paused: resumed") } else { fail("Rambla is still paused") }
+    } else {
+        pass("Rambla is not paused")
+    }
+case "frontmost-is":
+    // BUNDLE [SECONDS]: the app in front is BUNDLE. A focus that reaches a window of the app in front is the app moving
+    // between its own windows; one that comes with another app being activated (⌘Tab, the Dock) is routed differently.
+    let want = args[1], timeout = Double(args.count > 2 ? args[2] : "3")!
+    func front() -> String {
+        RunLoop.current.run(until: Date().addingTimeInterval(0.05))   // lets the workspace hear of a change
+        return NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "no app"
+    }
+    let there = waitUntil(timeout) { front() == want }
+    if there {
+        pass("\(want) is the app in front")
+    } else {
+        fail("the app in front is \(front()), not \(want): a focus given to a window of \(want) now would be an activation, not a move between its windows")
+    }
 default:
-    print("usage: e2e-check wait-columns N | settle | check-tiles | check-parked | check-focused-visible | check-focused-index N | check-gathered | check-floating ID | check-frame ID X Y | column-order | check-order IDS | check-columns IDS | window-at N | neighbor-right | watch-hidden ID COMMAND... | watch-enters ID right|left COMMAND... | watch-leaves ID right|left COMMAND... | wait-displays N [S] | other-display | wait-columns-on UUID N [S] | watch-until-displays N sliver|half ID | check-levels COUNT ACTIVE [S] | check-levels-on UUID COUNT ACTIVE [S] | check-shelved COUNT [X Y W H] | check-float-parked ID [X Y W H] | level-of ID [LEVEL [S]] | check-not-floating ID | frame-of ID | check-frame-near ID X Y W H | window-number ID | pointer-to-display")
+    print("usage: e2e-check wait-columns N | settle | check-tiles | check-parked | check-focused-visible | check-focused-index N | check-gathered | check-floating ID | check-frame ID X Y | column-order | check-order IDS | check-columns IDS | window-at N | neighbor-right | watch-hidden ID COMMAND... | watch-enters ID right|left COMMAND... | watch-leaves ID right|left COMMAND... | wait-displays N [S] | other-display | wait-columns-on UUID N [S] | watch-until-displays N sliver|half ID | check-levels COUNT ACTIVE [S] | check-levels-on UUID COUNT ACTIVE [S] | check-shelved COUNT [X Y W H] | check-float-parked ID [X Y W H] | level-of ID [LEVEL [S]] | check-not-floating ID | frame-of ID | check-frame-near ID X Y W H | window-number ID | pointer-to-display | check-paused true|false [S] | resume | frontmost-is BUNDLE [S]")
     exit(2)
 }

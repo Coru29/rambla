@@ -14,18 +14,40 @@ CLI=/Applications/$APP_NAME.app/Contents/MacOS/$APP_NAME
 HOST_ID=io.github.coru29.TestHost
 STATE=$PWD/.build/e2e-state.json
 
-# Quits Rambla as the installer does (it saves its layout on the way out) and waits until it is gone.
+# Quits Rambla as the installer does (it saves its layout on the way out) and waits until it is gone. It fails if
+# Rambla is still there: the steps after it would be checking the old process.
 quit_rambla() {
   pgrep -x $APP_NAME >/dev/null || return 0
   osascript -e 'tell application id "io.github.coru29.Rambla" to quit' >/dev/null 2>&1 || true
   for _ in $(seq 1 30); do pgrep -x $APP_NAME >/dev/null || return 0; sleep 0.1; done
   pkill -x $APP_NAME 2>/dev/null || true
   for _ in $(seq 1 30); do pgrep -x $APP_NAME >/dev/null || return 0; sleep 0.1; done
+  echo "FAIL: $APP_NAME is still running after being asked to quit, and then killed" >&2
+  return 1
 }
 
 # Waits until the test app has quit.
 wait_host_gone() {
   for _ in $(seq 1 50); do pgrep -x TestHost >/dev/null || return 0; sleep 0.1; done
+}
+
+# Rambla's pause is a toggle, and its preferences keep a pause across launches (a reinstall does not undo it). So a run
+# that fails while Rambla is paused resumes it on the way out, whatever stopped the run. PAUSED is 1 from before the
+# toggle that pauses it until the one that resumes it is seen to work; the resume looks at the state before it toggles.
+PAUSED=0
+resume_on_exit() { [ "$PAUSED" = 0 ] || $CHECK resume || true; }
+trap resume_on_exit EXIT
+pause_rambla() {
+  PAUSED=1
+  $CLI toggle-pause
+  $CHECK check-paused true
+  $CHECK settle
+}
+resume_rambla() {
+  $CLI toggle-pause
+  $CHECK check-paused false
+  PAUSED=0
+  $CHECK settle
 }
 
 # Rambla starts with no layout file: what an earlier run saved must not come back onto the new test windows.
@@ -86,9 +108,9 @@ $CHECK check-frame "$ID" 200 150
 $CHECK wait-columns 4
 
 # Pausing brings every window back on screen.
-$CLI toggle-pause; $CHECK settle
+pause_rambla
 $CHECK check-gathered
-$CLI toggle-pause; $CHECK settle
+resume_rambla
 $CHECK check-tiles
 
 # Closing a window removes its column.
@@ -164,7 +186,8 @@ $CHECK check-frame-near "$FLOAT" $FRAME
 $CHECK check-floating "$FLOAT"
 $CHECK check-placed
 # Floated back into the strip. The shortcut works on the focused window, so the test app gives that one the focus.
-$CHECK host "focus $($CHECK window-number "$FLOAT")"; $CHECK settle
+FLOAT_NUMBER=$($CHECK window-number "$FLOAT")
+$CHECK host "focus $FLOAT_NUMBER"; $CHECK settle
 $CLI toggle-float; $CHECK settle
 $CHECK wait-columns 4
 $CHECK check-not-floating "$FLOAT"
@@ -181,10 +204,12 @@ $CHECK level-of "$SENT" 1
 $CHECK check-placed
 $CHECK check-shelved 3
 
-# The app gives the focus to a window of the strip below. The test app is in front already, so this is no activation,
-# just a move between its own windows, like a click on its sliver: that strip comes into view and the sent window goes
-# out of sight.
-$CHECK host "focus $($CHECK window-number "$BELOW")"; $CHECK settle
+# The app gives the focus to a window of the strip below. The test app must be in front already, so that this is no
+# activation, just a move between its own windows, like a click on its sliver: that strip comes into view and the sent
+# window goes out of sight.
+BELOW_NUMBER=$($CHECK window-number "$BELOW")
+$CHECK frontmost-is $HOST_ID
+$CHECK host "focus $BELOW_NUMBER"; $CHECK settle
 $CHECK check-levels 2 0
 $CHECK check-focused-index 0
 $CHECK check-focused-visible
@@ -201,9 +226,9 @@ $CHECK level-of "$SENT" 1
 $CHECK check-levels 2 0
 
 # Pausing brings every window back on screen, the ones out of sight too; resuming puts the strip above away again.
-$CLI toggle-pause; $CHECK settle
+pause_rambla
 $CHECK check-gathered
-$CLI toggle-pause; $CHECK settle
+resume_rambla
 $CHECK check-levels 2 0
 $CHECK check-placed
 $CHECK check-shelved 1
