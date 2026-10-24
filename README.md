@@ -30,13 +30,14 @@ Every window is a column on one horizontal strip that keeps going past the edges
 ## Features
 
 - **One strip per display and per Space**, with spring animations and its own focus and scroll position.
+- **Stacked strips**: keep more than one strip per display and Space, one above the other and one in view at a time (work below, home above, say). You switch with a short swipe up or down, ⌃⌥⌘↑ / ⌃⌥⌘↓ or the overview, and ⌃⌥⌘⇧↑ / ⌃⌥⌘⇧↓ takes the focused window along. They survive restarts and display changes.
 - **New windows open beside the focused one**; the strip scrolls to the focused window (centering: never, only when it overflows, always).
 - **Column widths**: presets (25/33/50/66/75 %), full width, wider/narrower, center, and **pin a column** to the left or right edge.
 - **Stacks and tabs**: put several windows in one column, stacked vertically or as tabs with a clickable tab bar.
-- **Trackpad**: a three- or four-finger swipe slides the strip, with a gentle haptic tap at each column; a short quick swipe reaches the next one. Swipe up for full width, down to go back, further down for the overview.
-- **Overview** (⌃⌘O, or a long move down on the trackpad or with the mouse buttons): the whole strip at a glance, with every window's app and title; click one, or pick it with the arrows, to jump there; drag one to put its column somewhere else.
+- **Trackpad**: a three- or four-finger swipe slides the strip, with a gentle haptic tap at each column; a short quick swipe reaches the next one. A short swipe up or down switches strips, a long one up gives full width and a long one down opens the overview (or choose the old gesture in Settings: up for full width, down to go back).
+- **Overview** (⌃⌘O, or a long move down on the trackpad or with the mouse buttons): the whole strip at a glance (a row per strip when you stack several), with every window's app and title; click one, or pick it with the arrows, to jump there; drag one to put its column somewhere else.
 - **Strip indicator**: a frosted bar with one icon per column while you navigate; click a tile to jump, drag it to reorder.
-- **Mouse**: hold ⌃⌘ and turn the wheel to go through the columns, or hold the mouse buttons you choose (the middle one, the side buttons 4 + 5 together…) and move the mouse: sideways slides the strip, up for full width, down to go back. Drag a window onto another column to reorder; resize it to set the column width. Gets along with Mac Mouse Fix.
+- **Mouse**: hold ⌃⌘ and turn the wheel to go through the columns, or hold the mouse buttons you choose (the middle one, the side buttons 4 + 5 together…) and move the mouse: sideways slides the strip, a little up or down switches strips, further up gives full width and further down opens the overview. Drag a window onto another column to reorder; resize it to set the column width. Gets along with Mac Mouse Fix.
 - **Focus border** and **dim inactive windows** (optional), focus follows mouse / mouse follows focus (optional).
 - **Per-app rules** (tile or float, initial width, where new windows open) and per-display on/off.
 - **Remembers the layout** across restarts, and when you plug a display back in, its windows return to their places; launch at login.
@@ -75,6 +76,8 @@ All of them can be changed in **Settings → Shortcuts**.
 | ⌃⌘1 … ⌃⌘9 | Jump to column N |
 | ⌃⌘⇧ + arrows (or H J K L) | Move the column / the window inside its stack |
 | ⌃⌘N | Send the window to the next display |
+| ⌃⌥⌘↑ / ⌃⌥⌘↓ | Go to the strip above / below |
+| ⌃⌥⌘⇧↑ / ⌃⌥⌘⇧↓ | Send the window to the strip above / below, and follow it |
 | ⌃⌘O | Overview of the strip |
 | ⌃⌘R | Cycle preset widths |
 | ⌃⌘M | Full width (again to restore) |

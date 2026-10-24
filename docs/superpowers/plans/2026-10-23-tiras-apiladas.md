@@ -75,10 +75,14 @@
 | `Sources/RamblaCore/StripLevels.swift` | stack navigation and cleanup rules |
 | `Sources/RamblaCore/FocusRoute.swift` | where focus that lands on another level goes |
 | `Sources/RamblaCore/OverviewStack.swift` | the overview's rows (one per level) and the selection across them |
+| `Sources/RamblaCore/EmptyStripHint.swift` | the text of the empty-strip hint, from the strips, shortcuts and swipe the user has (Task 10) |
+| `Sources/RamblaCore/FloatShelf.swift` | which floating windows go with a level that leaves the view, and where they park and come back (Task 14) |
 | `Sources/Rambla/Engine/WindowManager+Levels.swift` | switching levels, shelving, sending windows, level actions, gesture entry points |
 | `Tests/RamblaCoreTests/StripLevelsTests.swift` | tests for `StripLevels` |
 | `Tests/RamblaCoreTests/FocusRouteTests.swift` | tests for `FocusRoute` |
 | `Tests/RamblaCoreTests/OverviewStackTests.swift` | tests for `OverviewStack` |
+| `Tests/RamblaCoreTests/EmptyStripHintTests.swift` | tests for `EmptyStripHint` |
+| `Tests/RamblaCoreTests/FloatShelfTests.swift` | tests for `FloatShelf` |
 
 **Modified**
 
@@ -689,9 +693,9 @@ func showLevels(_ rows: [LevelRow], on screen: NSScreen)      // IndicatorContro
 
 **`OverlayCoordinator`.**
 - **On `levelHook`:** build rows for levels 0...top of the stack and show them on its display, if `prefs.indicatorEnabled`.
-- **On `emptyLevelHook`:** `hint.show("Tira vacía", detail:)`. The detail is "Abrí acá lo que quieras, o traé la ventana enfocada con \(combo of send-strip-up). Para volver, deslizá hacia arriba o usá \(combo of strip-down)."
-  - Use `KeyNames.display` of the current bindings.
-  - Leave out a clause whose shortcut is unbound.
+- **On `emptyLevelHook`:** `hint.show("Tira vacía", detail:)`. The detail comes from `EmptyStripHint.detail(active:occupied:prefs:shortcutName:)` (`Sources/RamblaCore/EmptyStripHint.swift`, with `EmptyStripHintTests`), not from one fixed sentence: it says that anything can be opened there and, pointing at the nearest strip with windows, how to bring a window from it and how to go back.
+  - The coordinator passes `KeyNames.display` as `shortcutName`, so the sentences name the current bindings.
+  - A sentence whose shortcut is unbound is left out.
 - Add the English translations.
 
 - [ ] **Step 1: Implement.** Render the panel offscreen once (`NSHostingController.sizeThatFits`, `cacheDisplay`), check the size and the look, and say so in the report.
