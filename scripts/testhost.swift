@@ -1,6 +1,7 @@
 // A tiny regular app with plain resizable windows, so live tests never touch the user's real apps.
-// Commands (distributed notification "TestHost.command"): "add", "quit", "hide", "unhide", "minimize N", "restore N"
-// (N counts the windows in the order they were made, from 1), "label TEXT" (every window shows TEXT).
+// Commands (distributed notification "TestHost.command"): "add", "quit", "hide", "unhide", "minimize N", "restore N",
+// "focus N" (N counts the windows in the order they were made, from 1; the app makes window N its key one, as it would
+// by itself, which is no activation when it is already in front), "label TEXT" (every window shows TEXT).
 import AppKit
 
 final class Host: NSObject, NSApplicationDelegate, NSWindowDelegate {
@@ -20,6 +21,11 @@ final class Host: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 case "unhide": NSApp.unhide(nil)
                 case "minimize": window?.miniaturize(nil)
                 case "restore": window?.deminiaturize(nil)
+                case "focus":
+                    if let window {
+                        window.makeKeyAndOrderFront(nil)
+                        NSApp.activate()
+                    }
                 case "label": self?.labels.forEach { $0.stringValue = words.dropFirst().joined(separator: " ") }
                 default: break
                 }

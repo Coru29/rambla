@@ -1,6 +1,8 @@
 #!/bin/bash
 # Live end-to-end checks on the real app. Only the windows of a throwaway test app (TestHost) are
 # managed, so nothing else on screen moves. Requires the app installed with the Accessibility permission.
+# The last steps (stacked strips) restart Rambla with a layout file of the run's own, .build/e2e-state.json, never the
+# user's, and put the pointer on the main display (a strip command given while nothing is focused goes by the pointer).
 # Usage: scripts/e2e.sh [--no-install]
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -10,13 +12,32 @@ CHECK=.build/e2e-check
 HOST=$(scripts/build-testhost.sh)
 CLI=/Applications/$APP_NAME.app/Contents/MacOS/$APP_NAME
 HOST_ID=io.github.coru29.TestHost
+STATE=$PWD/.build/e2e-state.json
 
-$CHECK host quit >/dev/null || true
-if [ "${1:-}" != "--no-install" ]; then
-  scripts/install.sh --only-bundle $HOST_ID >/dev/null
-else
+# Quits Rambla as the installer does (it saves its layout on the way out) and waits until it is gone.
+quit_rambla() {
+  pgrep -x $APP_NAME >/dev/null || return 0
+  osascript -e 'tell application id "io.github.coru29.Rambla" to quit' >/dev/null 2>&1 || true
+  for _ in $(seq 1 30); do pgrep -x $APP_NAME >/dev/null || return 0; sleep 0.1; done
   pkill -x $APP_NAME 2>/dev/null || true
-  open -a /Applications/$APP_NAME.app --args --only-bundle $HOST_ID
+  for _ in $(seq 1 30); do pgrep -x $APP_NAME >/dev/null || return 0; sleep 0.1; done
+}
+
+# Waits until the test app has quit.
+wait_host_gone() {
+  for _ in $(seq 1 50); do pgrep -x TestHost >/dev/null || return 0; sleep 0.1; done
+}
+
+# Rambla starts with no layout file: what an earlier run saved must not come back onto the new test windows.
+$CHECK host quit >/dev/null || true
+wait_host_gone
+if [ "${1:-}" != "--no-install" ]; then
+  rm -f "$STATE"
+  scripts/install.sh --only-bundle $HOST_ID --state-file "$STATE" >/dev/null
+else
+  quit_rambla
+  rm -f "$STATE"
+  open -a /Applications/$APP_NAME.app --args --only-bundle $HOST_ID --state-file "$STATE"
 fi
 open -n "$HOST" --args 4
 
@@ -102,6 +123,124 @@ $CHECK check-columns "$ORDER"
 $CHECK check-placed
 $CLI debug-neighbor; sleep 1; $CHECK settle
 $CHECK check-placed
+
+# Stacked strips. They start on a fresh test app with four windows (so nothing the steps above left behind, like the
+# window that floats, gets in the way), with the pointer on its display (a strip command given while nothing is focused,
+# as from an empty strip, goes by the pointer) and the focus on the second column.
+$CHECK host quit >/dev/null
+wait_host_gone
+open -n "$HOST" --args 4
+$CHECK wait-columns 4
+$CHECK settle
+$CHECK pointer-to-display
+$CLI focus-2; $CHECK settle
+$CHECK check-tiles
+$CHECK check-parked
+$CHECK check-levels 1 0
+
+# A new strip above, empty, comes into view; the four windows of the strip below go out of sight, parked on a side edge.
+$CLI strip-up; $CHECK settle
+$CHECK check-levels 2 1
+$CHECK check-shelved 4
+
+# Back down: the empty strip goes (nothing above has windows and it is no longer in view); the windows are in place.
+$CLI strip-down; $CHECK settle
+$CHECK check-levels 1 0
+$CHECK check-placed
+
+# A floating window goes with its strip: it is parked out of sight with it, and comes back to the same place with it.
+FLOAT=$($CHECK window-at 2)
+$CLI focus-3; $CHECK settle
+$CLI toggle-float; $CHECK settle
+$CHECK check-floating "$FLOAT"
+FRAME=$($CHECK frame-of "$FLOAT")
+$CLI strip-up; $CHECK settle
+$CHECK check-levels 2 1
+$CHECK check-float-parked "$FLOAT"
+$CHECK check-shelved 4
+$CLI strip-down; $CHECK settle
+$CHECK check-levels 1 0
+$CHECK check-frame-near "$FLOAT" $FRAME
+$CHECK check-floating "$FLOAT"
+$CHECK check-placed
+# Floated back into the strip. The shortcut works on the focused window, so the test app gives that one the focus.
+$CHECK host "focus $($CHECK window-number "$FLOAT")"; $CHECK settle
+$CLI toggle-float; $CHECK settle
+$CHECK wait-columns 4
+$CHECK check-not-floating "$FLOAT"
+$CHECK check-placed
+
+# Sending the focused window up: it goes alone to a new strip, which comes into view with it, and the other windows go
+# out of sight. A second later, if the old app reports its focus late, the strip in view must not bounce back.
+$CLI focus-2; $CHECK settle
+BELOW=$($CHECK window-at 0)
+SENT=$($CHECK window-at 1)
+$CLI send-strip-up; sleep 1; $CHECK settle
+$CHECK check-levels 2 1
+$CHECK level-of "$SENT" 1
+$CHECK check-placed
+$CHECK check-shelved 3
+
+# The app gives the focus to a window of the strip below. The test app is in front already, so this is no activation,
+# just a move between its own windows, like a click on its sliver: that strip comes into view and the sent window goes
+# out of sight.
+$CHECK host "focus $($CHECK window-number "$BELOW")"; $CHECK settle
+$CHECK check-levels 2 0
+$CHECK check-focused-index 0
+$CHECK check-focused-visible
+$CHECK check-placed
+$CHECK check-shelved 1
+$CHECK level-of "$SENT" 1
+
+# Another app moving a window that is out of sight (what Rectangle does, or an app restoring its own frame): it goes
+# back to its parking spot, in its own strip, instead of floating.
+$CLI debug-external-move "$SENT" 300 200 700 500; sleep 2; $CHECK settle
+$CHECK check-shelved 1
+$CHECK check-not-floating "$SENT"
+$CHECK level-of "$SENT" 1
+$CHECK check-levels 2 0
+
+# Pausing brings every window back on screen, the ones out of sight too; resuming puts the strip above away again.
+$CLI toggle-pause; $CHECK settle
+$CHECK check-gathered
+$CLI toggle-pause; $CHECK settle
+$CHECK check-levels 2 0
+$CHECK check-placed
+$CHECK check-shelved 1
+
+# A display beside the one with the strips: nothing out of sight shows on it, whichever strip is in view.
+NEIGHBOR=$($CHECK neighbor-right)
+$CLI debug-neighbor $NEIGHBOR; sleep 1; $CHECK settle
+$CHECK check-shelved 1 $NEIGHBOR
+$CLI strip-up; $CHECK settle
+$CHECK check-levels 2 1
+$CHECK check-shelved 3 $NEIGHBOR
+$CLI strip-down; $CHECK settle
+$CHECK check-levels 2 0
+$CHECK check-shelved 1 $NEIGHBOR
+$CLI debug-neighbor; sleep 1; $CHECK settle
+$CHECK check-placed
+$CHECK check-shelved 1
+
+# Restarting Rambla with the strip above in view: both strips come back from the layout file, each window on its own
+# level, and the one that was in view is in view again.
+$CLI strip-up; $CHECK settle
+$CHECK check-levels 2 1
+quit_rambla
+[ -s "$STATE" ] || { echo "FAIL: Rambla saved no layout in $STATE"; exit 1; }
+open -g -a /Applications/$APP_NAME.app --args --only-bundle $HOST_ID --state-file "$STATE"
+$CHECK check-levels 2 1 30
+$CHECK settle
+$CHECK level-of "$SENT" 1
+$CHECK wait-columns 1
+$CHECK check-placed
+$CHECK check-shelved 3
+# And the restored strips work: down to the one below.
+$CLI strip-down; $CHECK settle
+$CHECK check-levels 2 0
+$CHECK wait-columns 3
+$CHECK check-placed
+$CHECK check-shelved 1
 
 $CHECK host quit >/dev/null
 echo "E2E OK"
