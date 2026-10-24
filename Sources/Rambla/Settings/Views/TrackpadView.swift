@@ -2,8 +2,8 @@ import AppKit
 import RamblaCore
 import SwiftUI
 
-/// "Trackpad y mouse": the horizontal swipe, the macOS settings that would fight it, the mouse wheel and the mouse
-/// buttons.
+/// "Trackpad y mouse": the trackpad's swipes (sideways, and up and down as chosen), the macOS settings that would
+/// fight them, the mouse wheel and the mouse buttons.
 struct TrackpadView: View {
     let backend: SettingsBackend?
     @ObservedObject private var store = PreferencesStore.shared
@@ -54,13 +54,30 @@ struct TrackpadView: View {
                 .disabled(!enabled)
             Toggle("Dirección natural", isOn: $store.prefs.trackpad.natural)
                 .disabled(!enabled)
-            Toggle("Hacia arriba, ancho completo; hacia abajo, el ancho de antes", isOn: $store.prefs.trackpad.verticalSwipe)
+            Toggle("Gestos hacia arriba y abajo", isOn: $store.prefs.trackpad.verticalSwipe)
                 .disabled(!enabled)
+            // The mouse buttons go by it too, so it does not wait for the trackpad's swipe to be on.
+            Picker("Deslizar hacia arriba o abajo", selection: $store.prefs.verticalGesture) {
+                Text("Cambia de tira").tag(VerticalGesture.strips)
+                Text("Cambia el ancho").tag(VerticalGesture.width)
+            }
+            .pickerStyle(.segmented)
+            .disabled(!store.prefs.trackpad.verticalSwipe)
             Toggle("Respuesta háptica", isOn: $store.prefs.trackpad.haptics)
         } header: {
             Text("Trackpad")
         } footer: {
-            Text("Un swipe horizontal con esa cantidad de dedos desplaza la tira. Al soltar, se asienta en una columna: un swipe corto y rápido pasa a la siguiente. Con la dirección natural, la tira sigue a los dedos; sin ella, va al revés. Hacia abajo se decide al soltar, y bajando un buen trecho se abre la vista general. Con la respuesta háptica, el trackpad da un toque suave cada vez que la tira va a pasar a otra columna y con los gestos hacia arriba o abajo.")
+            trackpadFooter
+        }
+    }
+
+    /// What the swipes do, up and down as chosen.
+    private var trackpadFooter: Text {
+        switch store.prefs.verticalGesture {
+        case .strips:
+            Text("Un swipe horizontal con esa cantidad de dedos desplaza la tira. Al soltar, se asienta en una columna: un swipe corto y rápido pasa a la siguiente. Con la dirección natural, la tira sigue a los dedos; sin ella, va al revés. Un swipe corto hacia arriba o abajo cambia de tira al soltar: con la dirección natural, hacia abajo aparece la tira de arriba; sin ella, la de abajo. Subiendo un buen trecho, la columna enfocada toma el ancho completo o, si ya lo tenía, vuelve al de antes; bajando un buen trecho se abre la vista general. Con la respuesta háptica, el trackpad da un toque suave cada vez que la tira va a pasar a otra columna, cuando ya podés soltar para cambiar de tira y al subir o bajar un buen trecho.")
+        case .width:
+            Text("Un swipe horizontal con esa cantidad de dedos desplaza la tira. Al soltar, se asienta en una columna: un swipe corto y rápido pasa a la siguiente. Con la dirección natural, la tira sigue a los dedos; sin ella, va al revés. Hacia arriba, la columna enfocada toma el ancho completo; hacia abajo, al soltar, vuelve al ancho que tenía, y bajando un buen trecho se abre la vista general. Con la respuesta háptica, el trackpad da un toque suave cada vez que la tira va a pasar a otra columna y con los gestos hacia arriba o abajo.")
         }
     }
 
@@ -95,6 +112,16 @@ struct TrackpadView: View {
         } header: {
             Text("Botones del mouse")
         } footer: {
+            buttonsFooter
+        }
+    }
+
+    /// What moving with the buttons held does, up and down as chosen in the trackpad's section.
+    private var buttonsFooter: Text {
+        switch store.prefs.verticalGesture {
+        case .strips:
+            Text("Mantené apretados esos botones y mové el mouse: hacia los costados desliza la tira, y un poco hacia arriba o abajo cambia de tira al soltar. Con la dirección natural, hacia abajo aparece la tira de arriba; sin ella, la de abajo. Subiendo bastante, la columna enfocada toma el ancho completo o, si ya lo tenía, vuelve al de antes; bajando bastante se abre la vista general. Con un solo botón, un clic sin mover sigue funcionando como siempre. Con varios, cada uno por separado sigue haciendo lo suyo: así conviven con Mac Mouse Fix y otras apps que usan los mismos botones.")
+        case .width:
             Text("Mantené apretados esos botones y mové el mouse: hacia los costados desliza la tira, hacia arriba la columna enfocada toma el ancho completo y hacia abajo, al soltar, vuelve al ancho que tenía; bajando bastante se abre la vista general. Con un solo botón, un clic sin mover sigue funcionando como siempre. Con varios, cada uno por separado sigue haciendo lo suyo: así conviven con Mac Mouse Fix y otras apps que usan los mismos botones.")
         }
     }

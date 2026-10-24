@@ -8,7 +8,8 @@ enum Haptics {
         NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
     }
 
-    /// A swipe up or down did what it does: a width, the overview.
+    /// A swipe up or down did what it does (a width, the overview), or went far enough that lifting the fingers changes
+    /// strip.
     static func gesture() {
         NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
     }

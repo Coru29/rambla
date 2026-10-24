@@ -17,6 +17,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         onEnd: { [weak self] velocity in self?.engine.gestureEnded(velocity: velocity) },
         onVertical: { [weak self] up in self?.engine.verticalSwipe(up: up, onTrackpad: true) },
         onOverview: { [weak self] in self?.engine.showOverviewUnderPointer(onTrackpad: true) },
+        onStrip: { [weak self] fingersUp in self?.engine.stripSwipe(fingersUp: fingersUp, onTrackpad: true) },
+        onArmed: { [weak self] fingersUp in self?.engine.stripSwipeArmed(fingersUp: fingersUp) },
+        onToggleWidth: { [weak self] in self?.engine.toggleWidthBySwipe(onTrackpad: true) },
         // The scroll tap keeps the swipe's scrolling from the app under the pointer.
         onTouches: { [weak self] touching, time in self?.wheel.touched(touching, at: time) })
     private lazy var wheel = ScrollWheelTracker(handlers: .init(
@@ -30,7 +33,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         slide: { [weak self] dx in self?.engine.mouseDragged(dx) },
         slideEnded: { [weak self] velocity in self?.engine.mouseDragEnded(velocity: velocity) },
         vertical: { [weak self] up in self?.engine.verticalSwipe(up: up, onTrackpad: false) },
-        overview: { [weak self] in self?.engine.showOverviewUnderPointer(onTrackpad: false) }))
+        overview: { [weak self] in self?.engine.showOverviewUnderPointer(onTrackpad: false) },
+        strip: { [weak self] pointerUp in self?.engine.stripSwipe(fingersUp: pointerUp, onTrackpad: false) },
+        toggleWidth: { [weak self] in self?.engine.toggleWidthBySwipe(onTrackpad: false) }))
     private lazy var mouseFocus = MouseFocus { [weak self] point in self?.engine.hover(at: point) }
     private var overlays: OverlayCoordinator?
     private lazy var settingsBackend = AppSettingsBackend(mouseButtons: mouseButtons)
@@ -157,7 +162,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if prefs.enabled == engine.isPaused { engine.setPaused(!prefs.enabled) }
         if old?.allShortcuts != prefs.allShortcuts { applyHotkeys() }
         if old?.trackpad != prefs.trackpad || old?.mouse != prefs.mouse || old?.mouseButtons != prefs.mouseButtons
-            || old?.focusFollowsMouse != prefs.focusFollowsMouse {
+            || old?.verticalGesture != prefs.verticalGesture || old?.focusFollowsMouse != prefs.focusFollowsMouse {
             applyInputs()
         }
         refreshMenu()
@@ -169,12 +174,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let active = !engine.isPaused && prefs.enabled
         let trackpad = active && prefs.trackpad.enabled
         let fingers = prefs.trackpad.fingers
-        gestures.configure(enabled: trackpad, fingers: fingers, vertical: prefs.trackpad.verticalSwipe)
+        gestures.configure(enabled: trackpad, fingers: fingers, vertical: prefs.trackpad.verticalSwipe,
+                           mode: prefs.verticalGesture)
         // The scroll tap serves the wheel, and keeps the trackpad swipe's scrolling from the apps: only with a finger
         // count a swipe can have, since 2 would keep every two-finger scroll from them.
         wheel.configure(wheel: active && prefs.mouse.enabled, modifiers: prefs.mouse.modifiers,
                         swipeFingers: trackpad && (3...4).contains(fingers) ? fingers : nil)
-        mouseButtons.configure(enabled: active && prefs.mouseButtons.enabled, buttons: prefs.mouseButtons.buttons)
+        mouseButtons.configure(enabled: active && prefs.mouseButtons.enabled, buttons: prefs.mouseButtons.buttons,
+                               vertical: prefs.verticalGesture)
         mouseFocus.setEnabled(active && prefs.focusFollowsMouse)
     }
 

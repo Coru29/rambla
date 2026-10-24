@@ -7,10 +7,12 @@ private let mouseButtonCallback: CGEventTapCallBack = { proxy, type, event, user
     return session.handle(proxy: proxy, type: type, event: event)
 }
 
-/// "Botones del mouse": moving the mouse with the chosen buttons held slides the strip, a move up gives the focused
+/// "Botones del mouse": moving the mouse with the chosen buttons held slides the strip, and up and down do what
+/// `Preferences.verticalGesture` says (`MouseButtonGesture` decides which presses and moves are Rambla's). Changing
+/// strips: a short move changes strip when the buttons are let go, a long one up gives the focused column the full
+/// width (or gives it back) and a long one down opens the overview. Changing the width: a move up gives the focused
 /// column the full width, and a move down gives back its width when the buttons are let go, or opens the overview when
-/// it goes further (`MouseButtonGesture` decides which presses and moves are Rambla's). It also records a new
-/// combination for the settings.
+/// it goes further. It also records a new combination for the settings.
 ///
 /// The taps sit where the mouse's events enter the window server, ahead of the other apps' taps (Mac Mouse Fix has
 /// its own there), so a chord of buttons that another app also uses on their own reaches Rambla first. A press that is
@@ -24,8 +26,13 @@ final class MouseButtonTracker: @unchecked Sendable {
         let slide: @MainActor (Double) -> Void
         /// Release speed in pointer points per second.
         let slideEnded: @MainActor (Double) -> Void
+        /// Width mode: up the full width, down the previous width.
         let vertical: @MainActor (_ up: Bool) -> Void
         let overview: @MainActor () -> Void
+        /// Strips mode: a short move, the buttons released, so the strip changes. `pointerUp`: the pointer went up.
+        let strip: @MainActor (_ pointerUp: Bool) -> Void
+        /// Strips mode: a long move up, the focused column's full width or back to its width.
+        let toggleWidth: @MainActor () -> Void
     }
 
     /// The settings' recorder: told the buttons down so far, then the whole combination once they are all released.
@@ -54,17 +61,21 @@ final class MouseButtonTracker: @unchecked Sendable {
     private var session: Session?
     private var enabled = false
     private var buttons: [Int] = []
+    /// What up and down do (`Preferences.verticalGesture`).
+    private var vertical = VerticalGesture.strips
     private let retry = TapRetry(name: "Mouse button taps")
 
     init(handlers: Handlers) {
         self.handlers = handlers
     }
 
+    /// A session's gesture is built for one set of buttons and one `VerticalGesture`: any change takes a new session.
     @MainActor
-    func configure(enabled: Bool, buttons: [Int]) {
-        let changed = enabled != self.enabled || buttons != self.buttons
+    func configure(enabled: Bool, buttons: [Int], vertical: VerticalGesture) {
+        let changed = enabled != self.enabled || buttons != self.buttons || vertical != self.vertical
         self.enabled = enabled
         self.buttons = buttons
+        self.vertical = vertical
         update(restart: changed)
         if changed, enabled {
             Log.info("Mouse buttons \(buttons.map(String.init).joined(separator: " + ")) drive the strip")
@@ -113,7 +124,7 @@ final class MouseButtonTracker: @unchecked Sendable {
         }
         if wanted, session == nil, !retry.isWaiting {
             // With the gestures off, an empty chord: every press stays the apps' (only a recording is Rambla's).
-            let session = Session(tracker: self, buttons: enabled ? buttons : [])
+            let session = Session(tracker: self, buttons: enabled ? buttons : [], vertical: vertical)
             self.session = session
             session.start()
         }
@@ -148,7 +159,8 @@ final class MouseButtonTracker: @unchecked Sendable {
                     case .slideEnded(let velocity): handlers.slideEnded(velocity)
                     case .vertical(let up): handlers.vertical(up)
                     case .overview: handlers.overview()
-                    case .strip, .toggleWidth: break   // strips mode: a later task wires them
+                    case .strip(let up): handlers.strip(up)
+                    case .toggleWidth: handlers.toggleWidth()
                     }
                 }
             }
@@ -217,9 +229,9 @@ final class MouseButtonTracker: @unchecked Sendable {
         /// Presses a recording kept from the apps: their releases are kept too, even after it ends.
         private var recordingSwallowed: Set<Int> = []
 
-        init(tracker: MouseButtonTracker, buttons: [Int]) {
+        init(tracker: MouseButtonTracker, buttons: [Int], vertical: VerticalGesture) {
             self.tracker = tracker
-            gesture = MouseButtonGesture(buttons: buttons)
+            gesture = MouseButtonGesture(buttons: buttons, vertical: vertical)
         }
 
         var isBusy: Bool { lock.withLock { busy } }
