@@ -129,6 +129,10 @@ La opción vale para el trackpad y para los botones del mouse. El interruptor ac
   - las de la que llega saltan a su lugar, sin cruzar la pantalla.
   - No hay movimiento vertical posible, porque macOS no deja sacar ventanas por arriba ni por abajo.
 - **Orden:** primero se ubican las que llegan, que quedan detrás, y después se van las otras.
+- **Velo** (pedido por el usuario al probarlo, porque el salto se veía brusco): un velo de vidrio esmerilado cruza la pantalla en la dirección del cambio y tapa el salto.
+  - Baja desde arriba al ir a la tira de arriba y sube desde abajo al ir a la de abajo. El cambio corre cuando el velo tapa la pantalla, y el velo se va cuando las apps terminaron de mover sus ventanas.
+  - Solo en los cambios que pide el usuario: el gesto, los atajos y mandar una ventana. El foco desde afuera cambia sin velo, porque mientras tanto el teclado quedaría en una ventana escondida. Elegir una ventana de otra fila en la vista general también cambia sin velo.
+  - Sigue Animaciones y Velocidad de Configuración. Sin animaciones no hay velo, y con Reducir movimiento es un fundido.
 - **Foco:** se enfoca la ventana enfocada de la tira que llega, y su columna queda a la vista.
 - **Indicador de tiras:** si el indicador está activado, aparece un momento un panel con una fila por tira de esa pantalla, la de arriba arriba.
   - cada fila muestra los íconos de sus apps;
@@ -245,7 +249,6 @@ La opción vale para el trackpad y para los botones del mouse. El interruptor ac
 
 - Nombres para las tiras, como "Trabajo" o "Casa", en el indicador y en la vista general.
 - Reglas por app que manden sus ventanas a una tira.
-- Un barrido animado que acompañe el cambio de tira, si el cambio inmediato se ve brusco.
 
 ## Decisiones mías (a confirmar al leer)
 

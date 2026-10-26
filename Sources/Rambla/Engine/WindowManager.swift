@@ -157,6 +157,10 @@ final class WindowManager {
     var levelHook: ((StackKey) -> Void)?
     /// Called when the level that came into view of that stack is empty (its hint).
     var emptyLevelHook: ((StackKey) -> Void)?
+    /// Runs a switch between the strips of a stack that the user asked for (a swipe, a strip shortcut, sending a
+    /// window) behind the overlay's veil: `change` runs once the veil covers the stack's display. `up`: toward the strip
+    /// above. Nil: the switch runs at once.
+    var levelTransition: ((_ stack: StackKey, _ up: Bool, _ change: @escaping () -> Void) -> Void)?
     /// Saved layout from the previous run (its floating windows; the strips go to `archive`).
     var restoreState: SavedState?
     /// Strips not in view: those of the previous run not seen yet, and those of unplugged displays. Each is rebuilt
@@ -534,6 +538,17 @@ final class WindowManager {
 
     func worker(for id: WindowID) -> AppWorker? {
         windows[id].flatMap { workers[$0.pid] }
+    }
+
+    /// Calls `done` once every app has made the moves asked of it so far (each app's worker makes them in order), or
+    /// after `timeout` when one takes longer: the veil over a switch between strips waits for the windows to be in
+    /// their places before it shows them.
+    func afterPendingMoves(timeout: TimeInterval, _ done: @escaping () -> Void) {
+        let waiting = PendingMoves(apps: workers.count, done: done)
+        for worker in workers.values {
+            worker.afterPendingWork { MainActor.assumeIsolated { waiting.appDone() } }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + timeout) { MainActor.assumeIsolated { waiting.finish() } }
     }
 
     // MARK: - AX events
@@ -2135,6 +2150,31 @@ final class WindowManager {
         strips[key] = strip
         requested[id] = nil
         reveal(key)
+    }
+}
+
+/// What `afterPendingMoves` waits for: the apps that have not made their moves yet, and what to call, once, when none
+/// is left or the wait is over.
+@MainActor
+private final class PendingMoves {
+    private var apps: Int
+    private var done: (() -> Void)?
+
+    init(apps: Int, done: @escaping () -> Void) {
+        self.apps = apps
+        self.done = done
+        if apps == 0 { finish() }
+    }
+
+    func appDone() {
+        apps -= 1
+        if apps == 0 { finish() }
+    }
+
+    func finish() {
+        let done = self.done
+        self.done = nil
+        done?()
     }
 }
 

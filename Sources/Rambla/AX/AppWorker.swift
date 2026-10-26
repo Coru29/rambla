@@ -197,6 +197,12 @@ final class AppWorker: @unchecked Sendable {
         }
     }
 
+    /// Calls `done` on the main thread once this worker has done everything asked of it before, the frame writes
+    /// included: it takes them in order.
+    func afterPendingWork(_ done: @escaping @Sendable () -> Void) {
+        perform { DispatchQueue.main.async(execute: done) }
+    }
+
     /// Test hook: moves a window the way another app (e.g. Rectangle) would, bypassing Rambla's own
     /// bookkeeping, so the move reaches the engine as an external change.
     func debugExternalMove(_ id: WindowID, _ frame: CGRect) {

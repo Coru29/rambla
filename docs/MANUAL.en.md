@@ -217,7 +217,7 @@ Want to keep work and home apart on the same screen? With stacked strips you can
           └───────────────────────────┘
 ```
 
-You switch between them with a swipe, a shortcut or the overview. The switch is instant, it does not go through Mission Control and it does not use macOS desktops. Inside each strip everything works as usual, and each one keeps its own focus, scroll and pinned columns. The windows of the strips you do not see are parked at the edge of the screen, like the columns that are out of view. If macOS or an app moves one, Rambla parks it again: it never floats because of that.
+You switch between them with a swipe, a shortcut or the overview. The switch is quick, it does not go through Mission Control and it does not use macOS desktops. Inside each strip everything works as usual, and each one keeps its own focus, scroll and pinned columns. The windows of the strips you do not see are parked at the edge of the screen, like the columns that are out of view. If macOS or an app moves one, Rambla parks it again: it never floats because of that.
 
 > Do not mix them up with the stacks of [chapter 7](#7-stacks-and-tabs), which pile windows inside a column. Here whole strips are stacked.
 
@@ -250,6 +250,8 @@ They act on the strip of the focused window or, if no window is focused, on the 
 **From the overview**, as explained below.
 
 When you switch strips, a panel with all the strips of the display shows up for a moment ([chapter 13](#13-visual-aids)).
+
+While it switches, a frosted-glass veil crosses the screen and hides the jump of the windows. It comes down from above when you go to the strip above, and up from below when you go to the strip below. It follows **Animations** and **Speed** in Settings → General: with animations off there is no veil, and with macOS's **Reduce motion** it fades in and out without moving.
 
 ### Sending windows to another strip
 

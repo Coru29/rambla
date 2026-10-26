@@ -217,7 +217,7 @@ Con un solo botón (el del medio, por ejemplo), un clic sin mover sigue funciona
           └───────────────────────────┘
 ```
 
-Cambiás de una a otra con un deslizamiento, con un atajo o desde la vista general. El cambio es inmediato, no pasa por Mission Control y no usa los escritorios de macOS. Dentro de cada tira todo funciona como siempre, y cada una guarda su foco, su scroll y sus columnas fijadas. Las ventanas de las tiras que no ves quedan estacionadas en el borde de la pantalla, como las columnas que están fuera de la vista. Si macOS o una app mueve una, Rambla la vuelve a estacionar: nunca queda flotando por eso.
+Cambiás de una a otra con un deslizamiento, con un atajo o desde la vista general. El cambio es rápido, no pasa por Mission Control y no usa los escritorios de macOS. Dentro de cada tira todo funciona como siempre, y cada una guarda su foco, su scroll y sus columnas fijadas. Las ventanas de las tiras que no ves quedan estacionadas en el borde de la pantalla, como las columnas que están fuera de la vista. Si macOS o una app mueve una, Rambla la vuelve a estacionar: nunca queda flotando por eso.
 
 > No las confundas con las pilas del [capítulo 7](#7-pilas-y-pestañas), que apilan ventanas dentro de una columna. Acá se apilan tiras enteras.
 
@@ -250,6 +250,8 @@ Actúan sobre la tira de la ventana enfocada o, si no hay ninguna enfocada, sobr
 **Desde la vista general**, como se cuenta más abajo.
 
 Al cambiar de tira, aparece un momento un panel con todas las tiras de la pantalla ([capítulo 13](#13-ayudas-visuales)).
+
+Mientras cambia, un velo de vidrio esmerilado cruza la pantalla y tapa el salto de las ventanas. Baja desde arriba cuando vas a la tira de arriba, y sube desde abajo cuando vas a la de abajo. Sigue **Animaciones** y **Velocidad** de Configuración → General: con las animaciones apagadas no hay velo, y con **Reducir movimiento** de macOS aparece y se va sin desplazarse.
 
 ### Mandar ventanas a otra tira
 

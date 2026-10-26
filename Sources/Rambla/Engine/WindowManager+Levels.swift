@@ -90,15 +90,32 @@ extension WindowManager {
         Log.info("Strip level \(level) of display \(stack.displayUUID.prefix(8))")
     }
 
-    /// Goes to the level above or below the one in view of `stack`; above the top, to a new empty level when the top
-    /// has windows (`StripLevels.target`). False at either end of the stack.
+    /// Goes to the level above or below the one in view of `stack`, behind the veil (`levelTransition`); above the top,
+    /// to a new empty level when the top has windows (`StripLevels.target`). False at either end of the stack.
     @discardableResult
     func stepLevel(up: Bool, on stack: StackKey) -> Bool {
-        guard isRunning, !isPaused, isCurrentStack(stack),
-              let level = StripLevels.target(from: activeLevel(of: stack), up: up, top: topLevel(of: stack),
-                                             occupied: occupiedLevels(of: stack)) else { return false }
-        switchLevel(of: stack, to: level)
+        guard stepTarget(up: up, on: stack) != nil else { return false }
+        behindVeil(of: stack, up: up) { [weak self] in
+            // Found again once the veil covers: the stack may have changed meanwhile.
+            guard let self, let level = stepTarget(up: up, on: stack) else { return }
+            switchLevel(of: stack, to: level)
+        }
         return true
+    }
+
+    /// The level `stepLevel` goes to, or nil when it goes nowhere.
+    private func stepTarget(up: Bool, on stack: StackKey) -> Int? {
+        guard isRunning, !isPaused, isCurrentStack(stack) else { return nil }
+        return StripLevels.target(from: activeLevel(of: stack), up: up, top: topLevel(of: stack),
+                                  occupied: occupiedLevels(of: stack))
+    }
+
+    /// Runs `change`, a switch between the strips of `stack` that the user asked for, behind the overlay's veil, or at
+    /// once when there is none (`levelTransition`). A switch that follows a focus from outside Rambla never waits for
+    /// it: the keyboard would be in a window out of sight meanwhile.
+    private func behindVeil(of stack: StackKey, up: Bool, _ change: @escaping () -> Void) {
+        guard let levelTransition else { return change() }
+        levelTransition(stack, up, change)
     }
 
     /// Nothing in view to give the keyboard to (an empty level came into view, or the last window in view went away
@@ -118,29 +135,58 @@ extension WindowManager {
     // MARK: - Sending windows
 
     /// Sends the focused window, alone, to the level above or below (a new one above the top), next to that level's
-    /// focused column and with its width, and follows it there. The only window of the top level stays where it is
-    /// rather than go up to a new level and leave an empty one below (`StripLevels.sendTarget`). A floating one
-    /// (`floating`) goes along instead: the level of its display changes, and it stays in view with the focus.
+    /// focused column and with its width, and follows it there, behind the veil (`levelTransition`). The only window of
+    /// the top level stays where it is rather than go up to a new level and leave an empty one below
+    /// (`StripLevels.sendTarget`). A floating one (`floating`) goes along instead: the level of its display changes,
+    /// and it stays in view with the focus.
     func sendFocusedWindow(up: Bool) {
-        guard isRunning, !isPaused else { return }
+        guard let plan = sendPlan(up: up) else { return }
+        behindVeil(of: plan.stack, up: up) { [weak self] in
+            // Planned again once the veil covers: the focus may have moved meanwhile.
+            guard let self, let plan = sendPlan(up: up) else { return }
+            send(plan)
+        }
+    }
+
+    /// Where sending the focused window up or down takes it: the level of the stack it goes to, and the strip it
+    /// leaves, nil for a floating window, which goes along.
+    private struct SendPlan {
+        let window: WindowID
+        let stack: StackKey
+        let level: Int
+        let from: StripKey?
+    }
+
+    /// Where sending the focused window up or down takes it now, or nil when it stays.
+    private func sendPlan(up: Bool) -> SendPlan? {
+        guard isRunning, !isPaused else { return nil }
         if let id = focusedWindow, floating.contains(id), key(containing: id) == nil,
            floatShelfKey(holding: id) == nil {
-            takeFloatAlong(id, up: up)
-            return
+            return floatAlongTarget(id, up: up).map { SendPlan(window: id, stack: $0.stack, level: $0.level, from: nil) }
         }
         guard let key = activeStripKey(), let id = strips[key]?.focusedWindow,
               let level = StripLevels.sendTarget(from: key.level, up: up, top: topLevel(of: key.stack),
                                                  occupied: occupiedLevels(of: key.stack),
-                                                 alone: strips[key]?.allWindows == [id]) else { return }
-        let target = key.stack.level(level)
+                                                 alone: strips[key]?.allWindows == [id]) else { return nil }
+        return SendPlan(window: id, stack: key.stack, level: level, from: key)
+    }
+
+    private func send(_ plan: SendPlan) {
+        let id = plan.window
+        guard let key = plan.from else {
+            Log.info("Floating window \(id) goes along to strip level \(plan.level)")
+            switchLevel(of: plan.stack, to: plan.level, carrying: id)
+            return
+        }
+        let target = key.stack.level(plan.level)
         let width = strips[key]!.location(of: id).map { strips[key]!.columns[$0.column].width } ?? .fraction(0.5)
         strips[key]!.remove(window: id)
         var other = strips[target] ?? Strip()
         other.insert(window: id, width: width, at: .afterFocused)
         strips[target] = other
         carryHidden([id], from: key, to: target)
-        Log.info("Window \(id) sent to strip level \(level)")
-        switchLevel(of: key.stack, to: level, focusing: id)
+        Log.info("Window \(id) sent to strip level \(plan.level)")
+        switchLevel(of: key.stack, to: plan.level, focusing: id)
     }
 
     /// Moves a whole column (its windows, width and mode; not its pin) to `level` of the same stack, at `index`, or
@@ -187,17 +233,17 @@ extension WindowManager {
 
     /// The focused window floats in view, one the user floated or one Rambla floated after another app moved it: the
     /// level of its display steps up or down (a new one above the top, as for any window sent) and the window goes
-    /// along, in view with the focus, instead of being parked with the level that leaves.
-    private func takeFloatAlong(_ id: WindowID, up: Bool) {
-        guard let record = windows[id] else { return }
+    /// along, in view with the focus, instead of being parked with the level that leaves. That stack and level, or nil
+    /// when there is none that way.
+    private func floatAlongTarget(_ id: WindowID, up: Bool) -> (stack: StackKey, level: Int)? {
+        guard let record = windows[id] else { return nil }
         let frame = Self.windowFrames(onScreenOnly: true)[id].flatMap { $0 == .zero ? nil : $0 } ?? record.frame
         guard let best = Displays.best(for: frame, in: displays),
               let display = enabledDisplays.first(where: { $0.uuid == best.uuid }),
               let current = currentKey(of: display),
               let level = StripLevels.target(from: current.level, up: up, top: topLevel(of: current.stack),
-                                             occupied: occupiedLevels(of: current.stack)) else { return }
-        Log.info("Floating window \(id) goes along to strip level \(level)")
-        switchLevel(of: current.stack, to: level, carrying: id)
+                                             occupied: occupiedLevels(of: current.stack)) else { return nil }
+        return (current.stack, level)
     }
 
     // MARK: - Floating windows
