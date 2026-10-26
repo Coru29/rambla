@@ -303,6 +303,14 @@ $CHECK level-of "$UP1" 0
 $CHECK check-placed
 $CHECK check-shelved 1
 
+# A command right after a strip change acts on the strip that comes, even while the veil still covers the display: the
+# switch that waits for the veil runs first. So Rambla's state, read at once without waiting, already has it.
+$CLI strip-up; $CHECK check-levels 2 1 0
+$CLI strip-down; $CHECK check-levels 2 0 0
+$CHECK settle
+$CHECK check-placed
+$CHECK check-shelved 1
+
 # A display beside the one with the strips: nothing out of sight shows on it, whichever strip is in view.
 NEIGHBOR=$($CHECK neighbor-right)
 $CLI debug-neighbor $NEIGHBOR; sleep 1; $CHECK settle
