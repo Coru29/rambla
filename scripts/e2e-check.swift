@@ -79,6 +79,21 @@ func samples(_ id: UInt32, running command: [String]) -> [CGRect] {
     return result
 }
 
+/// Rambla's own log file (`Log`), and what it wrote since it was `offset` bytes long: from the start of a file that
+/// rolled over meanwhile.
+let ramblaLogURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/Rambla/rambla.log")
+
+func ramblaLogSize() -> UInt64 {
+    ((try? FileManager.default.attributesOfItem(atPath: ramblaLogURL.path))?[.size] as? NSNumber)?.uint64Value ?? 0
+}
+
+func ramblaLog(since offset: UInt64) -> String {
+    guard let handle = try? FileHandle(forReadingFrom: ramblaLogURL) else { return "" }
+    defer { try? handle.close() }
+    try? handle.seek(toOffset: ramblaLogSize() >= offset ? offset : 0)
+    return String(decoding: handle.readDataToEndOfFile(), as: UTF8.self)
+}
+
 func activeDisplays() -> Int {
     var count: UInt32 = 0
     CGGetActiveDisplayList(0, nil, &count)
@@ -437,11 +452,26 @@ case "watch-reparked":
             && abs(r.height - spot.height) <= 2
     }
     func describe(_ r: CGRect) -> String { "\(Int(r.minX)),\(Int(r.minY)) \(Int(r.width))x\(Int(r.height))" }
+    let logStart = ramblaLogSize()
     let frames = samples(id, running: Array(args.dropFirst(2)))
     if frames.count < 50 { fail("only \(frames.count) samples of window \(id)") }
     guard let away = frames.first(where: { !atSpot($0) }) else {
-        fail("window \(id) was never seen away from its parking spot at \(describe(spot)) (\(frames.count) samples): "
-             + "the move did not happen, so nothing shows it was parked again")
+        // Rambla can park it again within one sample (8 ms apart): then its own log is what says it saw the move.
+        let seen = ramblaLog(since: logStart).split(separator: "\n").last {
+            $0.contains("Window \(id) of strip level ") && $0.contains(" moved by another app ")
+                && $0.hasSuffix(": back to its place")
+        }
+        guard let seen else {
+            fail("window \(id) was never seen away from its parking spot at \(describe(spot)) (\(frames.count) samples), "
+                 + "and Rambla's log does not say it moved: the move did not happen, so nothing shows it was parked again")
+        }
+        guard let last = frames.last, atSpot(last) else {
+            fail("Rambla saw window \(id) moved but it is not back at its parking spot \(describe(spot)): "
+                 + "it is at \(frames.last.map(describe) ?? "?")")
+        }
+        pass("window \(id) was moved and parked again at \(describe(spot)) too fast for the samples; Rambla's log: "
+             + seen.drop { $0 != "[" })
+        exit(0)
     }
     guard let last = frames.last, atSpot(last) else {
         fail("window \(id) was moved to \(describe(away)) and is not back at its parking spot \(describe(spot)): "
