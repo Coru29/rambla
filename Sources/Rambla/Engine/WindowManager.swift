@@ -162,9 +162,13 @@ final class WindowManager {
     /// the veil covers it. False when no veil comes (the animations are off, or the display is not there), and nil
     /// without an overlay: the switch runs at once.
     var levelTransition: ((_ stack: StackKey, _ up: Bool) -> Bool)?
+    /// Takes every veil off its display at once, calling nothing back: the switches waiting for them were dropped
+    /// (`cancelPendingSwitches`).
+    var levelTransitionReset: (() -> Void)?
     /// The switches between strips the user asked for that wait for the veil to cover their display (`behindVeil`),
-    /// oldest first: `runPendingSwitches` runs them.
-    var pendingSwitches: [() -> Void] = []
+    /// oldest first: `runPendingSwitches` runs them. Each runs, or is dropped when it is no longer what was asked for,
+    /// and says whether it ran.
+    var pendingSwitches: [() -> Bool] = []
     /// Saved layout from the previous run (its floating windows; the strips go to `archive`).
     var restoreState: SavedState?
     /// Strips not in view: those of the previous run not seen yet, and those of unplugged displays. Each is rebuilt
@@ -274,6 +278,7 @@ final class WindowManager {
     /// Stops managing windows and puts every parked window back on screen (quit, crash signals).
     func stop() {
         guard isRunning else { return }
+        cancelPendingSwitches(because: "Rambla stops")
         animator.cancelAll()
         gatherAll(synchronously: true)
         isRunning = false
@@ -329,10 +334,13 @@ final class WindowManager {
             appLaunchTimes[app.processIdentifier] = CFAbsoluteTimeGetCurrent()
             register(app)
         }
+        // An app activated, hidden, shown or quit moves the focus or the windows: like anything else asked of Rambla,
+        // it comes after the switches between strips waiting for the veil (`runPendingSwitches`).
         observe(ws, NSWorkspace.didTerminateApplicationNotification) { [weak self] note in
             guard let self, let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else {
                 return
             }
+            runPendingSwitches()
             // Quitting the app that has the focus moves it by itself, often to a window of the next app. Asked before
             // its windows go.
             if hadTheFocus(app.processIdentifier) { lastLossAt = CFAbsoluteTimeGetCurrent() }
@@ -340,6 +348,12 @@ final class WindowManager {
         }
         observe(ws, NSWorkspace.didActivateApplicationNotification) { [weak self] note in
             guard let self, let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
+            // The app of the focused window, or Rambla itself, coming to the front only confirms the focus Rambla gave
+            // (often a switch's own): nothing changes for the switches still waiting.
+            if app.processIdentifier != getpid(),
+               focusedWindow.flatMap({ self.windows[$0]?.pid }) != app.processIdentifier {
+                runPendingSwitches()
+            }
             frontmostPID = app.processIdentifier
             lastActivation = (app.processIdentifier, CFAbsoluteTimeGetCurrent())
             // Some apps only become "regular" (Dock icon) after launching.
@@ -352,6 +366,7 @@ final class WindowManager {
         }
         observe(ws, NSWorkspace.didHideApplicationNotification) { [weak self] note in
             guard let self else { return }
+            runPendingSwitches()
             // Hiding the app that has the focus moves it by itself, to a window of the next app; hiding the others
             // (⌥⌘H) does not.
             if let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
@@ -362,6 +377,7 @@ final class WindowManager {
         }
         observe(ws, NSWorkspace.didUnhideApplicationNotification) { [weak self] note in
             guard let self else { return }
+            runPendingSwitches()
             if let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication {
                 markReappearing(windows.values.filter { $0.pid == app.processIdentifier }.map(\.id))
             }
@@ -369,6 +385,8 @@ final class WindowManager {
         }
         observe(ws, NSWorkspace.activeSpaceDidChangeNotification) { [weak self] _ in
             guard let self else { return }
+            // The user moved on: a switch between strips still waiting for the veil would act on the desktop just left.
+            cancelPendingSwitches(because: "the desktop changed")
             // The focused window belongs to the Space we left: drop it so the border and dimming hide
             // until the new Space reports its own focus.
             focusedWindow = nil
@@ -449,9 +467,11 @@ final class WindowManager {
     }
 
     /// macOS moves windows while it changes the displays, sometimes before the screen-parameters notification: those
-    /// moves are not another app's, so they must not float the windows.
+    /// moves are not another app's, so they must not float the windows. A switch between strips still waiting for the
+    /// veil would act on displays that are not the ones it was asked for on: it goes.
     fileprivate func displaysReconfiguring() {
         guard isRunning else { return }
+        cancelPendingSwitches(because: "the displays changed")
         grace(2.5)
         scheduleReconcile(after: 0.4)
     }
@@ -557,10 +577,14 @@ final class WindowManager {
 
     // MARK: - AX events
 
+    /// The events that change the windows or the focus come after the switches between strips waiting for the veil
+    /// (`runPendingSwitches`), as anything asked of Rambla does. Frame and title changes do not: they come all the
+    /// time, and would make the windows of a switch jump in sight.
     private func handle(_ event: AXEvent) {
         guard isRunning else { return }
         switch event {
         case .appWindows(let pid, let snapshots):
+            runPendingSwitches()
             awaitingWindowLists.remove(pid)
             listedOnce.insert(pid)
             // An app launched while Rambla runs often shows its first window before its observer exists:
@@ -569,14 +593,17 @@ final class WindowManager {
             snapshots.forEach { upsert($0, fresh: launchedRecently && windows[$0.id] == nil) }
             scheduleReconcile()
         case .windowCreated(let snapshot):
+            runPendingSwitches()
             upsert(snapshot, fresh: windows[snapshot.id] == nil)
             scheduleReconcile()
         case .windowDestroyed(_, let id):
+            runPendingSwitches()
             removeWindow(id)
             scheduleReconcile()
         case .frameChanged(_, let id, let frame, let mouseDown):
             externalFrameChange(id, frame, mouseDown: mouseDown)
         case .minimized(_, let id, let isMinimized):
+            runPendingSwitches()
             // Minimizing the focused window moves the focus by itself; a window back from the Dock that takes the focus
             // was picked by the user (`FocusRoute`).
             if isMinimized, id == focusedWindow, spaceInView(of: id, record: windows[id]) != nil {
@@ -596,7 +623,12 @@ final class WindowManager {
                 overlayHook?()
             }
         case .focusedWindow(let pid, let id):
-            if pid == frontmostPID { focusChanged(id) }
+            // Only the app in front moves the focus. A report of the window that has it changes nothing (often the
+            // echo of Rambla's own focus, a switch's).
+            if pid == frontmostPID {
+                if id != focusedWindow { runPendingSwitches() }
+                focusChanged(id)
+            }
         case .applied(_, let id, let frame):
             learn(id, actual: frame)
         }
@@ -1024,6 +1056,13 @@ final class WindowManager {
     /// Its display shows its Space and is managed: one of its levels is in view.
     func isCurrentStack(_ stack: StackKey) -> Bool {
         enabledDisplays.contains { $0.uuid == stack.displayUUID && $0.currentSpace == stack.spaceID }
+    }
+
+    /// Its display shows its Space and is managed (`isCurrentStack`), and the WindowServer still shows that Space there
+    /// now: `displays` catches up with a desktop change only at the next reconcile, a moment after it.
+    func isCurrentStackNow(_ stack: StackKey) -> Bool {
+        guard isCurrentStack(stack) else { return false }
+        return Displays.currentSpace(of: stack.displayUUID).map { $0 == stack.spaceID } ?? true
     }
 
     /// The display a strip is shown on: nil unless its Space is the display's current one and its level is the one in

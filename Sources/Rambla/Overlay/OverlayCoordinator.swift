@@ -2,14 +2,19 @@ import AppKit
 import RamblaCore
 import UniformTypeIdentifiers
 
-/// Feeds the overlays (strip indicator, tab bars, focus border, dimming, overview) from the engine's state.
+/// Feeds the overlays (strip indicator, tab bars, focus border, dimming, overview) from the engine's state. What the
+/// user does on them (choosing or moving a column, a tab, a window of the overview, closing it) comes after the
+/// switches between strips waiting for the veil, as anything asked of Rambla does (`runPendingSwitches`).
 @MainActor
 final class OverlayCoordinator {
     private let engine: WindowManager
     private lazy var indicator = IndicatorController(
         onSelect: { [weak self] id in self?.selectColumn(id) },
         onMove: { [weak self] from, to in self?.moveColumn(from: from, to: to) })
-    private lazy var tabBars = TabBarController { [weak self] id in self?.engine.focusTab(id) }
+    private lazy var tabBars = TabBarController { [weak self] id in
+        self?.engine.runPendingSwitches()
+        self?.engine.focusTab(id)
+    }
     private lazy var overview = OverviewController(
         onChoose: { [weak self] id, key in self?.focusFromOverview(id, in: key) },
         onMove: { [weak self] column, target, key, window in
@@ -18,7 +23,10 @@ final class OverlayCoordinator {
         onSend: { [weak self] column, key, level, index, window in
             self?.sendFromOverview(column, from: key, toLevel: level, at: index, selecting: window)
         },
-        onDismiss: { [weak self] in self?.engine.keepKeyboardInView() })
+        onDismiss: { [weak self] in
+            self?.engine.runPendingSwitches()
+            self?.engine.keepKeyboardInView()
+        })
     private let border = FocusBorderController()
     private let hint = HintController()
     private let dimmer = DimmerController()
@@ -43,6 +51,7 @@ final class OverlayCoordinator {
         engine.levelHook = { [weak self] stack in self?.levelChanged(on: stack) }
         engine.emptyLevelHook = { [weak self] stack in self?.showEmptyStripHint(of: stack) }
         engine.levelTransition = { [weak self] stack, up in self?.coverSwitch(of: stack, up: up) ?? false }
+        engine.levelTransitionReset = { [weak self] in self?.veil.reset() }
         engine.overviewHook = { [weak self] key in self?.toggleOverview(key) }
         engine.overviewAction = { [weak self] action in self?.overview.perform(action) ?? false }
         engine.overviewSwipe = { [weak self] stack, up, move in self?.overview.swipe(on: stack, up: up, move: move) ?? nil }
@@ -113,6 +122,7 @@ final class OverlayCoordinator {
     }
 
     private func selectColumn(_ id: UUID) {
+        engine.runPendingSwitches()
         guard let key = indicatorKey else { return }
         engine.focusColumn(id: id, in: key)
         showIndicator(key, holding: nil)
@@ -120,6 +130,7 @@ final class OverlayCoordinator {
 
     /// Indicator positions are in visual order; map them back to strip columns (pinned ones stay put).
     private func moveColumn(from: Int, to: Int) {
+        engine.runPendingSwitches()
         guard let key = indicatorKey, let (_, order) = tiles(for: key), let strip = engine.strips[key],
               order.indices.contains(from), order.indices.contains(to) else { return }
         let source = order[from], target = order[to]
@@ -261,6 +272,7 @@ final class OverlayCoordinator {
     /// Columns are found by id, since the strip may have changed since the overview was made.
     private func moveFromOverview(_ column: UUID, toPlaceOf target: UUID, in key: StripKey,
                                   selecting window: WindowID?) -> OverviewContent? {
+        engine.runPendingSwitches()
         guard let display = engine.display(forStack: key.stack), let strip = engine.strips[key],
               let from = strip.index(ofColumn: column), let to = strip.index(ofColumn: target) else { return nil }
         engine.moveColumn(in: key, from: from, to: to)
@@ -272,6 +284,7 @@ final class OverlayCoordinator {
     /// that goes out of view with its column hands it over only once the overview closes (`onDismiss`).
     private func sendFromOverview(_ column: UUID, from key: StripKey, toLevel level: Int, at index: Int?,
                                   selecting window: WindowID?) -> OverviewContent? {
+        engine.runPendingSwitches()
         guard let display = engine.display(forStack: key.stack), engine.strips[key]?.index(ofColumn: column) != nil else {
             return nil
         }
@@ -284,6 +297,7 @@ final class OverlayCoordinator {
     /// another strip brings that strip into view, with it focused. When it is gone, the overview has closed all the
     /// same, so the keyboard comes back from it as when the user closes it (`keepKeyboardInView`).
     private func focusFromOverview(_ id: WindowID, in key: StripKey) {
+        engine.runPendingSwitches()
         guard engine.windows[id] != nil, engine.strips[key]?.contains(id) == true else {
             NSSound.beep()
             engine.keepKeyboardInView()

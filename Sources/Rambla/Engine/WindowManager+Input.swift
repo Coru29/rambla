@@ -1,7 +1,9 @@
 import AppKit
 import RamblaCore
 
-/// Trackpad swipes, the mouse wheel, mouse button drags and focus-follows-mouse.
+/// Trackpad swipes, the mouse wheel, mouse button drags and focus-follows-mouse. Like anything asked of Rambla, each
+/// comes after the switches between strips waiting for the veil (`runPendingSwitches`), and sees the strips as they
+/// leave them; only the short vertical swipe, a switch itself, queues behind them (`stripSwipe`).
 extension WindowManager {
     /// Scroll-area widths the strip travels when the fingers cross the whole trackpad, at sensitivity 1×:
     /// a comfortable four-finger swipe (about a quarter of the trackpad) moves a bit more than half a screen.
@@ -13,6 +15,7 @@ extension WindowManager {
     /// A slide starts on the strip under the pointer (the trackpad and the mouse wheel both act where you look).
     /// `onTrackpad`: the fingers are on the trackpad, so it can tap each column the strip passes.
     func gestureBegan(onTrackpad: Bool) {
+        runPendingSwitches()
         guard isRunning, !isPaused else { return }
         gestureKey = stripKeyUnderPointer()
         slideDetent = onTrackpad && prefs.trackpad.haptics ? SlideDetent() : nil
@@ -43,6 +46,7 @@ extension WindowManager {
 
     /// Moves the strip being slid by `points` toward later columns.
     func slide(by points: Double) {
+        runPendingSwitches()
         guard let key = gestureKey, var strip = strips[key] else { return }
         strip.scroll += points
         strips[key] = strip
@@ -57,6 +61,7 @@ extension WindowManager {
     /// Settles on a column edge (carrying the release `velocity`, in points per second, so a flick reaches the next
     /// column) and focuses the column it lands on, without another scroll.
     func slideEnded(velocity: Double) {
+        runPendingSwitches()
         guard let key = gestureKey else { return }
         gestureKey = nil
         slideDetent = nil
@@ -82,6 +87,7 @@ extension WindowManager {
     /// focused column takes the full width of the screen (without macOS's full screen); swipe down: back to the width it
     /// had. On the trackpad it taps once.
     func verticalSwipe(up: Bool, onTrackpad: Bool) {
+        runPendingSwitches()
         guard isRunning, !isPaused, gestureKey == nil, let key = activeStripKey(), var strip = strips[key] else { return }
         Log.info("Swipe \(up ? "up: full width" : "down: previous width")")
         strip.setFullWidth(up)
@@ -95,6 +101,7 @@ extension WindowManager {
     /// A short vertical swipe: the fingers (or the pointer) went up when `fingersUp`. With the device's natural direction
     /// the content follows them, so going down shows the strip above. Acts on the stack under the pointer; while the
     /// overview shows that stack, on its rows instead: the selection goes to the row above or below (`overviewSwipe`).
+    /// A switch between strips itself, it queues behind those waiting for the veil (`stepLevel`).
     func stripSwipe(fingersUp: Bool, onTrackpad: Bool) {
         guard isRunning, !isPaused, gestureKey == nil, let stack = stackUnderPointer() else { return }
         let natural = onTrackpad ? prefs.trackpad.natural : prefs.mouseButtons.natural
@@ -125,6 +132,7 @@ extension WindowManager {
     /// A long swipe up: the focused column's full width, or back to its width (like ⌃⌘M). On a strip without a focused
     /// column (a new empty one in view) nothing happens, not even the tap.
     func toggleWidthBySwipe(onTrackpad: Bool) {
+        runPendingSwitches()
         guard isRunning, !isPaused, gestureKey == nil, let key = activeStripKey(), var strip = strips[key],
               strip.focusedColumn != nil else { return }
         strip.toggleFullWidth()
@@ -140,6 +148,7 @@ extension WindowManager {
     /// One notch of the mouse wheel with the chosen keys held: focus the next column (`direction` > 0) or the
     /// previous one of the strip under the pointer, like the keyboard shortcuts do.
     func wheelStep(_ direction: Int) {
+        runPendingSwitches()
         guard isRunning, !isPaused, gestureKey == nil, let key = stripKeyUnderPointer(), var strip = strips[key] else { return }
         Log.info("Wheel step \(direction > 0 ? "right" : "left")")
         let before = strip.focusedWindow
@@ -157,6 +166,7 @@ extension WindowManager {
     /// A long move down, on the trackpad or with the mouse buttons held: the overview of the strip under the pointer.
     /// On the trackpad it taps once.
     func showOverviewUnderPointer(onTrackpad: Bool) {
+        runPendingSwitches()
         guard isRunning, !isPaused, gestureKey == nil, let key = stripKeyUnderPointer() else { return }
         overviewHook?(key)
         if onTrackpad, prefs.trackpad.haptics { Haptics.gesture() }
@@ -164,6 +174,7 @@ extension WindowManager {
 
     func hover(at point: CGPoint) {
         guard isRunning, !isPaused, prefs.focusFollowsMouse, gestureKey == nil else { return }
+        runPendingSwitches()
         for key in currentKeys {
             guard let result = results[key], let display = display(for: key) else { continue }
             for (id, placement) in result.placements {
@@ -203,6 +214,7 @@ extension WindowManager {
     /// Gives keyboard focus without scrolling the strip when macOS reports the change back. A window that already has
     /// the focus gets no report, so nothing is suppressed for it (a leftover would keep a later ⌘Tab from revealing it).
     func focusWithoutScrolling(_ id: WindowID) {
+        runPendingSwitches()
         revealSuppressedFor = id == focusedWindow ? nil : id
         focusedWindow = id
         worker(for: id)?.focus(id)

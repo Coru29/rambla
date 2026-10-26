@@ -299,3 +299,7 @@ private func held(up: Bool = true) -> (veil: Veil, hold: Int) {
     var idle = Veil()
     #expect(idle.tick(now: 0) == [.stopTicking])
 }
+
+@Test func onlyTheSwitchesBetweenStripsWaitForTheVeil() {
+    #expect(Action.allCases.filter(\.switchesStrips) == [.stripUp, .stripDown, .sendStripUp, .sendStripDown])
+}

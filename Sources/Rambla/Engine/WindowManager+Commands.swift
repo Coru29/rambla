@@ -3,7 +3,9 @@ import RamblaCore
 
 extension WindowManager {
     /// Text commands from `rambla://` links and from the `rambla` command. What each source may run is decided by
-    /// `CommandPolicy`. Returns false if the command is unknown or not allowed.
+    /// `CommandPolicy`. Returns false if the command is unknown or not allowed. They run in the order they come: one
+    /// that is not a switch between strips runs those waiting for the veil first (`Action.switchesStrips`), so a script
+    /// that switches strips and then acts on the strip in view, or dumps it, finds the strip it switched to.
     @discardableResult
     func perform(command: String, from source: CommandPolicy.Source) -> Bool {
         let parts = command.split(separator: " ", maxSplits: 1).map(String.init)
@@ -12,6 +14,7 @@ extension WindowManager {
             Log.error("Refused command from \(source == .url ? "a link" : "the command line"): \(word)")
             return false
         }
+        if Action.parse(word)?.switchesStrips != true { runPendingSwitches() }
         let argument = parts.count > 1 ? parts[1] : nil
         switch word {
         case "dump":
@@ -49,8 +52,13 @@ extension WindowManager {
         return true
     }
 
+    /// A shortcut's action, or a command's. The switches between strips queue behind those already waiting for the
+    /// veil, so that quick repeats share one veil; every other action runs those first, and sees the strips as they
+    /// leave them (`Action.switchesStrips`).
     func perform(_ action: Action, holding modifiers: NSEvent.ModifierFlags? = nil) {
-        guard isRunning, overviewAction?(action) != true else { return }
+        guard isRunning else { return }
+        if !action.switchesStrips { runPendingSwitches() }
+        guard overviewAction?(action) != true else { return }
         if action == .togglePause {
             setPaused(!isPaused)
             return

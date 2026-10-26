@@ -121,6 +121,16 @@ public enum Action: String, CaseIterable, Codable, Sendable, CodingKeyRepresenta
         }
     }
 
+    /// The switches between stacked strips the user asks for (going to the strip above or below, sending the focused
+    /// window there): they wait for the veil to cover the display, behind the ones already waiting, so that quick
+    /// repeats share one veil. Every other action runs those first, and sees the strips as they leave them.
+    public var switchesStrips: Bool {
+        switch self {
+        case .stripUp, .stripDown, .sendStripUp, .sendStripDown: return true
+        default: return false
+        }
+    }
+
     /// Reads an action id from a URL host or a CLI word. Case and surrounding whitespace do not matter.
     public static func parse(_ text: String) -> Action? {
         Action(rawValue: text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())

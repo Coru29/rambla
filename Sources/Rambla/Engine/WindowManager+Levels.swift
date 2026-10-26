@@ -90,42 +90,96 @@ extension WindowManager {
         Log.info("Strip level \(level) of display \(stack.displayUUID.prefix(8))")
     }
 
-    /// Goes to the level above or below the one in view of `stack`, behind the veil (`levelTransition`); above the top,
-    /// to a new empty level when the top has windows (`StripLevels.target`). False at either end of the stack.
-    @discardableResult
-    func stepLevel(up: Bool, on stack: StackKey) -> Bool {
-        guard stepTarget(up: up, on: stack) != nil else { return false }
-        behindVeil(of: stack, up: up) { [weak self] in
-            // Found again once the veil covers: the stack may have changed meanwhile.
-            guard let self, let level = stepTarget(up: up, on: stack) else { return }
-            switchLevel(of: stack, to: level)
+    /// Goes to the level above or below the one in view of `stack`, behind the veil (`behindVeil`); above the top, to a
+    /// new empty level when the top has windows (`StripLevels.target`). Nothing happens at either end of the stack.
+    ///
+    /// The level it leaves and the one it goes to are planned when it is asked for, and once the veil covers the
+    /// display it runs only if they still hold: it is dropped when another level came into view meanwhile, or the
+    /// strips changed so that it would go elsewhere. Asked for while other switches wait, it goes on from where they
+    /// leave the strips, planned once they have run: quick repeats go one level further each, behind the same veil.
+    func stepLevel(up: Bool, on stack: StackKey) {
+        let what = "Switch to the strip \(up ? "above" : "below")"
+        guard pendingSwitches.isEmpty else {
+            return behindVeil(of: stack, up: up) { [weak self] in
+                guard let self else { return false }
+                if let why = switchBlocked(on: stack) { return dropSwitch(what, because: why) }
+                if let level = stepTarget(from: activeLevel(of: stack), up: up, on: stack) {
+                    switchLevel(of: stack, to: level)
+                }
+                return true
+            }
         }
-        return true
+        guard switchBlocked(on: stack) == nil else { return }
+        let from = activeLevel(of: stack)
+        guard let to = stepTarget(from: from, up: up, on: stack) else { return }
+        behindVeil(of: stack, up: up) { [weak self] in
+            guard let self else { return false }
+            if let why = switchBlocked(on: stack) { return dropSwitch(what, because: why) }
+            let level = activeLevel(of: stack)
+            guard level == from else {
+                return dropSwitch(what, because: "strip level \(level) came into view meanwhile")
+            }
+            guard stepTarget(from: from, up: up, on: stack) == to else {
+                return dropSwitch(what, because: "the strips changed meanwhile")
+            }
+            switchLevel(of: stack, to: to)
+            return true
+        }
     }
 
-    /// The level `stepLevel` goes to, or nil when it goes nowhere.
-    private func stepTarget(up: Bool, on stack: StackKey) -> Int? {
-        guard isRunning, !isPaused, isCurrentStack(stack) else { return nil }
-        return StripLevels.target(from: activeLevel(of: stack), up: up, top: topLevel(of: stack),
-                                  occupied: occupiedLevels(of: stack))
+    /// Where a step from `level` of `stack` goes (`StripLevels.target`), or nil when it goes nowhere.
+    private func stepTarget(from level: Int, up: Bool, on stack: StackKey) -> Int? {
+        StripLevels.target(from: level, up: up, top: topLevel(of: stack), occupied: occupiedLevels(of: stack))
     }
 
     /// Runs `change`, a switch between the strips of `stack` that the user asked for, behind the overlay's veil: it
     /// waits with the others (`pendingSwitches`) until the veil covers the display (`levelTransition`), or runs at
     /// once, after them, when no veil comes. A switch that follows a focus from outside Rambla never waits for it: the
     /// keyboard would be in a window out of sight meanwhile.
-    private func behindVeil(of stack: StackKey, up: Bool, _ change: @escaping () -> Void) {
+    private func behindVeil(of stack: StackKey, up: Bool, _ change: @escaping () -> Bool) {
         pendingSwitches.append(change)
         if levelTransition?(stack, up) != true { runPendingSwitches() }
     }
 
     /// Runs the switches waiting for the veil (`pendingSwitches`), each once and in the order they were asked for: the
-    /// veil covers the display. Nothing happens when none waits.
+    /// veil covers the display, or Rambla is asked for something else, which must see the strips as these switches
+    /// leave them. Once one is dropped, so are those asked for after it, which were to go on from where it would have
+    /// left the strips. Nothing happens when none waits.
     func runPendingSwitches() {
         guard !pendingSwitches.isEmpty else { return }
         let waiting = pendingSwitches
         pendingSwitches.removeAll()
-        waiting.forEach { $0() }
+        for (index, run) in waiting.enumerated() {
+            guard run() else {
+                for _ in waiting.dropFirst(index + 1) {
+                    Log.info("Strip switch dropped: it was to go on from one that was dropped")
+                }
+                return
+            }
+        }
+    }
+
+    /// Drops the switches waiting for the veil without running them, and takes the veils off the displays at once
+    /// (`levelTransitionReset`): the desktop or the displays changed, or Rambla stops, and a switch run now would act
+    /// on what the user just left.
+    func cancelPendingSwitches(because reason: String) {
+        for _ in pendingSwitches { Log.info("Strip switch dropped: \(reason)") }
+        pendingSwitches.removeAll()
+        levelTransitionReset?()
+    }
+
+    /// Why no switch between the strips of `stack` can run now, or nil when one can: Rambla stopped or paused, or the
+    /// stack is no longer in view as the WindowServer has it now (`isCurrentStackNow`).
+    private func switchBlocked(on stack: StackKey) -> String? {
+        if !isRunning { return "Rambla stopped" }
+        if isPaused { return "Rambla is paused" }
+        return isCurrentStackNow(stack) ? nil : "its desktop is no longer in view"
+    }
+
+    /// Logs why a switch that waited for the veil does not run, and says it did not (false).
+    private func dropSwitch(_ what: String, because why: String) -> Bool {
+        Log.info("\(what) dropped: \(why)")
+        return false
     }
 
     /// Nothing in view to give the keyboard to (an empty level came into view, or the last window in view went away
@@ -145,22 +199,41 @@ extension WindowManager {
     // MARK: - Sending windows
 
     /// Sends the focused window, alone, to the level above or below (a new one above the top), next to that level's
-    /// focused column and with its width, and follows it there, behind the veil (`levelTransition`). The only window of
-    /// the top level stays where it is rather than go up to a new level and leave an empty one below
+    /// focused column and with its width, and follows it there, behind the veil (`behindVeil`). The only window of the
+    /// top level stays where it is rather than go up to a new level and leave an empty one below
     /// (`StripLevels.sendTarget`). A floating one (`floating`) goes along instead: the level of its display changes,
     /// and it stays in view with the focus.
+    ///
+    /// Where it goes is planned when it is asked for (`SendPlan`), and once the veil covers the display it runs only if
+    /// sending the focused window still means the same: it is dropped when the focus or the strips changed meanwhile.
+    /// Asked for while other switches wait, it sends the window they leave focused, planned once they have run.
     func sendFocusedWindow(up: Bool) {
-        guard let plan = sendPlan(up: up) else { return }
+        let what = "Sending the focused window \(up ? "up" : "down")"
+        guard pendingSwitches.isEmpty else {
+            guard let stack = sendPlan(up: up)?.stack ?? activeStripKey()?.stack else { return }
+            return behindVeil(of: stack, up: up) { [weak self] in
+                guard let self else { return false }
+                guard let plan = sendPlan(up: up) else { return true }
+                if let why = switchBlocked(on: plan.stack) { return dropSwitch(what, because: why) }
+                send(plan)
+                return true
+            }
+        }
+        guard let plan = sendPlan(up: up), switchBlocked(on: plan.stack) == nil else { return }
         behindVeil(of: plan.stack, up: up) { [weak self] in
-            // Planned again once the veil covers: the focus may have moved meanwhile.
-            guard let self, let plan = sendPlan(up: up) else { return }
+            guard let self else { return false }
+            if let why = switchBlocked(on: plan.stack) { return dropSwitch(what, because: why) }
+            guard sendPlan(up: up) == plan else {
+                return dropSwitch(what, because: "the focused window or its strip changed meanwhile")
+            }
             send(plan)
+            return true
         }
     }
 
     /// Where sending the focused window up or down takes it: the level of the stack it goes to, and the strip it
     /// leaves, nil for a floating window, which goes along.
-    private struct SendPlan {
+    private struct SendPlan: Equatable {
         let window: WindowID
         let stack: StackKey
         let level: Int

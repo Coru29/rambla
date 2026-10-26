@@ -274,10 +274,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return item
     }
 
-    @objc private func togglePause() { engine.setPaused(!engine.isPaused) }
-    @objc private func relayout() { engine.relayoutAll() }
-    @objc private func gather() { engine.gatherAll(synchronously: false) }
-    @objc private func toggleFloat() { engine.toggleFloatFocused() }
+    // The menu's actions on the windows come after the switches between strips waiting for the veil, as anything
+    // asked of Rambla does (`runPendingSwitches`).
+    @objc private func togglePause() {
+        engine.runPendingSwitches()
+        engine.setPaused(!engine.isPaused)
+    }
+    @objc private func relayout() {
+        engine.runPendingSwitches()
+        engine.relayoutAll()
+    }
+    @objc private func gather() {
+        engine.runPendingSwitches()
+        engine.gatherAll(synchronously: false)
+    }
+    @objc private func toggleFloat() {
+        engine.runPendingSwitches()
+        engine.toggleFloatFocused()
+    }
     @objc private func showLog() { NSWorkspace.shared.open(Log.fileURL) }
     @objc private func openManual() { NSWorkspace.shared.open(Self.manualURL) }
     @objc private func openWelcome() { WelcomeWindowController.shared.show() }
