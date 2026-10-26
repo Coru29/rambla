@@ -239,6 +239,32 @@ public enum Layout {
         return LayoutResult(placements: placements, columnFrames: columnFrames, tabBars: tabBars, metrics: m, exits: exits)
     }
 
+    /// Target frames for every window of a strip that is not in view, all parked with a sliver on the display so
+    /// nothing of it shows. Windows `compute` leaves visible (pinned ones too) park at the edge on the side of the
+    /// display their center is on, or at the other edge when a neighbor display touches it (`shelvedFrame`); windows
+    /// `compute` already parks stay as they are, and hidden ones stay out. Nothing shows to put a tab bar on or to
+    /// animate across the display, so there are no tab bars and no exits. The column frames and metrics are
+    /// `compute`'s: the strip keeps its place for when it comes back into view.
+    public static func shelved(_ input: LayoutInput) -> LayoutResult {
+        var result = compute(input)
+        result.placements = result.placements.mapValues { placement in
+            guard case .visible(let frame) = placement else { return placement }
+            return .parked(shelvedFrame(for: frame, display: input.display, others: input.otherDisplays,
+                                        sliver: input.config.sliver))
+        }
+        result.tabBars = [:]
+        result.exits = [:]
+        return result
+    }
+
+    /// Where a window on `display` parks while its strip is out of view: at the edge on the side of the display its
+    /// center is on, or at the other edge when a neighbor display overlaps that one (`parkingFrame`), keeping its size
+    /// and y. The floating windows that go with their strip park the same way (`FloatShelf`).
+    public static func shelvedFrame(for frame: CGRect, display: CGRect, others: [CGRect], sliver: Double) -> CGRect {
+        let side: HDirection = frame.midX < display.midX ? .left : .right
+        return parking(for: frame, side: side, display: display, others: others, sliver: sliver).frame
+    }
+
     // MARK: - Transitions
 
     /// How a window gets to its placement when the strip animates.

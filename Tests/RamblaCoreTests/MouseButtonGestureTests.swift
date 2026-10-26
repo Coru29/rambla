@@ -382,3 +382,124 @@ private func isSlideEnd(_ output: Output) -> Bool {
     #expect(gesture.handle(.drag(dx: 50, dy: 0), at: 0.05) == passes)
     #expect(gesture.handle(.up(3), at: 0.1) == passes)
 }
+
+// MARK: - Strips mode
+
+/// A gesture in strips mode with all of the chord's buttons down (one-button chord by default).
+private func stripsGesture(_ buttons: [Int] = [3]) -> MouseButtonGesture {
+    var gesture = MouseButtonGesture(buttons: buttons, vertical: .strips)
+    for (index, button) in buttons.enumerated() { _ = gesture.handle(.down(button), at: Double(index) * 0.01) }
+    return gesture
+}
+
+@Test func stripsModeShortDragUpChangesStripOnRelease() {
+    var gesture = stripsGesture()
+    #expect(gesture.handle(.drag(dx: 0, dy: -60), at: 0.03) == swallowed)         // decided when the button is let go
+    #expect(gesture.handle(.up(3), at: 0.1) == Output(passes: false, commands: [.strip(up: true)]))
+    #expect(!gesture.holdsButtons)
+}
+
+@Test func stripsModeShortDragDownChangesStripOnRelease() {
+    var gesture = stripsGesture()
+    #expect(gesture.handle(.drag(dx: 0, dy: 60), at: 0.03) == swallowed)
+    #expect(gesture.handle(.up(3), at: 0.1) == Output(passes: false, commands: [.strip(up: false)]))
+    #expect(!gesture.holdsButtons)
+}
+
+@Test func stripsModeLongDragUpTogglesWidth() {
+    var gesture = stripsGesture()
+    #expect(gesture.handle(.drag(dx: 0, dy: -60), at: 0.03) == swallowed)         // the strip, if released now
+    #expect(gesture.handle(.drag(dx: 0, dy: -110), at: 0.06) == Output(passes: false, commands: [.toggleWidth]))
+    #expect(gesture.handle(.drag(dx: 0, dy: -80), at: 0.08) == swallowed)         // once per press
+    #expect(gesture.handle(.up(3), at: 0.2) == swallowed)                         // and no strip change on top of it
+}
+
+@Test func stripsModeLongDragDownOpensTheOverview() {
+    var gesture = stripsGesture()
+    #expect(gesture.handle(.drag(dx: 0, dy: 170), at: 0.03) == Output(passes: false, commands: [.overview]))
+    #expect(gesture.handle(.drag(dx: 0, dy: 80), at: 0.05) == swallowed)
+    #expect(gesture.handle(.up(3), at: 0.2) == swallowed)
+}
+
+@Test func stripsModeBackNearTheStartDoesNothing() {
+    var gesture = stripsGesture()
+    #expect(gesture.handle(.drag(dx: 0, dy: 60), at: 0.03) == swallowed)
+    #expect(gesture.handle(.drag(dx: 0, dy: -40), at: 0.06) == swallowed)         // back near where it started
+    #expect(gesture.handle(.up(3), at: 0.2) == swallowed)                         // neither a strip nor a click
+}
+
+@Test func stripsModeBackNearTheStartAfterGoingUpDoesNothing() {
+    var gesture = stripsGesture()
+    #expect(gesture.handle(.drag(dx: 0, dy: -60), at: 0.03) == swallowed)
+    #expect(gesture.handle(.drag(dx: 0, dy: 40), at: 0.06) == swallowed)
+    #expect(gesture.handle(.up(3), at: 0.2) == swallowed)
+}
+
+@Test func stripsModeAFirstStepThatIsAlreadyLongActsAtOnce() {
+    var up = stripsGesture()
+    #expect(up.handle(.drag(dx: 5, dy: -170), at: 0.03) == Output(passes: false, commands: [.toggleWidth]))
+    #expect(up.handle(.up(3), at: 0.1) == swallowed)
+    var down = stripsGesture()
+    #expect(down.handle(.drag(dx: -5, dy: 170), at: 0.03) == Output(passes: false, commands: [.overview]))
+    #expect(down.handle(.up(3), at: 0.1) == swallowed)
+}
+
+@Test func stripsModeReversingPastTheStartIsNotTheLongSwipe() {
+    // Going up and then far down is not the long swipe up, and going down and then far up is not the overview: the
+    // long distance counts in the direction the press took, and a release that is not short in that direction gives
+    // nothing.
+    var up = stripsGesture()
+    #expect(up.handle(.drag(dx: 0, dy: -60), at: 0.03) == swallowed)
+    #expect(up.handle(.drag(dx: 0, dy: 230), at: 0.06) == swallowed)              // 170 below where it started
+    #expect(up.handle(.up(3), at: 0.2) == swallowed)
+    var down = stripsGesture()
+    #expect(down.handle(.drag(dx: 0, dy: 60), at: 0.03) == swallowed)
+    #expect(down.handle(.drag(dx: 0, dy: -230), at: 0.06) == swallowed)           // 170 above where it started
+    #expect(down.handle(.up(3), at: 0.2) == swallowed)
+}
+
+@Test func stripsModeStillSlidesSideways() {
+    var gesture = stripsGesture()
+    #expect(gesture.handle(.drag(dx: 12, dy: 2), at: 0.03) == Output(passes: false, commands: [.slideBegan, .slide(12)]))
+    #expect(gesture.handle(.drag(dx: 0, dy: -90), at: 0.05) == Output(passes: false, commands: [.slide(0)]))
+    #expect(isSlideEnd(gesture.handle(.up(3), at: 0.1)))
+}
+
+@Test func stripsModeALostReleaseChangesNothing() {
+    for dy in [-60.0, 60.0] {
+        var gesture = stripsGesture()
+        _ = gesture.handle(.drag(dx: 0, dy: dy), at: 0.03)
+        #expect(gesture.handle(.released, at: 0.1) == passes)                     // no strip change on a guess
+        #expect(!gesture.holdsButtons)
+    }
+}
+
+@Test func stripsModeReleasingTheChordOneButtonAtATimeChangesStripOnce() {
+    var gesture = stripsGesture([4, 5])
+    #expect(gesture.handle(.drag(dx: 0, dy: -60), at: 0.03) == swallowed)
+    #expect(gesture.handle(.up(5), at: 0.1) == Output(passes: false, commands: [.strip(up: true)]))
+    #expect(gesture.handle(.drag(dx: 0, dy: -90), at: 0.11) == swallowed)         // 4 is still down: still Rambla's
+    #expect(gesture.handle(.up(4), at: 0.12) == swallowed)
+    #expect(!gesture.holdsButtons)
+}
+
+@Test func stripsModeTheNextPressStartsAnotherGesture() {
+    var gesture = stripsGesture()
+    _ = gesture.handle(.drag(dx: 0, dy: 60), at: 0.03)
+    #expect(gesture.handle(.up(3), at: 0.1) == Output(passes: false, commands: [.strip(up: false)]))
+    #expect(gesture.handle(.down(3), at: 0.5) == swallowed)
+    #expect(gesture.handle(.drag(dx: 0, dy: -45), at: 0.53) == swallowed)
+    #expect(gesture.handle(.up(3), at: 0.6) == Output(passes: false, commands: [.strip(up: true)]))
+}
+
+@Test func widthModeStaysTheDefault() {
+    // Without a mode, up is one command at once and down waits for the release: the buttons' gesture as it always was.
+    for var gesture in [MouseButtonGesture(buttons: [3]), MouseButtonGesture(buttons: [3], vertical: .width)] {
+        _ = gesture.handle(.down(3), at: 0)
+        #expect(gesture.handle(.drag(dx: 0, dy: -45), at: 0.02) == Output(passes: false, commands: [.vertical(up: true)]))
+        #expect(gesture.handle(.up(3), at: 0.1) == swallowed)
+        _ = gesture.handle(.down(3), at: 1)
+        #expect(gesture.handle(.drag(dx: 0, dy: 45), at: 1.02) == swallowed)
+        #expect(gesture.handle(.up(3), at: 1.1) == Output(passes: false, commands: [.vertical(up: false)]))
+    }
+}

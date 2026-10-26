@@ -90,3 +90,118 @@ import Testing
     #expect(sideways == nil)
     #expect(!swipe.isVertical)
 }
+
+// MARK: - Up and down in strips mode
+
+@Test func shortSwipeDownChangesStripOnLift() {
+    var v = TrackpadVertical(mode: .strips)
+    #expect(v.moved(.down, dy: -0.12) == .armed(up: false))
+    #expect(v.moved(.down, dy: -0.2) == nil)
+    #expect(v.lifted(dy: -0.2) == .strip(up: false))
+}
+
+@Test func shortSwipeUpChangesStripOnLift() {
+    var v = TrackpadVertical(mode: .strips)
+    #expect(v.moved(.up, dy: 0.12) == .armed(up: true))
+    #expect(v.lifted(dy: 0.15) == .strip(up: true))
+}
+
+@Test func longSwipeUpTogglesWidthOnce() {
+    var v = TrackpadVertical(mode: .strips)
+    _ = v.moved(.up, dy: 0.12)
+    #expect(v.moved(.up, dy: 0.31) == .toggleWidth)
+    #expect(v.moved(.up, dy: 0.5) == nil)
+    #expect(v.lifted(dy: 0.5) == nil)
+}
+
+@Test func longSwipeDownOpensTheOverviewInStripsMode() {
+    var v = TrackpadVertical(mode: .strips)
+    _ = v.moved(.down, dy: -0.12)
+    #expect(v.moved(.down, dy: -0.31) == .overview)
+    #expect(v.lifted(dy: -0.4) == nil)
+}
+
+@Test func comingBackBeforeLiftingDoesNothing() {
+    var v = TrackpadVertical(mode: .strips)
+    _ = v.moved(.down, dy: -0.12)
+    #expect(v.lifted(dy: -0.05) == nil)
+}
+
+@Test func aFastSwipeGoesStraightToTheLongCommand() {
+    var v = TrackpadVertical(mode: .strips)
+    #expect(v.moved(.up, dy: 0.35) == .toggleWidth)
+}
+
+@Test func aFastSwipeDownGoesStraightToTheOverview() {
+    var v = TrackpadVertical(mode: .strips)
+    #expect(v.moved(.down, dy: -0.35) == .overview)                                  // not .armed first
+    #expect(v.moved(.down, dy: -0.4) == nil)
+    #expect(v.lifted(dy: -0.4) == nil)                                               // and no strip change after it
+}
+
+@Test func aSwipeUpThatComesBackBeforeLiftingDoesNothing() {
+    var v = TrackpadVertical(mode: .strips)
+    _ = v.moved(.up, dy: 0.12)
+    #expect(v.lifted(dy: 0.05) == nil)
+}
+
+@Test func theFirstMoveDecidesTheDirectionOfAStripsSwipe() {
+    // Going on past where the fingers landed does not turn an up swipe into a down one, nor the other way round.
+    var up = TrackpadVertical(mode: .strips)
+    _ = up.moved(.up, dy: 0.12)
+    #expect(up.moved(nil, dy: -0.35) == nil)                                         // not the overview
+    #expect(up.lifted(dy: -0.2) == nil)                                              // not a strip down either
+    var down = TrackpadVertical(mode: .strips)
+    _ = down.moved(.down, dy: -0.12)
+    #expect(down.moved(nil, dy: 0.35) == nil)                                        // not the full width
+    #expect(down.lifted(dy: 0.2) == nil)
+}
+
+@Test func inStripsModeASwipeIsVerticalOnceItGoesUpOrDown() {
+    var sideways = TrackpadVertical(mode: .strips)
+    #expect(sideways.moved(.horizontal, dy: 0.01) == nil)
+    #expect(sideways.moved(nil, dy: 0.05) == nil)                                    // too slanted to tell yet
+    #expect(!sideways.isVertical)                                                    // the rest of it may still slide
+    var up = TrackpadVertical(mode: .strips)
+    _ = up.moved(.up, dy: 0.12)
+    #expect(up.isVertical)
+    var down = TrackpadVertical(mode: .strips)
+    _ = down.moved(.down, dy: -0.12)
+    #expect(down.isVertical)
+    var long = TrackpadVertical(mode: .strips)
+    _ = long.moved(.up, dy: 0.35)
+    #expect(long.isVertical)                                                         // done, and still not a slide
+}
+
+@Test func aSwipeThatNeverWentUpOrDownChangesNoStripOnLift() {
+    // Every swipe ends with a lift, a slide with some vertical drift included.
+    var slide = TrackpadVertical(mode: .strips)
+    #expect(slide.moved(.horizontal, dy: 0.15) == nil)
+    #expect(slide.lifted(dy: 0.15) == nil)
+    var undecided = TrackpadVertical(mode: .strips)
+    #expect(undecided.moved(nil, dy: -0.15) == nil)
+    #expect(undecided.lifted(dy: -0.15) == nil)
+}
+
+@Test func theNextStripsSwipeStartsOverInTheSameMode() {
+    var v = TrackpadVertical(mode: .strips)
+    _ = v.moved(.down, dy: -0.12)
+    #expect(v.lifted(dy: -0.15) == .strip(up: false))
+    #expect(!v.isVertical)
+    // Still strips mode: armed again, not the full width at once.
+    #expect(v.moved(.up, dy: 0.12) == .armed(up: true))
+    #expect(v.moved(.up, dy: 0.31) == .toggleWidth)
+    #expect(v.lifted(dy: 0.5) == nil)
+    #expect(v.moved(.down, dy: -0.12) == .armed(up: false))
+}
+
+@Test func widthModeIsTheDefault() {
+    #expect(TrackpadVertical() == TrackpadVertical(mode: .width))
+    var v = TrackpadVertical(mode: .width)
+    #expect(v.moved(.up, dy: 0.12) == .fullWidth)
+}
+
+@Test func theLongSwipeIsThirtyPercentAndTheOverviewDistanceIsTheSame() {
+    #expect(TrackpadVertical.longStart == 0.3)
+    #expect(TrackpadVertical.overviewStart == TrackpadVertical.longStart)
+}

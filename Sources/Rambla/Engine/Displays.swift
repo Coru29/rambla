@@ -53,9 +53,7 @@ enum Displays {
                 return nil
             }
             let uuid = uuid(of: id)
-            // With "Displays have separate Spaces" off there is a single "Main" entry for every display.
-            let entry = spaces.first { $0.displayUUID.caseInsensitiveCompare(uuid) == .orderedSame }
-                ?? spaces.first { $0.displayUUID == "Main" }
+            let entry = entry(for: uuid, in: spaces)
             let current = entry?.current ?? Private.currentSpace(displayUUID: uuid)
             let key = current.flatMap { entry?.uuids[$0] } ?? current.map { "\($0)" } ?? "none"
             return DisplayInfo(
@@ -67,6 +65,19 @@ enum Displays {
                 screen: screen
             )
         }
+    }
+
+    /// The Space display `uuid` shows now, read from the WindowServer the way `current()` reads it: a `DisplayInfo`
+    /// has it as of the last reconcile, a moment after a desktop change. Nil when macOS does not say.
+    static func currentSpace(of uuid: String) -> UInt64? {
+        entry(for: uuid, in: Private.displaySpaces())?.current ?? Private.currentSpace(displayUUID: uuid)
+    }
+
+    /// The Spaces of display `uuid` among `spaces`. With "Displays have separate Spaces" off there is a single "Main"
+    /// entry for every display.
+    private static func entry(for uuid: String, in spaces: [Private.DisplaySpaces]) -> Private.DisplaySpaces? {
+        spaces.first { $0.displayUUID.caseInsensitiveCompare(uuid) == .orderedSame }
+            ?? spaces.first { $0.displayUUID == "Main" }
     }
 
     /// The display whose frame contains the largest part of `rect` (nil if none intersects).

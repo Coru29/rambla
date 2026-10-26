@@ -8,6 +8,16 @@ public enum NewWindowWidth: Codable, Equatable, Sendable {
     case fraction(Double)
 }
 
+/// What a short vertical swipe does, with the trackpad's fingers or the mouse's buttons.
+public enum VerticalGesture: String, Codable, CaseIterable, Sendable {
+    /// Changes the strip in view. A long swipe up gives the focused column the full width (or gives it back), and a
+    /// long one down opens the overview.
+    case strips
+    /// The gesture as it was before stacked strips: up gives the focused column the full width at once, down gives
+    /// back its width (when the swipe ends), and a long one down opens the overview.
+    case width
+}
+
 public struct FocusBorderPrefs: Codable, Equatable, Sendable {
     public var enabled: Bool
     public var colorHex: String
@@ -54,7 +64,7 @@ public struct TrackpadPrefs: Codable, Equatable, Sendable {
     public var sensitivity: Double
     /// Natural direction: the strip follows the fingers.
     public var natural: Bool
-    /// Swiping up with the same fingers gives the focused column the full width; down gives back its width.
+    /// Swiping up or down with the same fingers does what `Preferences.verticalGesture` says; without it, nothing.
     public var verticalSwipe: Bool
     /// A tap on the trackpad (Force Touch) each time a slide passes a column, and when a swipe up or down acts.
     public var haptics: Bool
@@ -105,8 +115,8 @@ public struct MousePrefs: Codable, Equatable, Sendable {
     }
 }
 
-/// Moving the mouse with a combination of its buttons held (see `MouseButtonGesture`): sideways slides the strip, up
-/// gives the focused column the full width and down gives back the width it had.
+/// Moving the mouse with a combination of its buttons held (see `MouseButtonGesture`): sideways slides the strip, and
+/// up and down do what `Preferences.verticalGesture` says.
 public struct MouseButtonsPrefs: Codable, Equatable, Sendable {
     public var enabled: Bool
     /// The buttons to hold together, numbered the way mouse apps number them: 3 is the middle button, 4 and 5 the
@@ -202,6 +212,8 @@ public struct Preferences: Codable, Equatable, Sendable {
     public var trackpad = TrackpadPrefs()
     public var mouse = MousePrefs()
     public var mouseButtons = MouseButtonsPrefs()
+    /// What a short swipe up or down does, on the trackpad and with the mouse's buttons.
+    public var verticalGesture: VerticalGesture = .strips
     public var appRules: [AppRule] = []
     /// UUIDs of the displays Rambla does not manage.
     public var disabledDisplays: [String] = []
@@ -235,6 +247,7 @@ public struct Preferences: Codable, Equatable, Sendable {
         trackpad = try container.decodeIfPresent(TrackpadPrefs.self, forKey: .trackpad) ?? trackpad
         mouse = try container.decodeIfPresent(MousePrefs.self, forKey: .mouse) ?? mouse
         mouseButtons = try container.decodeIfPresent(MouseButtonsPrefs.self, forKey: .mouseButtons) ?? mouseButtons
+        verticalGesture = try container.decodeIfPresent(VerticalGesture.self, forKey: .verticalGesture) ?? verticalGesture
         appRules = try container.decodeIfPresent([AppRule].self, forKey: .appRules) ?? appRules
         disabledDisplays = try container.decodeIfPresent([String].self, forKey: .disabledDisplays) ?? disabledDisplays
         checkForUpdates = try container.decodeIfPresent(Bool.self, forKey: .checkForUpdates) ?? checkForUpdates

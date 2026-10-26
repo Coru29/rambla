@@ -28,17 +28,18 @@ Cada ventana es una columna de una tira horizontal que sigue más allá de los b
 ## Qué hace
 
 - **Una tira por pantalla y por escritorio**, con animaciones de resorte y su propio foco y scroll.
+- **Tiras apiladas**: más de una tira por pantalla y por escritorio, una arriba de otra y una sola a la vista (el trabajo abajo y la casa arriba, por ejemplo). Se cambia de tira con un deslizamiento corto hacia arriba o abajo, con ⌃⌥⌘↑ / ⌃⌥⌘↓ o desde la vista general, y ⌃⌥⌘⇧↑ / ⌃⌥⌘⇧↓ se lleva la ventana enfocada. Sobreviven a los reinicios y a los cambios de pantalla.
 - **Las ventanas nuevas se abren al lado de la enfocada** y la tira se desliza hasta la ventana enfocada. Centrado: nunca, solo si no entra o siempre.
 - **Anchos de columna**: prefijados (25/33/50/66/75 %), ancho completo, más ancha o más angosta, centrar y **fijar una columna** al borde izquierdo o derecho.
 - **Pilas y pestañas**: varias ventanas en una columna, apiladas o en pestañas con una barra en la que se puede hacer click.
-- **Trackpad**: deslizar con tres o cuatro dedos mueve la tira, con un toque háptico suave en cada columna; un deslizamiento corto y rápido pasa a la siguiente. Hacia arriba, ancho completo; hacia abajo, vuelve; más abajo, la vista general.
-- **Vista general** (⌃⌘O, o bajando bastante con el trackpad o con los botones del mouse): toda la tira de un vistazo, con la app y el título de cada ventana; un click, o elegirla con las flechas, te lleva a ella, y arrastrarla cambia su columna de lugar.
+- **Trackpad**: deslizar con tres o cuatro dedos mueve la tira, con un toque háptico suave en cada columna; un deslizamiento corto y rápido pasa a la siguiente. Un deslizamiento corto hacia arriba o abajo cambia de tira, uno largo hacia arriba da el ancho completo y uno largo hacia abajo abre la vista general (o elegí el gesto de antes en Configuración: arriba, ancho completo; abajo, vuelve).
+- **Vista general** (⌃⌘O, o bajando bastante con el trackpad o con los botones del mouse): toda la tira de un vistazo (una fila por tira si apilás varias), con la app y el título de cada ventana; un click, o elegirla con las flechas, te lleva a ella, y arrastrarla cambia su columna de lugar.
 - **Barra indicadora**: aparece al navegar con un ícono por columna; click para saltar, arrastrar para reordenar.
-- **Mouse**: con ⌃⌘ apretado, la ruedita recorre las columnas. También podés mantener apretados los botones que elijas (el del medio, los laterales 4 + 5 juntos…) y mover el mouse: a los costados desliza la tira, hacia arriba da el ancho completo y hacia abajo vuelve. Arrastrá una ventana sobre otra columna para reordenar, o cambiale el tamaño para fijar el ancho de su columna. Convive con Mac Mouse Fix.
+- **Mouse**: con ⌃⌘ apretado, la ruedita recorre las columnas. También podés mantener apretados los botones que elijas (el del medio, los laterales 4 + 5 juntos…) y mover el mouse: a los costados desliza la tira, un poco hacia arriba o abajo cambia de tira, más arriba da el ancho completo y más abajo abre la vista general. Arrastrá una ventana sobre otra columna para reordenar, o cambiale el tamaño para fijar el ancho de su columna. Convive con Mac Mouse Fix.
 - Opcionales: **borde en la ventana enfocada**, **atenuar las inactivas**, el foco sigue al mouse y el mouse sigue al foco.
 - **Reglas por app**: mosaico o flotante, ancho inicial y dónde se abren. Además, se puede activar o desactivar por pantalla.
 - **Recuerda el layout** al reiniciar, y al volver a conectar una pantalla sus ventanas vuelven a su lugar. Puede arrancar con la Mac.
-- **Convive con [Rectangle](https://rectangleapp.com)**: los atajos usan ⌃⌘, así que no chocan con los ⌃⌥ del set normal de Rectangle (con su set Spectacle chocan un par, y Rambla te avisa). Si Rectangle (u otra app) mueve una ventana, esa ventana sale de la tira y queda donde la pusieron. La página Mac de la configuración avisa si algún atajo choca con tu Rectangle.
+- **Convive con [Rectangle](https://rectangleapp.com)**: los atajos usan ⌃⌘, y ⌃⌥⌘ con ↑ y ↓ los de cambiar de tira, así que no chocan con el set normal de Rectangle, que usa ⌃⌥, y ⌃⌥⌘ solo con ← y → (con su set Spectacle chocan un par, y Rambla te avisa). Si Rectangle (u otra app) mueve una ventana, esa ventana sale de la tira y queda donde la pusieron. La página Mac de la configuración avisa si algún atajo choca con tu Rectangle.
 - **Automatización**: enlaces `rambla://`, comando de terminal `rambla` y exportación de scripts para Raycast.
 - **Español e inglés**: la interfaz sigue el idioma de tu Mac.
 - **Liviana**: Swift nativo (AppKit, con la configuración en SwiftUI), sin Electron y basada en eventos. En reposo usa cerca de 0 % de CPU y ~12 MB de memoria.
@@ -73,6 +74,8 @@ Todos se pueden cambiar en **Configuración → Atajos**.
 | ⌃⌘1 … ⌃⌘9 | Ir a la columna N |
 | ⌃⌘⇧ + flechas (o H J K L) | Mover la columna o la ventana dentro de su pila |
 | ⌃⌘N | Mandar la ventana a la siguiente pantalla |
+| ⌃⌥⌘↑ / ⌃⌥⌘↓ | Ir a la tira de arriba / abajo |
+| ⌃⌥⌘⇧↑ / ⌃⌥⌘⇧↓ | Mandar la ventana a la tira de arriba / abajo y seguirla |
 | ⌃⌘O | Vista general de la tira |
 | ⌃⌘R | Rotar entre los anchos prefijados |
 | ⌃⌘M | Ancho completo (repetir para volver) |

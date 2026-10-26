@@ -14,6 +14,14 @@ private let temp = "/var/folders/ab/xyz/T/"
     }
 }
 
+@Test func linksMayChangeStrips() {
+    // Changing strips, or sending a window to another one, only arranges windows: no more than a link may do.
+    for word in ["strip-up", "strip-down", "send-strip-up", "send-strip-down"] {
+        #expect(CommandPolicy.allows(word, from: .url), "\(word)")
+        #expect(CommandPolicy.allows(word, from: .commandLine), "\(word)")
+    }
+}
+
 @Test func theCommandLineMayAlsoAskForDiagnostics() {
     for word in ["focus-left", "close-window", "settings", "dump", "debug-windows", "debug-update", "debug-external-move",
                  "debug-neighbor"] {

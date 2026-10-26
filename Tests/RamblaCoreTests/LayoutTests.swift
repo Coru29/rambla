@@ -1012,6 +1012,147 @@ import CoreGraphics
         #expect(r.placements[2] == visible(-100, 0, 495, 800))
     }
 
+    // MARK: - Shelved
+
+    /// Three 300 pt columns (windows 1, 2, 3) that fit side by side, centered at x 150, 460 and 770.
+    func fittingColumns() -> Strip {
+        Strip(columns: [
+            Column(windows: [1], width: .points(300)),
+            Column(windows: [2], width: .points(300)),
+            Column(windows: [3], width: .points(300)),
+        ], focused: 0)
+    }
+
+    @Test func shelvedParksEveryWindowWithASliver() {
+        for sliver in [1.0, 3.0] {
+            var config = cfg
+            config.sliver = sliver
+            let r = Layout.shelved(input(fittingColumns(), config: config))
+            #expect(r.placements.count == 3)
+            for (id, placement) in r.placements {
+                #expect(isParked(placement), "window \(id), sliver \(sliver)")
+                // An edge sliver: `sliver` points wide, the window's full height inside the display.
+                // (`Double(...)` because, inside `#expect`, a CGFloat compared with a Double is always false.)
+                let shown = placement.frame.intersection(vp)
+                #expect(Double(shown.width) == sliver, "window \(id), sliver \(sliver)")
+                #expect(shown.height == 800, "window \(id), sliver \(sliver)")
+            }
+            // Columns centered left of the display's center park on its left edge, the others on its right edge.
+            #expect(r.placements[1] == parked(sliver - 300, 0, 300, 800))
+            #expect(r.placements[2] == parked(sliver - 300, 0, 300, 800))
+            #expect(r.placements[3] == parked(1000 - sliver, 0, 300, 800))
+        }
+        // A column centered exactly on the display's center is not left of it: it parks on the right edge.
+        let centered = Strip(columns: [Column(windows: [1], width: .fraction(1))], focused: 0)
+        #expect(Layout.shelved(input(centered)).placements[1] == parked(999, 0, 1000, 800))
+    }
+
+    @Test func shelvedFrameParksOnTheSideOfTheWindowsCenter() {
+        // The rule `shelved` parks a strip's windows by, and the floating windows that go with it.
+        let left = CGRect(x: 0, y: 50, width: 400, height: 300)
+        #expect(Layout.shelvedFrame(for: left, display: vp, others: [], sliver: 1)
+                == CGRect(x: -399, y: 50, width: 400, height: 300))
+        // Centered exactly on the display's center is not left of it: the right edge.
+        let centered = CGRect(x: 300, y: 50, width: 400, height: 300)
+        #expect(Layout.shelvedFrame(for: centered, display: vp, others: [], sliver: 1)
+                == CGRect(x: 999, y: 50, width: 400, height: 300))
+        // A neighbor on that side sends it to the other edge.
+        let neighbor = CGRect(x: 1000, y: 0, width: 800, height: 600)
+        #expect(Layout.shelvedFrame(for: centered, display: vp, others: [neighbor], sliver: 1)
+                == CGRect(x: -399, y: 50, width: 400, height: 300))
+    }
+
+    @Test func shelvedAvoidsANeighborDisplay() {
+        // A display touching the right edge takes that edge, so every window parks on the left one.
+        let right = Layout.shelved(input(fittingColumns(), others: [CGRect(x: 1000, y: 0, width: 800, height: 600)]))
+        #expect(right.placements.count == 3)
+        for (id, placement) in right.placements { #expect(placement == parked(-299, 0, 300, 800), "window \(id)") }
+        // Mirrored: a display touching the left edge sends every window to the right one.
+        let left = Layout.shelved(input(fittingColumns(), others: [CGRect(x: -800, y: 0, width: 800, height: 600)]))
+        #expect(left.placements.count == 3)
+        for (id, placement) in left.placements { #expect(placement == parked(999, 0, 300, 800), "window \(id)") }
+    }
+
+    @Test func shelvedKeepsParkedWindowsAndDropsTabBars() {
+        // Window 1 is off the left edge already; the tabbed column (windows 2 and 3) is in view with its bar.
+        let tabs = Column(windows: [2, 3], width: .fraction(0.5), mode: .tabbed)
+        let strip = Strip(columns: [Column(windows: [1], width: .fraction(0.5)), tabs,
+                                    Column(windows: [4], width: .fraction(0.5))], focused: 1, scroll: 505)
+        let inView = Layout.compute(input(strip))
+        #expect(inView.placements[1] == parked(-494, 0, 495, 800))
+        #expect(inView.tabBars[tabs.id] == CGRect(x: 0, y: 0, width: 495, height: 28))
+
+        let r = Layout.shelved(input(strip))
+        #expect(r.tabBars.isEmpty)
+        // The parked window stays where `compute` put it.
+        #expect(r.placements[1] == inView.placements[1])
+        // The tabs park together and keep the y below the bar: their column is centered left of the display's center.
+        #expect(r.placements[2] == parked(-494, 28, 495, 772))
+        #expect(r.placements[3] == parked(-494, 28, 495, 772))
+        // The last column is centered right of it.
+        #expect(r.placements[4] == parked(999, 0, 495, 800))
+    }
+
+    @Test func shelvedLeavesHiddenWindowsOut() {
+        // Window 2 is hidden inside a stack; window 4 hides its whole column.
+        let strip = Strip(columns: [Column(windows: [1, 2], width: .points(300)),
+                                    Column(windows: [3], width: .points(300)),
+                                    Column(windows: [4], width: .points(300))], focused: 0)
+        let r = Layout.shelved(input(strip, hidden: [2, 4]))
+        #expect(r.placements[2] == nil)
+        #expect(r.placements[4] == nil)
+        #expect(Set(r.placements.keys) == [1, 3])
+        #expect(isParked(r.placements[1]) && isParked(r.placements[3]))
+    }
+
+    @Test func shelvedHasNoExits() {
+        // A display on the right: `compute` parks window 3 on the left edge and has it leave through the right one.
+        // A strip that is not in view is not on screen to animate, so it has no exits; the window stays parked.
+        let neighbor = [CGRect(x: 1000, y: 0, width: 800, height: 600)]
+        let strip = threeColumns(scroll: 252.5)
+        #expect(Layout.compute(input(strip, others: neighbor)).exits.keys.contains(3))
+        let r = Layout.shelved(input(strip, others: neighbor))
+        #expect(r.exits.isEmpty)
+        #expect(r.placements[3] == parked(-494, 0, 495, 800))
+    }
+
+    @Test func shelvedKeepsColumnFramesAndMetrics() {
+        // The strip keeps its scroll and its geometry while it is out of view; only its windows move.
+        let strip = threeColumns(scroll: 505)
+        let inView = Layout.compute(input(strip))
+        let r = Layout.shelved(input(strip))
+        #expect(r.columnFrames.count == 3)
+        #expect(r.columnFrames == inView.columnFrames)
+        #expect(r.metrics == inView.metrics)
+    }
+
+    @Test func shelvedParksAgainstTheDisplayNotTheViewport() {
+        // A second monitor, with the Dock on its left: the viewport starts 70 pt in, so its center (x 2450) is not the
+        // display's (x 2420). The column centered at x 2435 is right of the display's center, so it parks on the right
+        // edge, and the left edge is the display's own: parking against the viewport would leave the Dock area showing.
+        let display = CGRect(x: 1920, y: 100, width: 1000, height: 800)
+        let viewport = CGRect(x: 1990, y: 110, width: 920, height: 780)
+        let strip = Strip(columns: [Column(windows: [1], width: .points(290)),
+                                    Column(windows: [2], width: .points(290)),
+                                    Column(windows: [3], width: .points(290))], focused: 0)
+        let r = Layout.shelved(LayoutInput(strip: strip, viewport: viewport, display: display, config: cfg))
+        #expect(r.placements[1] == parked(1631, 110, 290, 780))
+        #expect(r.placements[2] == parked(2919, 110, 290, 780))
+        #expect(r.placements[3] == parked(2919, 110, 290, 780))
+    }
+
+    @Test func shelvedParksPinnedColumnsToo() {
+        // `compute` never parks a pinned column, but nothing of a strip that is not in view stays on screen.
+        let left = Layout.shelved(input(leftPinStrip()))
+        #expect(left.placements[1] == parked(-241.5, 0, 242.5, 800))
+        let right = Layout.shelved(input(rightPinStrip()))
+        #expect(right.placements[4] == parked(999, 0, 242.5, 800))
+        for result in [left, right] {
+            #expect(result.placements.count == 4)
+            for (id, placement) in result.placements { #expect(isParked(placement), "window \(id)") }
+        }
+    }
+
     // MARK: - Types
 
     @Test func placementFrame() {

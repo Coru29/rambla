@@ -118,7 +118,9 @@ public enum KeyCode {
 }
 
 /// The shortcuts Rambla ships with. ⌃⌘ is the base (Rectangle lives in ⌃⌥ space) and ⌃⌘⇧ marks "move" and the
-/// opposite-direction variants. Arrow keys come first and the vim-style HJKL second.
+/// opposite-direction variants. Arrow keys come first and the vim-style HJKL second. ⌃⌥⌘ moves between the stacked
+/// strips and ⇧ takes the focused window along; Rectangle's default sets use ⌃⌥⌘ only with ← and → (its display
+/// moves), so ↑ and ↓ are free.
 public enum DefaultShortcuts {
     public static let table: [Action: [KeyCombo]] = {
         var table: [Action: [KeyCombo]] = [:]
@@ -130,8 +132,12 @@ public enum DefaultShortcuts {
     private static func combos(for action: Action) -> [KeyCombo] {
         let base: Modifiers = [.control, .command]
         let shifted: Modifiers = [.control, .command, .shift]
+        let stacked: Modifiers = [.control, .option, .command]
+        let stackedShifted: Modifiers = [.control, .option, .command, .shift]
         func plain(_ keyCode: UInt16) -> KeyCombo { KeyCombo(keyCode: keyCode, modifiers: base) }
         func withShift(_ keyCode: UInt16) -> KeyCombo { KeyCombo(keyCode: keyCode, modifiers: shifted) }
+        func strips(_ keyCode: UInt16) -> KeyCombo { KeyCombo(keyCode: keyCode, modifiers: stacked) }
+        func stripsWithShift(_ keyCode: UInt16) -> KeyCombo { KeyCombo(keyCode: keyCode, modifiers: stackedShifted) }
 
         switch action {
         case .focusLeft: return [plain(KeyCode.left), plain(KeyCode.h)]
@@ -154,6 +160,10 @@ public enum DefaultShortcuts {
         case .moveUp: return [withShift(KeyCode.up), withShift(KeyCode.k)]
         case .moveDown: return [withShift(KeyCode.down), withShift(KeyCode.j)]
         case .sendNextDisplay: return [plain(KeyCode.n)]
+        case .stripUp: return [strips(KeyCode.up)]
+        case .stripDown: return [strips(KeyCode.down)]
+        case .sendStripUp: return [stripsWithShift(KeyCode.up)]
+        case .sendStripDown: return [stripsWithShift(KeyCode.down)]
         case .overview: return [plain(KeyCode.o)]
         case .cycleWidth: return [plain(KeyCode.r)]
         case .fullWidth: return [plain(KeyCode.m)]

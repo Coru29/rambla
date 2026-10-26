@@ -3,7 +3,9 @@ import RamblaCore
 
 extension WindowManager {
     /// Text commands from `rambla://` links and from the `rambla` command. What each source may run is decided by
-    /// `CommandPolicy`. Returns false if the command is unknown or not allowed.
+    /// `CommandPolicy`. Returns false if the command is unknown or not allowed. They run in the order they come: one
+    /// that is not a switch between strips runs those waiting for the veil first (`Action.switchesStrips`), so a script
+    /// that switches strips and then acts on the strip in view, or dumps it, finds the strip it switched to.
     @discardableResult
     func perform(command: String, from source: CommandPolicy.Source) -> Bool {
         let parts = command.split(separator: " ", maxSplits: 1).map(String.init)
@@ -12,6 +14,7 @@ extension WindowManager {
             Log.error("Refused command from \(source == .url ? "a link" : "the command line"): \(word)")
             return false
         }
+        if Action.parse(word)?.switchesStrips != true { runPendingSwitches() }
         let argument = parts.count > 1 ? parts[1] : nil
         switch word {
         case "dump":
@@ -49,8 +52,13 @@ extension WindowManager {
         return true
     }
 
+    /// A shortcut's action, or a command's. The switches between strips queue behind those already waiting for the
+    /// veil, so that quick repeats share one veil; every other action runs those first, and sees the strips as they
+    /// leave them (`Action.switchesStrips`).
     func perform(_ action: Action, holding modifiers: NSEvent.ModifierFlags? = nil) {
-        guard isRunning, overviewAction?(action) != true else { return }
+        guard isRunning else { return }
+        if !action.switchesStrips { runPendingSwitches() }
+        guard overviewAction?(action) != true else { return }
         if action == .togglePause {
             setPaused(!isPaused)
             return
@@ -63,6 +71,17 @@ extension WindowManager {
         if action == .toggleFloat {
             toggleFloatFocused()
             return
+        }
+        switch action {
+        case .stripUp, .stripDown:
+            // The stack of the focused window, else the one under the pointer, even before it has a strip.
+            if let stack = activeStripKey()?.stack ?? stackUnderPointer() { stepLevel(up: action == .stripUp, on: stack) }
+            return
+        case .sendStripUp, .sendStripDown:
+            sendFocusedWindow(up: action == .sendStripUp)
+            return
+        default:
+            break
         }
         guard let key = activeStripKey(), var strip = strips[key], let display = display(for: key) else { return }
         let hiddenSet = hidden[key] ?? []
@@ -109,8 +128,8 @@ extension WindowManager {
         case .closeWindow:
             if let id = strip.focusedWindow ?? focusedWindow { worker(for: id)?.close(id) }
             return
-        case .overview, .toggleFloat, .togglePause:
-            return
+        case .overview, .toggleFloat, .togglePause, .stripUp, .stripDown, .sendStripUp, .sendStripDown:
+            return   // handled before the strip guard
         }
 
         strips[key] = strip
@@ -132,14 +151,26 @@ extension WindowManager {
         return key
     }
 
-    /// Focuses a strip window: real keyboard focus through its app, then scrolls it into view.
-    func focus(window id: WindowID, in key: StripKey) {
+    /// Focuses a strip window: real keyboard focus through its app, then scrolls it into view. With "mouse follows
+    /// focus" on, the pointer goes to it too. `routed`: Rambla only passes on a focus that macOS or another app moved
+    /// (`FocusRoute`), which behaves like any focus from outside: the pointer stays where it is, and while the mouse
+    /// button is down the strip scrolls only once it is released. A strip out of view of a stack in view comes into
+    /// view first, with the window focused (`switchLevel`): nothing typed may reach a window that cannot be seen.
+    func focus(window id: WindowID, in key: StripKey, routed: Bool = false) {
+        if !isCurrent(key), isCurrentStack(key.stack) {
+            switchLevel(of: key.stack, to: key.level, focusing: id, routed: routed)
+            return
+        }
         revealSuppressedFor = nil   // this focus reveals by itself; an older suppression must not outlive it
         focusedWindow = id
         strips[key]?.focus(window: id)
         worker(for: id)?.focus(id)
-        reveal(key)
-        if prefs.mouseFollowsFocus, let frame = results[key]?.placements[id]?.frame {
+        if routed, dragTracker.isMouseDown {
+            pendingReveal = key
+        } else {
+            reveal(key)
+        }
+        if !routed, prefs.mouseFollowsFocus, let frame = results[key]?.placements[id]?.frame {
             CGWarpMouseCursorPosition(CGPoint(x: frame.midX, y: frame.midY))
             CGAssociateMouseAndMouseCursorPosition(1)
         }
@@ -152,13 +183,25 @@ extension WindowManager {
     }
 
     /// Moves a column (the strip indicator's or the overview's drag): the focused window keeps the focus and stays in
-    /// view, where the keyboard still is.
+    /// view, where the keyboard still is. A strip out of view (another row of the overview) keeps its focused column
+    /// for when it comes back, and stays out of sight.
     func moveColumn(in key: StripKey, from: Int, to: Int) {
         guard var strip = strips[key], strip.columns.indices.contains(from), strip.columns.indices.contains(to) else { return }
+        let focusedColumn = strip.focusedColumn?.id
         strip.moveColumn(from: from, to: to)
-        if let id = focusedWindow, strip.contains(id) { strip.focus(window: id) }
+        let inView = isCurrent(key)
+        if let id = focusedWindow, strip.contains(id) {
+            strip.focus(window: id)
+        } else if !inView, let focusedColumn {
+            strip.focused = strip.index(ofColumn: focusedColumn)
+        }
         strips[key] = strip
-        reveal(key)
+        if inView {
+            reveal(key)
+        } else {
+            shelve(key)
+            scheduleSave()
+        }
         onStateChanged?()
     }
 
@@ -196,6 +239,9 @@ extension WindowManager {
               let display = Displays.best(for: frame, in: enabledDisplays), let key = currentKey(of: display) else { return }
         floating.remove(id)
         autoFloated.remove(id)
+        // One parked with a level out of view (it has the focus there for a moment) joins the level in view instead.
+        takeFromFloatShelf(id)
+        floatsAway[id] = nil
         var strip = strips[key] ?? Strip()
         let available = display.visible.width - 2 * prefs.outerGap
         strip.insert(window: id, width: .points(min(max(frame.width, available * 0.25), available)), at: .afterFocused)
@@ -230,7 +276,8 @@ extension WindowManager {
                 }
             }
             stripList.append([
-                "display": key.displayUUID, "space": key.spaceID, "current": isCurrent(key),
+                "display": key.displayUUID, "space": key.spaceID, "level": key.level,
+                "current": isCurrent(key), "active": isCurrent(key),
                 "scroll": strip.scroll, "focused": strip.focused as Any,
                 "columns": strip.columns.map { column -> [String: Any] in
                     var width: [String: Double] = [:]
@@ -245,10 +292,26 @@ extension WindowManager {
                 "placements": placements,
             ])
         }
+        // Every stack with a strip: the level in view and the highest one.
+        let stacks = Set(strips.keys.map(\.stack))
+            .sorted { ($0.displayUUID, $0.spaceID) < ($1.displayUUID, $1.spaceID) }
+            .map { stack -> [String: Any] in
+                ["display": stack.displayUUID, "space": stack.spaceID, "active": activeLevel(of: stack),
+                 "top": topLevel(of: stack)]
+            }
+        // The floating windows parked with each level out of view.
+        let floatShelfList = floatShelf.keys
+            .sorted { ($0.displayUUID, $0.spaceID, $0.level) < ($1.displayUUID, $1.spaceID, $1.level) }
+            .map { key -> [String: Any] in
+                ["display": key.displayUUID, "space": key.spaceID, "level": key.level,
+                 "windows": (floatShelf[key] ?? [:]).keys.sorted()]
+            }
         let object: [String: Any] = [
             "paused": isPaused, "focused": focusedWindow as Any, "floating": Array(floating),
+            "floatShelf": floatShelfList, "floatsAway": floatsAway.keys.sorted(),
             "displays": displays.map { ["uuid": $0.uuid, "frame": rectJSON($0.frame), "visible": rectJSON($0.visible),
                                         "space": $0.currentSpace as Any] },
+            "stacks": stacks,
             "strips": stripList,
             "windows": windows.values.map { ["id": $0.id, "pid": $0.pid, "bundle": $0.bundleID as Any,
                                              "title": $0.title, "kind": "\($0.kind)", "frame": rectJSON($0.frame)] },

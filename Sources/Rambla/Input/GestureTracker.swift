@@ -11,16 +11,25 @@ private let tapCallback: CGEventTapCallBack = { _, type, event, userInfo in
 /// N-finger swipes on the trackpad, read from a listen-only event tap of gesture events (it never blocks or alters
 /// input). The tap exists only while the feature is on. Sideways slides the strip: positions are the fingers' mean x
 /// on the trackpad, from 0 (left edge) to 1 (right edge), and the release velocity is in those units per second.
-/// Up and down give one command per swipe (`TrackpadSwipe` tells them apart, `TrackpadVertical` decides): up the full
-/// width, down when the fingers lift the previous width, and further down the overview. Every count of the fingers
-/// touching goes to `onTouches` too, so the scroll tap can keep the swipe's scrolling from the apps.
+/// Up and down act once per swipe, as `Preferences.verticalGesture` says (`TrackpadSwipe` tells them apart,
+/// `TrackpadVertical` decides). Changing strips: a short swipe changes strip when the fingers lift, a long one up gives
+/// the focused column the full width (or gives it back) and a long one down opens the overview. Changing the width: up
+/// the full width, down when the fingers lift the previous width, and further down the overview. Every count of the
+/// fingers touching goes to `onTouches` too, so the scroll tap can keep the swipe's scrolling from the apps.
 @MainActor
 final class GestureTracker {
     private let onBegin: () -> Void
     private let onChange: (_ dx: Double) -> Void
     private let onEnd: (_ velocity: Double) -> Void
+    /// Width mode: up the full width, down the previous width.
     private let onVertical: (_ up: Bool) -> Void
     private let onOverview: () -> Void
+    /// Strips mode: a short swipe ended, so the strip changes. `fingersUp`: the fingers went up.
+    private let onStrip: (_ fingersUp: Bool) -> Void
+    /// Strips mode: the swipe just became a short one, so lifting now changes strip (the cue for a haptic tap).
+    private let onArmed: (_ fingersUp: Bool) -> Void
+    /// Strips mode: a long swipe up, the focused column's full width or back to its width.
+    private let onToggleWidth: () -> Void
     /// How many fingers touch the trackpad, at the event's time: every gesture event that carries touches. And 0 for a
     /// lift that came without one, seen because the reports stopped or because the fingers touching are all new.
     private let onTouches: (_ touching: Int, _ time: TimeInterval) -> Void
@@ -31,8 +40,10 @@ final class GestureTracker {
     private let retry = TapRetry(name: "Trackpad gesture tap")
     private var fingers = 4
     private var vertical = true
+    /// What up and down do: every swipe starts in it.
+    private var mode = VerticalGesture.strips
     /// Up or down: once a swipe is one, the rest of it does not slide the strip.
-    private var verticalSwipe = TrackpadVertical()
+    private lazy var verticalSwipe = TrackpadVertical(mode: mode)
     private var start: CGPoint?
     private var last: CGPoint?
     /// Where the fingers are now (`last` follows only a slide).
@@ -48,18 +59,28 @@ final class GestureTracker {
 
     init(onBegin: @escaping () -> Void, onChange: @escaping (_ dx: Double) -> Void,
          onEnd: @escaping (_ velocity: Double) -> Void, onVertical: @escaping (_ up: Bool) -> Void,
-         onOverview: @escaping () -> Void, onTouches: @escaping (_ touching: Int, _ time: TimeInterval) -> Void) {
+         onOverview: @escaping () -> Void, onStrip: @escaping (_ fingersUp: Bool) -> Void,
+         onArmed: @escaping (_ fingersUp: Bool) -> Void, onToggleWidth: @escaping () -> Void,
+         onTouches: @escaping (_ touching: Int, _ time: TimeInterval) -> Void) {
         self.onBegin = onBegin
         self.onChange = onChange
         self.onEnd = onEnd
         self.onVertical = onVertical
         self.onOverview = onOverview
+        self.onStrip = onStrip
+        self.onArmed = onArmed
+        self.onToggleWidth = onToggleWidth
         self.onTouches = onTouches
     }
 
-    func configure(enabled: Bool, fingers: Int, vertical: Bool) {
+    func configure(enabled: Bool, fingers: Int, vertical: Bool, mode: VerticalGesture) {
         self.fingers = fingers
         self.vertical = vertical
+        if mode != self.mode {
+            self.mode = mode
+            // A swipe under way ends in the mode it began in, and `reset` starts the next one in this one.
+            if start == nil { verticalSwipe = TrackpadVertical(mode: mode) }
+        }
         self.enabled = enabled
         if enabled, tap == nil, !retry.isWaiting { install() }
         if !enabled {
@@ -103,7 +124,7 @@ final class GestureTracker {
         lastTouch = nil
         if active { onEnd(velocity.velocity(at: time)) }
         if let start, let current, let command = verticalSwipe.lifted(dy: current.y - start.y) { perform(command) }
-        verticalSwipe = TrackpadVertical()
+        verticalSwipe = TrackpadVertical(mode: mode)
         active = false
         start = nil
         last = nil
@@ -116,6 +137,9 @@ final class GestureTracker {
         case .fullWidth: onVertical(true)
         case .previousWidth: onVertical(false)
         case .overview: onOverview()
+        case .toggleWidth: onToggleWidth()
+        case .strip(let up): onStrip(up)
+        case .armed(let up): onArmed(up)
         }
     }
 

@@ -40,6 +40,44 @@ enum CLI {
         return 0
     }
 
+    /// The other Ramblas running that started before this one (`RamblaInstance.startedBefore`): this one would manage
+    /// the same windows, and leaves them to those. One started after this one yields to it in turn, so two started at
+    /// once leave exactly one.
+    static func olderInstances() -> [pid_t] {
+        guard let me = instance(getpid()) else { return [] }
+        return NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+            .filter { $0.processIdentifier != me.pid && !$0.isTerminated }
+            .compactMap { instance($0.processIdentifier) }
+            .filter { $0.startedBefore(me) }
+            .map(\.pid)
+    }
+
+    /// Waits up to `timeout` for the processes `pids` to end: a Rambla quit to be opened again right away takes a
+    /// moment to go, as it puts every window back first. True once none of them is left.
+    static func waitForExit(of pids: [pid_t], timeout: TimeInterval) -> Bool {
+        let deadline = DispatchTime.now() + timeout
+        return pids.allSatisfy { pid in
+            let exited = DispatchSemaphore(value: 0)
+            let source = DispatchSource.makeProcessSource(identifier: pid, eventMask: .exit, queue: .global())
+            source.setEventHandler { exited.signal() }
+            source.resume()
+            defer { source.cancel() }
+            // One that ended before the source watched it sends nothing.
+            return instance(pid) == nil || exited.wait(timeout: deadline) == .success
+        }
+    }
+
+    /// The process `pid`, with when it started as the kernel has it; nil once it is gone, or only waits to be reaped.
+    private static func instance(_ pid: pid_t) -> RamblaInstance? {
+        var info = kinfo_proc()
+        var size = MemoryLayout<kinfo_proc>.stride
+        var name: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, pid]
+        guard sysctl(&name, u_int(name.count), &info, &size, nil, 0) == 0, size > 0,
+              Int32(info.kp_proc.p_stat) != SZOMB else { return nil }
+        let start = info.kp_proc.p_un.__p_starttime
+        return RamblaInstance(pid: pid, start: Double(start.tv_sec) + Double(start.tv_usec) / 1_000_000)
+    }
+
     private static func failed() -> Int32 {
         FileHandle.standardError.write(Data((String(localized: "No se pudo pasar la orden a Rambla.") + "\n").utf8))
         return 1

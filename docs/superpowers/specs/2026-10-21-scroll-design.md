@@ -49,11 +49,12 @@ El usuario quiere un clon gratis de [ChainYourMac](https://chainyourmac.com), un
 - La tira tiene una columna enfocada (y una ventana activa dentro de ella) y un desplazamiento horizontal (`scroll`).
 - **Viewport**: es el `visibleFrame` de la pantalla (sin barra de menú ni Dock) menos el margen exterior. Las columnas fijadas lo reducen.
 - Entre columnas va el gap interior y alrededor el margen exterior. Los dos son configurables desde 0.
+- **Tiras apiladas** (2026-10-23): cada par (pantalla, escritorio) puede tener varias tiras, una arriba de otra, y se ve una sola. Este documento describe una tira; lo que cambia con varias está en [`2026-10-23-tiras-apiladas-design.md`](2026-10-23-tiras-apiladas-design.md), y las secciones de abajo dicen "tira" para la que está a la vista.
 
 ### Qué ventanas entran a la tira
 
 - Entran las que tienen rol `AXWindow`, subrol `AXStandardWindow` y tamaño modificable, y pertenecen a apps "regulares" (con ícono en el Dock). Además no tienen que estar en pantalla completa nativa.
-- Quedan flotando, sin que se las toque: diálogos, paneles flotantes, hojas, Quick Look, Picture in Picture, ventanas no redimensionables y las ventanas de la propia app Rambla.
+- Quedan flotando, sin que se las toque: diálogos, paneles flotantes, hojas, Quick Look, Picture in Picture, ventanas no redimensionables y las ventanas de la propia app Rambla. Con tiras apiladas, esas y las de reglas de app se ven en todas las tiras (ver "Ventanas flotantes" en el diseño de tiras apiladas).
 - Reglas por app (bundle id):
   - comportamiento: Mosaico (default) o Flotante
   - ancho inicial opcional
@@ -63,13 +64,13 @@ El usuario quiere un clon gratis de [ChainYourMac](https://chainyourmac.com), un
 
 ### Ventanas nuevas
 
-- Una ventana nueva entra como columna a la derecha de la columna enfocada, en la tira de la pantalla donde aparece. Después se enfoca y la tira se desliza hasta mostrarla.
+- Una ventana nueva entra como columna a la derecha de la columna enfocada, en la tira a la vista de la pantalla donde aparece. Después se enfoca y la tira se desliza hasta mostrarla.
 - Ancho: el propio de la ventana, limitado al rango [25 %, 100 %] del viewport. Se puede cambiar a un preset fijo en General, y la regla de la app tiene prioridad.
 - Alto: todo el alto del viewport, salvo con "Mantener altura original", que conserva la altura de apertura alineada arriba.
 
 ### Foco y scroll
 
-- Cuando cambia la ventana enfocada (por atajo, click, ⌘Tab, Dock o Mission Control), la tira se desliza con una animación de resorte hasta que la columna enfocada queda entera a la vista.
+- Cuando cambia la ventana enfocada (por atajo, click, ⌘Tab, Dock o Mission Control), la tira se desliza con una animación de resorte hasta que la columna enfocada queda entera a la vista. Si la ventana es de otra tira de la pantalla, antes se cambia a esa tira, salvo en los casos que dice "Foco desde afuera" en el diseño de tiras apiladas.
 - Modos de centrado:
   - **Nunca** (default): scroll mínimo, alineando la columna al borde que corresponda.
   - **Solo si no entra**: si toda la tira entra en el viewport, no se mueve. Si no entra, centra la enfocada.
@@ -80,7 +81,7 @@ El usuario quiere un clon gratis de [ChainYourMac](https://chainyourmac.com), un
 
 ### Acciones y atajos por defecto
 
-Modificador base **⌃⌘** y **⌃⌘⇧** para la variante "mover". Ninguno choca con los atajos de Rectangle del usuario (⌃⌥, ⌃⌥⇧ y ⌃⌥⌘). Se evitan los atajos de sistema ⌃⌘F (pantalla completa), ⌃⌘Q (bloquear), ⌃⌘D (diccionario) y ⌃⌘Espacio (emojis). Cada acción admite hasta 2 atajos y todos se pueden cambiar.
+Modificador base **⌃⌘** y **⌃⌘⇧** para la variante "mover". Las de las tiras apiladas usan **⌃⌥⌘** y **⌃⌥⌘⇧** con ↑ y ↓, que Rectangle solo usa con ← y → (cambiar de pantalla). Ninguno choca con los atajos de Rectangle del usuario (⌃⌥, ⌃⌥⇧ y ⌃⌥⌘). Se evitan los atajos de sistema ⌃⌘F (pantalla completa), ⌃⌘Q (bloquear), ⌃⌘D (diccionario) y ⌃⌘Espacio (emojis). Cada acción admite hasta 2 atajos y todos se pueden cambiar.
 
 | Acción (id para URL/CLI) | Qué hace | Atajos por defecto |
 |---|---|---|
@@ -91,6 +92,8 @@ Modificador base **⌃⌘** y **⌃⌘⇧** para la variante "mover". Ninguno ch
 | `move-left` / `move-right` | Mueve la columna | ⌃⌘⇧← / ⌃⌘⇧→, ⌃⌘⇧H / ⌃⌘⇧L |
 | `move-up` / `move-down` | Mueve la ventana dentro de la pila | ⌃⌘⇧↑ / ⌃⌘⇧↓, ⌃⌘⇧K / ⌃⌘⇧J |
 | `send-next-display` | Manda la ventana a la siguiente pantalla | ⌃⌘N |
+| `strip-up` / `strip-down` | Va a la tira de arriba o de abajo | ⌃⌥⌘↑ / ⌃⌥⌘↓ |
+| `send-strip-up` / `send-strip-down` | Manda la ventana enfocada a la tira de arriba o de abajo, y la sigue | ⌃⌥⌘⇧↑ / ⌃⌥⌘⇧↓ |
 | `overview` | Abre o cierra la vista general de la tira | ⌃⌘O |
 | `cycle-width` | Rota el ancho entre los presets | ⌃⌘R |
 | `full-width` | Ancho completo, alternando con el anterior | ⌃⌘M |
@@ -110,15 +113,18 @@ Modificador base **⌃⌘** y **⌃⌘⇧** para la variante "mover". Ninguno ch
 - **Rotar ancho**: pasa al primer preset mayor que el ancho actual (con tolerancia de 1 %) y, si no hay ninguno, vuelve al primero. Los presets por defecto son 25, 33.3, 50, 66.7 y 75 %, y se pueden editar.
 - **Fijar a un borde**: la columna queda pegada al borde izquierdo o derecho del viewport y a todo el alto, fuera del scroll. Hay una sola columna fijada por lado. Si se fija otra en el mismo lado, la anterior vuelve a la tira junto a la enfocada. Repetir la acción la suelta.
 - **Pestañas**: todas las ventanas de la columna comparten el marco, debajo de una barra de pestañas propia (ícono y título, click para cambiar). Solo la activa se ve, al frente.
-- **Flotar**: la ventana sale de la tira, se centra en su pantalla con su tamaño (máximo 80 % del viewport) y se eleva. Si está flotando, vuelve a la tira junto a la columna enfocada.
+- **Flotar**: la ventana sale de la tira, se centra en su pantalla con su tamaño (máximo 80 % del viewport) y se eleva. Si está flotando, vuelve a la tira junto a la columna enfocada. Con tiras apiladas, las flotantes que hizo el usuario o que Rambla dejó flotando se van con su tira; las de reglas de app, los diálogos y los paneles se ven en todas (ver el diseño de tiras apiladas).
+- **Tiras apiladas**: `strip-up` y `strip-down` actúan sobre la tira de la ventana enfocada, o sobre la de la pantalla del puntero si no hay ventana enfocada. Mandar mueve la ventana sola y la sigue. En el grupo Navegar; también valen como comando, enlace y script de Raycast. Ver el diseño de tiras apiladas, "Atajos nuevos".
 - Con Rambla en pausa, los atajos se liberan, salvo `toggle-pause` si tiene uno asignado.
 
 ### Trackpad
 
 - Un swipe horizontal de N dedos (3 o 4, default 4) desplaza la tira siguiendo los dedos. Al soltar, la tira se asienta alineando el borde de columna más cercano y enfoca la columna más visible.
 - La dirección es natural (el contenido sigue a los dedos) y la sensibilidad es configurable.
-- Hacia arriba (10 % del alto del trackpad, bien vertical) da el ancho completo en el momento; hacia abajo se decide al soltar (vuelve al ancho anterior si sigue abajo), salvo que llegue al 30 %, que abre la vista general. Una vez por swipe, como con los botones del mouse.
-- **Respuesta háptica** (activada, se puede apagar): en un trackpad Force Touch, un toque (`NSHapticFeedbackManager`, `.alignment`) cada vez que cambia la columna donde aterrizaría la tira si se soltara ahora, contando la velocidad (`Layout.settle`): en un swipe rápido llega apenas arranca, con los dedos todavía apoyados; en uno lento, a mitad de camino entre columnas. Bordes a menos de 32 pt cuentan como uno y dos toques quedan a 80 ms o más. Vale con el gesto y con dos dedos y las teclas de la ruedita; otro toque (`.levelChange`) con los gestos hacia arriba o abajo. macOS solo los da con un dedo en el trackpad: con los botones del mouse no se piden.
+- Hacia arriba o abajo (bien vertical, una sola acción por swipe) hace lo que dice `Preferences.verticalGesture`, que se elige en Configuración y vale también para los botones del mouse. El interruptor de gestos verticales del trackpad los apaga en el trackpad.
+  - `strips` (el default): un swipe corto (10 % del alto del trackpad) cambia de tira al soltar, y uno largo (30 %) actúa en el momento: hacia arriba, el ancho completo (que alterna con el anterior, como `full-width`); hacia abajo, la vista general. Con la dirección natural, hacia abajo aparece la tira de arriba; los largos no dependen de ella. Volver bajo el 10 % antes de soltar no hace nada. El detalle está en el diseño de tiras apiladas, "Gestos".
+  - `width` (el gesto de antes): hacia arriba (10 %) da el ancho completo en el momento; hacia abajo se decide al soltar (vuelve al ancho anterior si sigue abajo), salvo que llegue al 30 %, que abre la vista general.
+- **Respuesta háptica** (activada, se puede apagar): en un trackpad Force Touch, un toque (`NSHapticFeedbackManager`, `.alignment`) cada vez que cambia la columna donde aterrizaría la tira si se soltara ahora, contando la velocidad (`Layout.settle`): en un swipe rápido llega apenas arranca, con los dedos todavía apoyados; en uno lento, a mitad de camino entre columnas. Bordes a menos de 32 pt cuentan como uno y dos toques quedan a 80 ms o más. Vale con el gesto y con dos dedos y las teclas de la ruedita; otro toque (`.levelChange`) con los gestos hacia arriba o abajo (con `strips`, al pasar el 10 % solo si hay una tira en esa dirección, y al pasar el 30 %). macOS solo los da con un dedo en el trackpad: con los botones del mouse no se piden.
 - macOS también recibe el gesto y no se puede bloquear. Configuración → Mac avisa si el gesto de escritorios de macOS usa la misma cantidad de dedos y ofrece abrir la configuración del Trackpad.
 
 ### Barra indicadora
@@ -150,7 +156,9 @@ Modificador base **⌃⌘** y **⌃⌘⇧** para la variante "mover". Ninguno ch
 ### Mouse
 
 - **Ruedita** (activada): con ⌃⌘ (configurable) cada paso de la ruedita enfoca la columna de al lado; con un Magic Mouse o dos dedos en el trackpad, la tira se desliza y se asienta al soltar.
-- **Botones del mouse** (apagado; combinación por defecto 4 + 5): con la combinación elegida apretada, mover el mouse hacia los costados desliza la tira (2 pt de tira por punto del puntero a sensibilidad 1×, con dirección natural configurable) y al soltar se asienta con la velocidad que llevaba; hacia arriba (40 pt, bien vertical) da el ancho completo en el momento; hacia abajo se decide al soltar (devuelve el ancho anterior si sigue abajo), salvo que llegue a 160 pt, que abre la vista general. Una vez por pulsación. Nunca intervienen el botón izquierdo ni el derecho.
+- **Botones del mouse** (apagado; combinación por defecto 4 + 5): con la combinación elegida apretada, mover el mouse hacia los costados desliza la tira (2 pt de tira por punto del puntero a sensibilidad 1×, con dirección natural configurable) y al soltar se asienta con la velocidad que llevaba. Hacia arriba o abajo hace lo que dice `Preferences.verticalGesture`, como en el trackpad y con los umbrales de los botones (40 pt el corto, 160 pt el largo; sin respuesta háptica; la dirección sigue la opción natural de los botones), una vez por pulsación. Nunca intervienen el botón izquierdo ni el derecho.
+  - `strips` (el default): el corto cambia de tira al soltar y el largo actúa en el momento (hacia arriba, el ancho completo, que alterna con el anterior; hacia abajo, la vista general).
+  - `width` (el gesto de antes): hacia arriba (40 pt, bien vertical) da el ancho completo en el momento; hacia abajo se decide al soltar (devuelve el ancho anterior si sigue abajo), salvo que llegue a 160 pt, que abre la vista general.
   - Se graba en Configuración apretando los botones juntos: queda la mayor cantidad que estuvo apretada a la vez.
   - Para no quitarles los botones a otras apps (Mac Mouse Fix usa el 4 y el 5 por separado), la primera pulsación de una combinación de varios botones se retiene hasta 0,2 s esperando las demás. Si no llegan, si se suelta, si el puntero se mueve más de 6 pt, si se aprieta otro botón o si gira la ruedita, la pulsación se le devuelve a la app. Con un solo botón, soltarlo antes de que haya gesto devuelve el clic, y girar la ruedita con el botón apretado se lo pasa a la app.
   - Los taps de la ruedita y de los botones están en el nivel HID con inserción al principio, para ver los eventos antes que Mac Mouse Fix (que si no convierte ⌘ + ruedita en zoom). Como el último tap creado queda primero, Rambla los vuelve a crear 3 s y 15 s después de que se abre cualquier app, salvo en medio de un gesto (reintenta cada 0,5 s).
@@ -160,20 +168,26 @@ Modificador base **⌃⌘** y **⌃⌘⇧** para la variante "mover". Ninguno ch
 ### Vista general
 
 - ⌃⌘O (`overview`), o el gesto hacia abajo largo del trackpad o de los botones del mouse, abre un panel a pantalla completa sobre la pantalla de la tira activa (o la del puntero, con los gestos) que muestra toda la tira en una fila de ventanas en miniatura a escala: barra de título con el título real, ícono y color de la app, pilas, pestañas, columnas fijadas y una barra con la parte que está en pantalla. Las tarjetas angostas y los espacios chicos se dibujan más anchos que su proporción, y la barra se ubica sobre las tarjetas que cubre.
-- Las flechas mueven la selección (saltando ventanas minimizadas u ocultas) y ↩ la enfoca; 1–9 enfocan directo esa columna, contando como ⌃⌘1…9 solo las que están en pantalla. Mientras está abierta, los atajos de Rambla para moverse (⌃⌘ + flechas, ⌃⌘A/E, ⌃⌘1…9) mueven la selección o eligen; cualquier otro la cierra y actúa sobre la tira. Elegir una ventana que no se puede (minimizada, o que se cerró mientras tanto) suena.
+- Las flechas mueven la selección (saltando ventanas minimizadas u ocultas) y ↩ la enfoca; 1–9 enfocan directo esa columna, contando como ⌃⌘1…9 solo las que están en pantalla. Mientras está abierta, los atajos de Rambla para moverse (⌃⌘ + flechas, ⌃⌘A/E, ⌃⌘1…9) mueven la selección o eligen (con tiras apiladas, también los de cambiar de tira, que pasan a la fila de arriba o de abajo, y los de mandar, que mandan la columna elegida); cualquier otro la cierra y actúa sobre la tira. Elegir una ventana que no se puede (minimizada, o que se cerró mientras tanto) suena.
 - Arrastrar una tarjeta la levanta: sigue al puntero de costado (sin pasar las columnas fijadas), las demás le hacen lugar donde caería (cuando su centro pasa el centro de otra) y al soltar se desliza hasta ahí; recién entonces su columna se mueve en la tira, que se ve detrás. ⇧← → (y ⌃⌘⇧← →, `move-left` / `move-right`) mueven así la columna elegida un lugar. Un click sin mover el puntero sigue eligiendo.
 - Esc, ⌘W, un click afuera de las ventanas, el atajo de nuevo, otra app u otro escritorio la cierran; ⌘Q y ⌘H no llegan al menú de Rambla.
 - No usa capturas reales de las ventanas (pedirían el permiso de grabación de pantalla). El panel recibe el teclado sin activar Rambla.
+- **Con varias tiras apiladas** muestra una fila por tira de la pantalla, la de arriba arriba:
+  - cada fila es como lo de arriba, con la barra de lo que está en pantalla solo en la tira a la vista, y las filas se achican para entrar;
+  - una tira sin ventanas es una tarjeta "Vacía" que no se puede elegir, y elegir una ventana de otra fila va a esa tira;
+  - ↑ y ↓ pasan de una fila a otra; ⇧↑ y ⇧↓ (o `send-strip-up` / `send-strip-down`) mandan la columna elegida a la tira de arriba o de abajo, y arrastrar una tarjeta a otra fila hace lo mismo. Mientras se arrastra aparece arriba una fila "Tira nueva" que la crea al soltar;
+  - se abre si alguna tira tiene ventanas: solo una pantalla sin ventanas en ninguna muestra el aviso de siempre;
+  - con una sola tira se ve como arriba. El detalle está en el diseño de tiras apiladas, "Vista general".
 
 ### Pantallas, escritorios y estados especiales
 
-- Cada pantalla y cada escritorio tiene su propia tira, con su foco y su scroll.
+- Cada pantalla y cada escritorio tiene su propia tira, con su foco y su scroll. Con tiras apiladas, tiene su propia pila de tiras y su tira a la vista, que se recuerda al ir y volver de escritorio; las de distintas pantallas no cambian juntas (ver "Pantallas y escritorios" en el diseño de tiras apiladas).
 - Ante un cambio de escritorio, la conexión o desconexión de pantallas o el reposo y despertar, se reconcilia el estado. Durante 2 s, los movimientos que haga macOS no cuentan como externos.
 - **Pantalla completa nativa**: la ventana sale de la tira y reingresa al volver.
 - Si la app está oculta (⌘H), la ventana minimizada o es una pestaña nativa inactiva, su columna se **colapsa**. No ocupa lugar y reaparece en el mismo sitio al volver.
 - **Pestañas nativas** (Finder, Terminal): si aparece una ventana nueva de la misma app con el mismo marco que una que acaba de ocultarse, se agrupa en la misma columna (best effort).
-- Si una ventana se pasa a otro escritorio desde Mission Control, se la mueve a la tira de ese escritorio en la próxima reconciliación.
-- **Pantalla desconectada**: pasados 15 s (2 s si es la pantalla de la Mac y la tapa está cerrada, `AppleClamshellState`), sus tiras van al archivo (ver Persistencia) y sus ventanas se suman a las tiras de las pantallas donde las deja macOS. Durante los 10 s después de que vuelve (25 s si arranca Rambla con ella conectada, porque después de reiniciar la Mac las apps tardan en abrir), cada tira archivada así recupera las ventanas que estén a la vista, de la tira donde estén, salvo las flotantes: por ID dentro de la misma sesión, y después de reiniciar la Mac por un título que tenga una sola ventana de esa app. Si su escritorio volvió con otra clave y era el único archivado de esa pantalla, va al escritorio que muestre (mientras macOS no liste los escritorios de la pantalla, se vuelve a intentar). Pasado ese tiempo se trata como cualquier tira archivada.
+- Si una ventana se pasa a otro escritorio desde Mission Control, se la mueve a la tira de ese escritorio (la que está a la vista, con tiras apiladas) en la próxima reconciliación.
+- **Pantalla desconectada**: pasados 15 s (2 s si es la pantalla de la Mac y la tapa está cerrada, `AppleClamshellState`), sus tiras van al archivo (ver Persistencia) y sus ventanas se suman a las tiras de las pantallas donde las deja macOS. Con tiras apiladas, la tira N va a la tira N de la otra pantalla (que se crea si no existe), las que no están a la vista quedan estacionadas, y al volver cada una recupera sus ventanas y la pantalla vuelve a mostrar la que tenía (ver "Pantallas y escritorios" en el diseño de tiras apiladas). Durante los 10 s después de que vuelve (25 s si arranca Rambla con ella conectada, porque después de reiniciar la Mac las apps tardan en abrir), cada tira archivada así recupera las ventanas que estén a la vista, de la tira donde estén, salvo las flotantes: por ID dentro de la misma sesión, y después de reiniciar la Mac por un título que tenga una sola ventana de esa app. Si su escritorio volvió con otra clave y era el único archivado de esa pantalla, va al escritorio que muestre (mientras macOS no liste los escritorios de la pantalla, se vuelve a intentar). Pasado ese tiempo se trata como cualquier tira archivada.
 - **Pantalla de paso**: una pantalla cuenta recién cuando lleva 3 s conectada (`DisplayPresence`). Al despertar una Mac con la tapa cerrada, macOS muestra durante un segundo una pantalla virtual (1920×1080, siempre el mismo UUID) mientras el monitor se enciende; antes de los 3 s una pantalla no recupera ventanas, no restaura su tira, no recibe ventanas sueltas ni las de otro escritorio. Los 10 s de recuperación empiezan a contar cuando se asienta.
 - Una tira cuyo escritorio ya no está en su pantalla (borrado, o la pantalla volvió antes de los 15 s con otros escritorios) va al archivo, y sus ventanas se suman a las tiras de los escritorios donde estén.
 
@@ -183,6 +197,7 @@ Modificador base **⌃⌘** y **⌃⌘⇧** para la variante "mover". Ninguno ch
 - Cada tira guardada lleva sus ventanas (ID, app y título) y la sesión de la Mac en que se vio por última vez. Dentro de esa sesión, un ID que existe es esa ventana (una nueva con el mismo título es otra), y una guardada cuyo ID ya no existe (se cerró, o su app se reinició) se puede reconocer por su título; después de cerrar sesión o reiniciar la Mac, solo por app + título (best effort). Los archivos de antes de 1.1.0 no dicen la sesión: primero ID, después título.
 - **Archivo**: las tiras que no están a la vista (escritorios no visitados desde que arrancó Rambla, pantallas desconectadas) se guardan junto con las vivas, hasta 30 días desde la última vez que se vieron; mientras un escritorio no se reconstruyó, el archivo guarda su tira y no la viva. Una tira se reconstruye la primera vez que su pantalla y escritorio están a la vista y aparece alguna ventana de esa pantalla para ubicar (las que ya se sumaron a esa tira también cuentan); si ninguna de sus ventanas está, el escritorio arranca como está y su tira viva reemplaza a la archivada.
 - Antes de reconstruir, espera a que las apps listen sus ventanas: al arrancar, al desbloquear y al cambiar de escritorio, hasta 2 s (solo las apps que ya respondieron alguna vez, salvo al arrancar y al desbloquear). Mientras tanto, las ventanas de esos escritorios no se ubican. Después de reiniciar la Mac, Rambla puede arrancar antes de que macOS vuelva a abrir las apps: durante los primeros 15 s, una tira de otra sesión espera además a que cada una de sus apps muestre una ventana y no aparezcan ventanas nuevas por 1 s (3 s si alguna de sus apps no tiene ninguna).
+- **Tiras apiladas**: cada tira guardada lleva su número desde abajo (`level`, 0 en los archivos de antes) y la tira a la vista de su pantalla y escritorio (`activeLevel`). El archivo las guarda todas, por número; al arrancar se reconstruyen todas y las que no están a la vista se estacionan. Ver "Persistencia" en el diseño de tiras apiladas.
 - Las preferencias van en UserDefaults (`io.github.coru29.Rambla`).
 - Arrancar con la Mac usa `SMAppService.mainApp`.
 
@@ -210,7 +225,7 @@ Modificador base **⌃⌘** y **⌃⌘⇧** para la variante "mover". Ninguno ch
 |---|---|
 | General | activo, arrancar con la Mac, animaciones (con velocidad), centrado, ancho de ventanas nuevas, mantener altura original, gaps (interior y exterior), presets de ancho, paso de ajuste, sacar de la tira lo que mueva otra app |
 | Atajos | todas las acciones agrupadas (Navegar, Tamaño, Pilas, Otros), con hasta 2 grabadores cada una, "Restaurar predeterminados", aviso de conflicto con Rectangle y aviso si el registro del atajo falla |
-| Trackpad y mouse | trackpad: activado, dedos (3/4), sensibilidad, dirección natural, hacia arriba para el ancho completo, aviso de conflicto con el gesto de macOS. Ruedita: activada y teclas. Botones del mouse: activados, botones (grabador), sensibilidad, dirección natural |
+| Trackpad y mouse | trackpad: activado, dedos (3/4), sensibilidad, dirección natural, gestos hacia arriba y abajo y qué hacen (cambiar de tira o el ancho; vale también para los botones del mouse), aviso de conflicto con el gesto de macOS. Ruedita: activada y teclas. Botones del mouse: activados, botones (grabador), sensibilidad, dirección natural |
 | Apariencia | barra indicadora (sí/no), borde de foco (sí/no, color, grosor), atenuar inactivas (sí/no, intensidad), el mouse sigue al foco, el foco sigue al mouse |
 | Apps | lista de reglas: app, comportamiento, ancho inicial, posición al abrir. Para agregar, se elige entre las apps abiertas o con un selector de .app |
 | Pantallas | pantallas conectadas con un interruptor cada una |
@@ -303,6 +318,7 @@ Modificador base **⌃⌘** y **⌃⌘⇧** para la variante "mover". Ninguno ch
   2. el borde del lado opuesto
 - Se elige el primer candidato cuyo rectángulo no interseca otra pantalla. Si ninguno sirve, se usa el primero.
 - Las esquinas inferiores no sirven: macOS sube la ventana hasta que la barra de título queda sobre el Dock.
+- Las ventanas de las tiras apiladas que no están a la vista se estacionan con esta misma regla, todas, y las flotantes que se van con su tira también (el lado se elige por el centro de la ventana). Con otra pantalla a cada lado no hay borde libre: se usa el primer candidato y las ventanas quedan sobre la pantalla vecina del lado más cercano, el mismo límite de las columnas estacionadas. El cambio de tira es inmediato: primero saltan a su lugar las que llegan y después las otras a su estacionamiento, sin cruzar la pantalla. Ver "Las ventanas de las otras tiras" en el diseño de tiras apiladas.
 
 ### Firma, empaquetado e instalación
 

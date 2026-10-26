@@ -48,27 +48,54 @@ public enum TrackpadSwipe: Equatable, Sendable {
     }
 }
 
-/// Up and down on the trackpad, like with the mouse buttons: up gives the full width at once; down is decided when
-/// the fingers lift (back to the previous width), unless they go down `overviewStart` first, which opens the overview;
-/// back up before lifting, nothing. One command per swipe.
+/// Up and down on the trackpad, like with the mouse buttons. One action per swipe (in strips mode it is told first,
+/// with `armed`, that a short swipe is ready, for the haptic tap, and then the action, if any), and a long swipe down
+/// opens the overview in both modes; the rest depends on `mode`:
+/// - Width mode: up gives the full width at once; down is decided when the fingers lift (back to the previous width),
+///   unless they go down `longStart` first; back up before lifting, nothing.
+/// - Strips mode: the first move up or down arms a short swipe, which changes strip when the fingers lift (back below
+///   the short distance before lifting, nothing); a long swipe up gives the focused column the full width (or gives it
+///   back) at once.
 public struct TrackpadVertical: Equatable, Sendable {
-    public enum Command: Equatable, Sendable { case fullWidth, previousWidth, overview }
+    public enum Command: Equatable, Sendable {
+        /// Width mode: the focused column takes the full width.
+        case fullWidth
+        /// Width mode: the focused column goes back to its previous width.
+        case previousWidth
+        /// A long swipe down, in both modes.
+        case overview
+        /// Strips mode: a long swipe up gives the focused column the full width, or gives it back.
+        case toggleWidth
+        /// Strips mode: a short swipe, decided when the fingers lift: change strip. `up`: the fingers went up.
+        case strip(up: Bool)
+        /// Strips mode: the swipe just became a short vertical one, so lifting now changes strip (the cue for a haptic
+        /// tap). `up`: the fingers went up.
+        case armed(up: Bool)
+    }
 
-    /// How far down (a fraction of the trackpad's height) opens the overview.
-    public static let overviewStart = 0.3
+    /// How far (a fraction of the trackpad's height) a long swipe goes: down opens the overview, and in strips mode up
+    /// gives the full width.
+    public static let longStart = 0.3
+    /// How far down opens the overview: the long swipe's distance.
+    public static let overviewStart = longStart
 
+    private let mode: VerticalGesture
+    private var goingUp = false
     private var goingDown = false
     private var done = false
 
-    public init() {}
+    public init(mode: VerticalGesture = .width) {
+        self.mode = mode
+    }
 
     /// The swipe went up or down: the rest of it does not slide the strip.
-    public var isVertical: Bool { goingDown || done }
+    public var isVertical: Bool { goingUp || goingDown || done }
 
     /// The fingers are `dy` from where they landed (a fraction of the trackpad's height, up positive), and the swipe
     /// reads as `kind` so far.
     public mutating func moved(_ kind: TrackpadSwipe?, dy: Double) -> Command? {
         guard !done else { return nil }
+        if mode == .strips { return movedInStripsMode(kind, dy: dy) }
         if !goingDown {
             if kind == .up {
                 done = true
@@ -82,9 +109,41 @@ public struct TrackpadVertical: Equatable, Sendable {
         return .overview
     }
 
-    /// The fingers lifted `dy` from where they landed; the next swipe starts over.
+    /// The fingers lifted `dy` from where they landed; the next swipe starts over, in the same mode.
     public mutating func lifted(dy: Double) -> Command? {
-        defer { self = TrackpadVertical() }
-        return goingDown && !done && dy <= -TrackpadSwipe.verticalStart ? .previousWidth : nil
+        defer { self = TrackpadVertical(mode: mode) }
+        switch mode {
+        case .width:
+            return goingDown && !done && dy <= -TrackpadSwipe.verticalStart ? .previousWidth : nil
+        case .strips:
+            guard !done else { return nil }
+            if goingUp, dy >= TrackpadSwipe.verticalStart { return .strip(up: true) }
+            if goingDown, dy <= -TrackpadSwipe.verticalStart { return .strip(up: false) }
+            return nil
+        }
+    }
+
+    /// Strips mode: the first move that reads as up or down arms a short swipe (or acts at once when it is already
+    /// long). The direction is then fixed, and only going far enough that way acts: going on past where the fingers
+    /// landed is neither the full width nor the overview.
+    private mutating func movedInStripsMode(_ kind: TrackpadSwipe?, dy: Double) -> Command? {
+        var arming = false
+        if !goingUp, !goingDown {
+            switch kind {
+            case .up?: goingUp = true
+            case .down?: goingDown = true
+            default: return nil
+            }
+            arming = true
+        }
+        if goingUp, dy >= Self.longStart {
+            done = true
+            return .toggleWidth
+        }
+        if goingDown, dy <= -Self.longStart {
+            done = true
+            return .overview
+        }
+        return arming ? .armed(up: goingUp) : nil
     }
 }

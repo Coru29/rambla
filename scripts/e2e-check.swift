@@ -79,6 +79,21 @@ func samples(_ id: UInt32, running command: [String]) -> [CGRect] {
     return result
 }
 
+/// Rambla's own log file (`Log`), and what it wrote since it was `offset` bytes long: from the start of a file that
+/// rolled over meanwhile.
+let ramblaLogURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/Rambla/rambla.log")
+
+func ramblaLogSize() -> UInt64 {
+    ((try? FileManager.default.attributesOfItem(atPath: ramblaLogURL.path))?[.size] as? NSNumber)?.uint64Value ?? 0
+}
+
+func ramblaLog(since offset: UInt64) -> String {
+    guard let handle = try? FileHandle(forReadingFrom: ramblaLogURL) else { return "" }
+    defer { try? handle.close() }
+    try? handle.seek(toOffset: ramblaLogSize() >= offset ? offset : 0)
+    return String(decoding: handle.readDataToEndOfFile(), as: UTF8.self)
+}
+
 func activeDisplays() -> Int {
     var count: UInt32 = 0
     CGGetActiveDisplayList(0, nil, &count)
@@ -92,6 +107,140 @@ func shown(_ r: CGRect, on display: CGRect) -> Double {
 
 func trace(_ frames: [CGRect], on display: CGRect) -> String {
     frames.filter { shown($0, on: display) > 3 }.map { "\(Int($0.minX))" }.joined(separator: " ")
+}
+
+/// `fail` for the commands whose output the script keeps (`$(…)`): the message must not end up in the value.
+func failAside(_ message: String) -> Never {
+    FileHandle.standardError.write(Data("FAIL: \(message)\n".utf8))
+    exit(1)
+}
+
+// MARK: - Stacked strips
+
+/// How much of a parked window stays on its display, in points (`WindowManager.sliver`).
+let sliver = 1.0
+
+/// A display of the dump, with the Space it shows.
+struct DumpDisplay {
+    let uuid: String
+    let frame: CGRect
+    let space: UInt64?
+}
+
+/// A rectangle of the dump ({x, y, w, h}).
+func rectFrom(_ o: Any?) -> CGRect {
+    let r = o as? [String: Double] ?? [:]
+    return CGRect(x: r["x"] ?? 0, y: r["y"] ?? 0, width: r["w"] ?? 0, height: r["h"] ?? 0)
+}
+
+/// The displays of the dump; the first is the one the test windows open on (`display(_:)`).
+func dumpDisplays(_ d: [String: Any]) -> [DumpDisplay] {
+    (d["displays"] as? [[String: Any]] ?? []).compactMap { entry in
+        guard let uuid = entry["uuid"] as? String else { return nil }
+        return DumpDisplay(uuid: uuid, frame: rectFrom(entry["frame"]), space: (entry["space"] as? NSNumber)?.uint64Value)
+    }
+}
+
+/// The stack in view on a display (the strips of the Space it shows; the display of the test windows unless `uuid`
+/// says another): the level in view and the highest one. Nil when the dump does not have it. Unlike `currentStrip`, it
+/// is there while the level in view is empty.
+func stackInView(_ d: [String: Any], on uuid: String? = nil) -> (display: DumpDisplay, active: Int, top: Int)? {
+    let all = dumpDisplays(d)
+    let chosen: DumpDisplay?
+    if let uuid { chosen = all.first { $0.uuid == uuid } } else { chosen = all.first }
+    guard let disp = chosen, let space = disp.space else { return nil }
+    let stack = (d["stacks"] as? [[String: Any]] ?? []).first {
+        ($0["display"] as? String) == disp.uuid && ($0["space"] as? NSNumber)?.uint64Value == space
+    }
+    guard let active = (stack?["active"] as? NSNumber)?.intValue, let top = (stack?["top"] as? NSNumber)?.intValue else { return nil }
+    return (disp, active, top)
+}
+
+/// The level of the strip that holds window `id`, at any level.
+func levelHolding(_ id: UInt32, in d: [String: Any]) -> Int? {
+    let holder = (d["strips"] as? [[String: Any]] ?? []).first { windowIDs($0).contains(id) }
+    return (holder?["level"] as? NSNumber)?.intValue
+}
+
+/// A window out of view: one of a level that is not in view of a stack that is (`float` false), or a floating window
+/// parked with such a level (`float`).
+struct OutOfView {
+    let id: UInt32
+    let display: DumpDisplay
+    let level: Int
+    let float: Bool
+}
+
+/// The windows out of view on the displays that show a stack: those of the levels that are not in view, and the
+/// floating windows parked with them.
+func outOfView(_ d: [String: Any]) -> [OutOfView] {
+    var found: [OutOfView] = []
+    for disp in dumpDisplays(d) {
+        guard let space = disp.space, let view = stackInView(d, on: disp.uuid) else { continue }
+        for strip in d["strips"] as? [[String: Any]] ?? []
+        where (strip["display"] as? String) == disp.uuid && (strip["space"] as? NSNumber)?.uint64Value == space {
+            let level = (strip["level"] as? NSNumber)?.intValue ?? 0
+            if level != view.active { found += windowIDs(strip).map { OutOfView(id: $0, display: disp, level: level, float: false) } }
+        }
+        found += parkedFloats(d, on: disp).filter { $0.level != view.active }
+    }
+    return found
+}
+
+/// The floating windows parked with a level (`floatShelf`) of the stack the display shows.
+func parkedFloats(_ d: [String: Any], on disp: DumpDisplay) -> [OutOfView] {
+    guard let space = disp.space else { return [] }
+    return (d["floatShelf"] as? [[String: Any]] ?? []).flatMap { shelf -> [OutOfView] in
+        guard (shelf["display"] as? String) == disp.uuid, (shelf["space"] as? NSNumber)?.uint64Value == space else { return [] }
+        let level = (shelf["level"] as? NSNumber)?.intValue ?? 0
+        return (shelf["windows"] as? [NSNumber] ?? []).map { OutOfView(id: $0.uint32Value, display: disp, level: level, float: true) }
+    }
+}
+
+/// What is wrong with how window `id` hides, in words: more than its sliver (and 1 pt) on its own display, or
+/// anything on another one: the real ones in `all`, and `extra`, frames of displays that are not there (the one
+/// `debug-neighbor` plugs). Nil when it hides.
+func exposure(of id: UInt32, on own: DumpDisplay, among all: [DumpDisplay], extra: [CGRect]) -> String? {
+    guard let real = bounds(id) else { return "has no window" }
+    var problems: [String] = []
+    let onOwn = shown(real, on: own.frame)
+    if onOwn > sliver + 1 { problems.append("\(Int(onOwn)) pt on its own display") }
+    for other in all where other.uuid != own.uuid && shown(real, on: other.frame) > 0.5 {
+        problems.append("\(Int(shown(real, on: other.frame))) pt on display \(other.uuid.prefix(8))")
+    }
+    for frame in extra where shown(real, on: frame) > 0.5 {
+        problems.append("\(Int(shown(real, on: frame))) pt on the display plugged at \(Int(frame.minX)),\(Int(frame.minY))")
+    }
+    return problems.isEmpty ? nil : "at \(Int(real.minX)),\(Int(real.minY)) (\(Int(real.width)) wide) shows " + problems.joined(separator: ", ")
+}
+
+/// The optional frame in `args` from `index` on (X Y W H): the display `debug-neighbor` plugs, which the checks for
+/// windows out of sight also look at.
+func pluggedDisplay(_ args: [String], from index: Int) -> [CGRect] {
+    guard args.count > index else { return [] }
+    let v = args[index...].compactMap(Double.init)
+    guard args.count == index + 4, v.count == 4 else { fail("the display to look at takes X Y W H, not: \(args[index...].joined(separator: " "))") }
+    return [CGRect(x: v[0], y: v[1], width: v[2], height: v[3])]
+}
+
+// MARK: - Pause
+
+/// Whether the dump says Rambla is paused, once it has said the same for `hold` seconds: a `toggle-pause` sent a moment
+/// ago may not be applied yet. Nil when it says nothing for that long (Rambla is not there to answer).
+func pausedOnceSteady(hold: Double = 1, timeout: Double = 10) -> Bool? {
+    func reading() -> Int { (dump()["paused"] as? Bool).map { $0 ? 1 : 0 } ?? -1 }
+    var value = reading()
+    var since = Date()
+    let end = Date().addingTimeInterval(timeout)
+    while Date() < end, Date().timeIntervalSince(since) < hold {
+        usleep(150_000)
+        let now = reading()
+        if now != value {
+            value = now
+            since = Date()
+        }
+    }
+    return value < 0 ? nil : value == 1
 }
 
 let args = Array(CommandLine.arguments.dropFirst())
@@ -152,11 +301,16 @@ case "check-gathered":
     let d = dump()
     let disp = display(d)
     let ids = ((d["windows"] as? [[String: Any]]) ?? []).compactMap { ($0["id"] as? NSNumber)?.uint32Value }
+    // Nothing to look at (Rambla gave no dump, or knows no window) is no pass.
+    guard !ids.isEmpty else { fail("the dump lists no windows") }
+    var looked = 0
     for id in ids {
         guard let real = bounds(id) else { continue }
+        looked += 1
         if !disp.visible.insetBy(dx: -2, dy: -2).contains(real) { fail("window \(id) at \(real) is outside \(disp.visible)") }
     }
-    pass("all \(ids.count) windows inside the visible area")
+    guard looked > 0 else { fail("none of the \(ids.count) windows in the dump has a window to look at") }
+    pass("all \(looked) windows inside the visible area")
 case "check-floating":
     let id = UInt32(args[1])!
     let d = dump()
@@ -172,7 +326,7 @@ case "host":
     pass("host \(args[1])")
 case "column-order":
     // The strip's columns, as the first window of each, in order.
-    guard let s = currentStrip(dump()) else { fail("no strip") }
+    guard let s = currentStrip(dump()) else { failAside("no strip") }
     print(columns(s).compactMap { ($0["windows"] as? [NSNumber])?.first?.stringValue }.joined(separator: ","))
 case "check-order":
     guard let s = currentStrip(dump()) else { fail("no strip") }
@@ -187,9 +341,9 @@ case "check-columns":
     if order == args[1] { pass("columns in the same order: \(order)") } else { fail("columns \(order), expected \(args[1])") }
 case "window-at":
     let n = Int(args[1])!
-    guard let s = currentStrip(dump()) else { fail("no strip") }
+    guard let s = currentStrip(dump()) else { failAside("no strip") }
     let cols = columns(s)
-    guard cols.indices.contains(n), let id = (cols[n]["windows"] as? [NSNumber])?.first else { fail("no column \(n)") }
+    guard cols.indices.contains(n), let id = (cols[n]["windows"] as? [NSNumber])?.first else { failAside("no column \(n)") }
     print(id.uint32Value)
 case "check-placed":
     // Every window of the current strips (one per display) is exactly where its strip puts it (visible or parked).
@@ -261,6 +415,7 @@ case "watch-until-displays":
 case "neighbor-right":
     // Arguments for `rambla debug-neighbor`: a laptop-sized display right of the strip's one.
     let f = display(dump()).frame
+    guard f.width > 0 else { failAside("no display in the dump") }
     print("\(Int(f.maxX)) \(Int(f.minY)) 1512 \(Int(f.height))")
 case "watch-hidden":
     // ID COMMAND...: while the command runs, the window never shows more than its sliver.
@@ -286,7 +441,233 @@ case "watch-enters", "watch-leaves":
     } else {
         fail("window \(id) crossed the display at x: \(trace(frames, on: disp)) (\(entering ? "ends" : "starts") at \(Int(reference.minX)))")
     }
+case "watch-reparked":
+    // ID COMMAND...: the command moves window ID, parked out of sight, away from its parking spot (another app moving
+    // it), and Rambla parks it again: while it runs, the window is seen away from that spot (or at another size), and
+    // it ends back there. A window that never moved would pass a check of where it ends alone.
+    let id = UInt32(args[1])!
+    guard let spot = bounds(id) else { fail("no window \(id)") }
+    func atSpot(_ r: CGRect) -> Bool {
+        abs(r.minX - spot.minX) <= 2 && abs(r.minY - spot.minY) <= 2 && abs(r.width - spot.width) <= 2
+            && abs(r.height - spot.height) <= 2
+    }
+    func describe(_ r: CGRect) -> String { "\(Int(r.minX)),\(Int(r.minY)) \(Int(r.width))x\(Int(r.height))" }
+    let logStart = ramblaLogSize()
+    let frames = samples(id, running: Array(args.dropFirst(2)))
+    if frames.count < 50 { fail("only \(frames.count) samples of window \(id)") }
+    guard let away = frames.first(where: { !atSpot($0) }) else {
+        // Rambla can park it again within one sample (8 ms apart): then its own log is what says it saw the move.
+        let seen = ramblaLog(since: logStart).split(separator: "\n").last {
+            $0.contains("Window \(id) of strip level ") && $0.contains(" moved by another app ")
+                && $0.hasSuffix(": back to its place")
+        }
+        guard let seen else {
+            fail("window \(id) was never seen away from its parking spot at \(describe(spot)) (\(frames.count) samples), "
+                 + "and Rambla's log does not say it moved: the move did not happen, so nothing shows it was parked again")
+        }
+        guard let last = frames.last, atSpot(last) else {
+            fail("Rambla saw window \(id) moved but it is not back at its parking spot \(describe(spot)): "
+                 + "it is at \(frames.last.map(describe) ?? "?")")
+        }
+        pass("window \(id) was moved and parked again at \(describe(spot)) too fast for the samples; Rambla's log: "
+             + seen.drop { $0 != "[" })
+        exit(0)
+    }
+    guard let last = frames.last, atSpot(last) else {
+        fail("window \(id) was moved to \(describe(away)) and is not back at its parking spot \(describe(spot)): "
+             + "it is at \(frames.last.map(describe) ?? "?")")
+    }
+    pass("window \(id) was moved to \(describe(away)) and parked again at \(describe(spot))")
+case "watch-moves-once":
+    // ID COMMAND...: while the command runs, window ID goes where it goes in a single move: its corner changes at most
+    // once (by more than 2 pt), never to a first place and then on to another (a strip laid out where it was, then
+    // scrolled to the column that gets the focus: a switch in two steps).
+    let id = UInt32(args[1])!
+    let frames = samples(id, running: Array(args.dropFirst(2)))
+    if frames.count < 50 { fail("only \(frames.count) samples of window \(id)") }
+    var places: [CGPoint] = []
+    for frame in frames where places.last.map({ abs($0.x - frame.minX) > 2 || abs($0.y - frame.minY) > 2 }) ?? true {
+        places.append(frame.origin)
+    }
+    let path = places.prefix(12).map { "\(Int($0.x)),\(Int($0.y))" }.joined(separator: " → ")
+        + (places.count > 12 ? " → …" : "")
+    if places.count <= 2 {
+        pass("window \(id) moved at most once: \(path)")
+    } else {
+        fail("window \(id) moved \(places.count - 1) times on the way: \(path)")
+    }
+case "check-levels", "check-levels-on":
+    // COUNT ACTIVE [SECONDS]  (check-levels-on: UUID COUNT ACTIVE [SECONDS]): the stack in view on the display of the test
+    // windows (or on that one) has COUNT levels, 0 to COUNT - 1, and ACTIVE is the one in view. It is there while the
+    // level in view is empty too, which `currentStrip` is not.
+    let on = args[0] == "check-levels-on"
+    let uuid = on ? args[1] : nil
+    let rest = Array(args.dropFirst(on ? 2 : 1))
+    let count = Int(rest[0])!, active = Int(rest[1])!, timeout = Double(rest.count > 2 ? rest[2] : "6")!
+    let whose = uuid.map { "display \($0.prefix(8))" } ?? "the display of the test windows"
+    let wanted = "\(count) strips, level \(active) in view"
+    func found() -> String { stackInView(dump(), on: uuid).map { "\($0.top + 1) strips, level \($0.active) in view" } ?? "no stack" }
+    if waitUntil(timeout, { found() == wanted }) { pass("\(whose) has \(wanted)") } else { fail("\(whose) has \(found()), expected \(wanted)") }
+case "check-shelved":
+    // COUNT [X Y W H]: the windows out of view are COUNT (those of the levels not in view of the stacks in view, and the
+    // floating windows parked with them), and each shows at most its sliver (and 1 pt) on its own display and nothing on
+    // any other: the real ones, and the one `debug-neighbor` plugs at X Y W H. It waits for them to get there, as the
+    // moves of windows out of sight are not tracked by `settle`.
+    guard args.count >= 2, let count = Int(args[1]) else { fail("usage: check-shelved COUNT [X Y W H]") }
+    let extra = pluggedDisplay(args, from: 2)
+    var problems: [String] = []
+    var out: [OutOfView] = []
+    let ok = waitUntil {
+        let d = dump()
+        let all = dumpDisplays(d)
+        out = outOfView(d)
+        problems = out.compactMap { w in
+            exposure(of: w.id, on: w.display, among: all, extra: extra)
+                .map { "window \(w.id) (level \(w.level)\(w.float ? ", floating" : "")) \($0)" }
+        }
+        if out.count != count { problems.insert("\(out.count) windows are out of view, expected \(count)", at: 0) }
+        return problems.isEmpty
+    }
+    if ok {
+        pass("\(out.count) windows out of view (\(out.filter(\.float).count) floating) show at most \(Int(sliver + 1)) pt")
+    } else {
+        fail(problems.joined(separator: "; "))
+    }
+case "check-float-parked":
+    // ID [X Y W H]: window ID is parked with a level out of view (it is in `floatShelf`), and hides as the windows of that
+    // level do (`check-shelved`).
+    let id = UInt32(args[1])!
+    let extra = pluggedDisplay(args, from: 2)
+    var problem = ""
+    let ok = waitUntil {
+        let d = dump()
+        let all = dumpDisplays(d)
+        let parked = all.flatMap { parkedFloats(d, on: $0) }
+        guard let shelf = parked.first(where: { $0.id == id }) else {
+            problem = "window \(id) is not parked with any level (floatShelf has \(parked.map(\.id)))"
+            return false
+        }
+        if let view = stackInView(d, on: shelf.display.uuid), view.active == shelf.level {
+            problem = "window \(id) is parked with level \(shelf.level), which is the one in view"
+            return false
+        }
+        if let why = exposure(of: id, on: shelf.display, among: all, extra: extra) {
+            problem = "floating window \(id) (parked with level \(shelf.level)) \(why)"
+            return false
+        }
+        return true
+    }
+    if ok { pass("floating window \(id) is parked out of sight") } else { fail(problem) }
+case "level-of":
+    // ID [LEVEL [SECONDS]]: prints the level of the strip that holds window ID, at any level; with LEVEL, checks that it is
+    // that one instead.
+    let id = UInt32(args[1])!
+    if args.count > 2 {
+        let want = Int(args[2])!, timeout = Double(args.count > 3 ? args[3] : "6")!
+        if waitUntil(timeout, { levelHolding(id, in: dump()) == want }) {
+            pass("window \(id) is on level \(want)")
+        } else {
+            fail("window \(id) is on level \(levelHolding(id, in: dump()).map(String.init) ?? "none (no strip holds it)"), expected \(want)")
+        }
+    } else {
+        var found: Int?
+        let held = waitUntil { found = levelHolding(id, in: dump()); return found != nil }
+        guard held, let level = found else { failAside("no strip holds window \(id)") }
+        print(level)
+    }
+case "check-not-floating":
+    // ID: window ID is in a strip, not floating (what a window another app moves while it is out of sight must stay).
+    let id = UInt32(args[1])!
+    let d = dump()
+    guard !d.isEmpty else { fail("no dump") }
+    let floating = (d["floating"] as? [NSNumber] ?? []).map(\.uint32Value)
+    if floating.contains(id) { fail("window \(id) is floating: \(floating)") }
+    guard let level = levelHolding(id, in: d) else { fail("window \(id) is in no strip") }
+    pass("window \(id) is not floating; it is on level \(level)")
+case "frame-of":
+    // ID: where window ID is, once it stops moving, as the X Y W H that `check-frame-near` takes.
+    let id = UInt32(args[1])!
+    var last: CGRect?
+    let steady = waitUntil(4) {
+        let before = bounds(id)
+        usleep(300_000)
+        last = bounds(id)
+        return before != nil && before == last
+    }
+    guard steady, let f = last else {
+        failAside("window \(id) \(bounds(id).map { "keeps moving: \($0)" } ?? "is gone")")
+    }
+    print("\(Int(f.minX.rounded())) \(Int(f.minY.rounded())) \(Int(f.width.rounded())) \(Int(f.height.rounded()))")
+case "check-frame-near":
+    // ID X Y W H: window ID is at that frame, in every number within 2 pt (`check-frame` looks at the corner only).
+    let id = UInt32(args[1])!
+    let v = args.dropFirst(2).compactMap(Double.init)
+    guard args.count == 6, v.count == 4 else { fail("usage: check-frame-near ID X Y W H") }
+    let want = CGRect(x: v[0], y: v[1], width: v[2], height: v[3])
+    func near(_ r: CGRect) -> Bool {
+        abs(r.minX - want.minX) <= 2 && abs(r.minY - want.minY) <= 2 && abs(r.width - want.width) <= 2 && abs(r.height - want.height) <= 2
+    }
+    func describe(_ r: CGRect) -> String { "\(Int(r.minX)),\(Int(r.minY)) \(Int(r.width))x\(Int(r.height))" }
+    let there = waitUntil { bounds(id).map(near) ?? false }
+    if there {
+        pass("window \(id) is at \(bounds(id).map(describe) ?? "?"), where it was (\(describe(want)))")
+    } else {
+        fail("window \(id) is at \(bounds(id).map(describe) ?? "nowhere"), expected \(describe(want))")
+    }
+case "window-number":
+    // ID: the number the test app gives window ID, for `host "focus N"`: the one in its title ("Prueba N").
+    let id = UInt32(args[1])!
+    let title = ((dump()["windows"] as? [[String: Any]]) ?? []).first { ($0["id"] as? NSNumber)?.uint32Value == id }?["title"] as? String
+    guard let number = title?.split(separator: " ").last.flatMap({ Int($0) }) else {
+        failAside("window \(id) has no test app number in its title: \(title ?? "no such window")")
+    }
+    print(number)
+case "pointer-to-display":
+    // The strip commands that start from nothing focused (an empty strip in view) act on the display under the pointer:
+    // put it on the display of the test windows, if it is on another one.
+    let frame = display(dump()).frame
+    guard frame.width > 0 else { fail("no display in the dump") }
+    let mouse = NSEvent.mouseLocation
+    let pointer = CGPoint(x: mouse.x, y: (NSScreen.screens.first?.frame.height ?? 0) - mouse.y)
+    if frame.contains(pointer) {
+        pass("the pointer is on the display of the test windows")
+    } else {
+        CGWarpMouseCursorPosition(CGPoint(x: frame.midX, y: frame.midY))
+        CGAssociateMouseAndMouseCursorPosition(1)
+        pass("the pointer went to the display of the test windows")
+    }
+case "check-paused":
+    // true|false [SECONDS]: Rambla is paused (true) or active (false), as a `toggle-pause` leaves it.
+    let want = args[1] == "true", timeout = Double(args.count > 2 ? args[2] : "6")!
+    let there = waitUntil(timeout) { dump()["paused"] as? Bool == want }
+    if there { pass("Rambla is \(want ? "paused" : "active")") } else { fail("Rambla is not \(want ? "paused" : "active"), as it should be") }
+case "resume":
+    // Resumes Rambla if it is paused, for a run that fails between two `toggle-pause`: its preferences keep a pause across
+    // launches, and a reinstall does not undo it. `toggle-pause` only flips, so it is sent only when the dump says paused,
+    // and only once the dump has said so for a second (a toggle sent a moment ago may not be applied yet).
+    guard let paused = pausedOnceSteady() else { fail("Rambla does not answer: it cannot tell whether it is paused") }
+    if paused {
+        _ = run(["toggle-pause"])
+        let resumed = waitUntil { dump()["paused"] as? Bool == false }
+        if resumed { pass("Rambla was paused: resumed") } else { fail("Rambla is still paused") }
+    } else {
+        pass("Rambla is not paused")
+    }
+case "frontmost-is":
+    // BUNDLE [SECONDS]: the app in front is BUNDLE. A focus that reaches a window of the app in front is the app moving
+    // between its own windows; one that comes with another app being activated (⌘Tab, the Dock) is routed differently.
+    let want = args[1], timeout = Double(args.count > 2 ? args[2] : "3")!
+    func front() -> String {
+        RunLoop.current.run(until: Date().addingTimeInterval(0.05))   // lets the workspace hear of a change
+        return NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "no app"
+    }
+    let there = waitUntil(timeout) { front() == want }
+    if there {
+        pass("\(want) is the app in front")
+    } else {
+        fail("the app in front is \(front()), not \(want): a focus given to a window of \(want) now would be an activation, not a move between its windows")
+    }
 default:
-    print("usage: e2e-check wait-columns N | settle | check-tiles | check-parked | check-focused-visible | check-focused-index N | check-gathered | check-floating ID | check-frame ID X Y | column-order | check-order IDS | check-columns IDS | window-at N | neighbor-right | watch-hidden ID COMMAND... | watch-enters ID right|left COMMAND... | watch-leaves ID right|left COMMAND... | wait-displays N [S] | other-display | wait-columns-on UUID N [S] | watch-until-displays N sliver|half ID")
+    print("usage: e2e-check wait-columns N | settle | check-tiles | check-parked | check-focused-visible | check-focused-index N | check-gathered | check-floating ID | check-frame ID X Y | column-order | check-order IDS | check-columns IDS | window-at N | neighbor-right | watch-hidden ID COMMAND... | watch-enters ID right|left COMMAND... | watch-leaves ID right|left COMMAND... | wait-displays N [S] | other-display | wait-columns-on UUID N [S] | watch-until-displays N sliver|half ID | watch-reparked ID COMMAND... | watch-moves-once ID COMMAND... | check-levels COUNT ACTIVE [S] | check-levels-on UUID COUNT ACTIVE [S] | check-shelved COUNT [X Y W H] | check-float-parked ID [X Y W H] | level-of ID [LEVEL [S]] | check-not-floating ID | frame-of ID | check-frame-near ID X Y W H | window-number ID | pointer-to-display | check-paused true|false [S] | resume | frontmost-is BUNDLE [S]")
     exit(2)
 }

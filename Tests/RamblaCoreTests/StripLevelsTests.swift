@@ -1,0 +1,103 @@
+import Testing
+@testable import RamblaCore
+
+@Test func upFromAnOccupiedTopOpensANewLevel() {
+    #expect(StripLevels.target(from: 0, up: true, top: 0, occupied: [0]) == 1)
+}
+
+@Test func upFromAnEmptyTopGoesNowhere() {
+    #expect(StripLevels.target(from: 1, up: true, top: 1, occupied: [0]) == nil)
+    #expect(StripLevels.target(from: 0, up: true, top: 0, occupied: []) == nil)
+}
+
+@Test func upInsideTheStackReachesEmptyMiddleLevels() {
+    #expect(StripLevels.target(from: 0, up: true, top: 2, occupied: [0, 2]) == 1)
+}
+
+@Test func downStopsAtZero() {
+    #expect(StripLevels.target(from: 0, up: false, top: 1, occupied: [0, 1]) == nil)
+    #expect(StripLevels.target(from: 2, up: false, top: 2, occupied: []) == 1)
+}
+
+@Test func theOnlyWindowOfTheTopLevelIsNotSentUp() {
+    // Up to a new level, it would leave an empty level below it, and with the key held a pile of them.
+    #expect(StripLevels.sendTarget(from: 1, up: true, top: 1, occupied: [0, 1], alone: true) == nil)
+    #expect(StripLevels.sendTarget(from: 0, up: true, top: 0, occupied: [0], alone: true) == nil)
+    // With another window there, it opens the new level as before.
+    #expect(StripLevels.sendTarget(from: 1, up: true, top: 1, occupied: [0, 1], alone: false) == 2)
+}
+
+@Test func sendingGoesWhereSwitchingGoesOtherwise() {
+    // Alone too: up to a level that is already there, and down.
+    #expect(StripLevels.sendTarget(from: 0, up: true, top: 1, occupied: [0, 1], alone: true) == 1)
+    #expect(StripLevels.sendTarget(from: 1, up: false, top: 1, occupied: [1], alone: true) == 0)
+    // Nowhere at either end, as for switching.
+    #expect(StripLevels.sendTarget(from: 0, up: false, top: 1, occupied: [0, 1], alone: false) == nil)
+}
+
+@Test func emptyLevelsAboveEverythingAreDropped() {
+    #expect(StripLevels.droppable(top: 2, occupied: [0], active: 0) == [1, 2])
+    #expect(StripLevels.droppable(top: 2, occupied: [0], active: 2) == [])
+    #expect(StripLevels.droppable(top: 2, occupied: [0], active: 1) == [2])
+    #expect(StripLevels.droppable(top: 3, occupied: [0, 2], active: 0) == [3])
+    #expect(StripLevels.droppable(top: 1, occupied: [], active: 0) == [1])
+}
+
+@Test func emptyLevelsBelowAnOccupiedOneStay() {
+    #expect(StripLevels.droppable(top: 2, occupied: [2], active: 2) == [])
+    #expect(StripLevels.droppable(top: 2, occupied: [2], active: 0) == [])
+}
+
+@Test func aStackOfOneLevelHasNothingToDrop() {
+    // The state of everyone who never goes up: level 0 is the top, with or without windows, and is never dropped.
+    #expect(StripLevels.droppable(top: 0, occupied: [0], active: 0) == [])
+    #expect(StripLevels.droppable(top: 0, occupied: [], active: 0) == [])
+}
+
+@Test func restoredActiveClampsToTop() {
+    #expect(StripLevels.restoredActive(nil, top: 2) == 0)
+    #expect(StripLevels.restoredActive(1, top: 2) == 1)
+    #expect(StripLevels.restoredActive(3, top: 1) == 1)
+}
+
+@Test func restoredActiveNeverGoesBelowZero() {
+    // Only a hand-edited file can say so: the bottom level is the nearest one there is.
+    #expect(StripLevels.restoredActive(-1, top: 2) == 0)
+    #expect(StripLevels.restoredActive(-4, top: 0) == 0)
+}
+
+@Test func withTheNaturalDirectionGoingDownShowsTheStripAbove() {
+    // The content follows the fingers (or the pointer): what is above comes down into view.
+    #expect(StripLevels.stripAbove(fingersUp: false, natural: true))
+    #expect(!StripLevels.stripAbove(fingersUp: true, natural: true))
+}
+
+@Test func withoutTheNaturalDirectionGoingUpShowsTheStripAbove() {
+    #expect(StripLevels.stripAbove(fingersUp: true, natural: false))
+    #expect(!StripLevels.stripAbove(fingersUp: false, natural: false))
+}
+
+@Test func goingBackFromAnEmptyLevelGoesToTheNearestOneWithWindows() {
+    #expect(StripLevels.nearestOccupied(from: 1, occupied: [0]) == 0)
+    #expect(StripLevels.nearestOccupied(from: 0, occupied: [1]) == 1)
+    // Levels in between with no windows are passed.
+    #expect(StripLevels.nearestOccupied(from: 3, occupied: [0, 1]) == 1)
+    #expect(StripLevels.nearestOccupied(from: 0, occupied: [2, 5]) == 2)
+}
+
+@Test func theNearestLevelWithWindowsCanBeOnEitherSide() {
+    #expect(StripLevels.nearestOccupied(from: 2, occupied: [0, 3]) == 3)
+    #expect(StripLevels.nearestOccupied(from: 3, occupied: [0, 4, 5]) == 4)
+    #expect(StripLevels.nearestOccupied(from: 4, occupied: [3, 7]) == 3)
+}
+
+@Test func withOneLevelAsNearOnEachSideTheOneBelowWins() {
+    #expect(StripLevels.nearestOccupied(from: 1, occupied: [0, 2]) == 0)
+    #expect(StripLevels.nearestOccupied(from: 4, occupied: [2, 6]) == 2)
+}
+
+@Test func withNoOtherLevelWithWindowsThereIsNowhereToGoBackTo() {
+    #expect(StripLevels.nearestOccupied(from: 1, occupied: []) == nil)
+    // The level itself is not a way back.
+    #expect(StripLevels.nearestOccupied(from: 1, occupied: [1]) == nil)
+}

@@ -48,6 +48,7 @@ private func decodePreferences(_ json: String) throws -> Preferences {
     #expect(p.mouseButtons.buttons == [4, 5])
     #expect(p.mouseButtons.sensitivity == 1.0)
     #expect(p.mouseButtons.natural == true)
+    #expect(p.verticalGesture == .strips)
     #expect(p.appRules.isEmpty)
     #expect(p.disabledDisplays.isEmpty)
     #expect(p.shortcutOverrides.isEmpty)
@@ -101,6 +102,7 @@ private func customizedPreferences() -> Preferences {
                                haptics: false)
     p.mouse = MousePrefs(enabled: false, modifiers: [.option, .command])
     p.mouseButtons = MouseButtonsPrefs(enabled: true, buttons: [3, 5], sensitivity: 2.5, natural: false)
+    p.verticalGesture = .width
     p.appRules = [
         AppRule(bundleID: "com.apple.finder", name: "Finder", behavior: .float),
         AppRule(bundleID: "com.apple.TextEdit", name: "TextEdit", behavior: .tile, width: 0.5, openAt: .end),
@@ -274,4 +276,20 @@ private func customizedPreferences() -> Preferences {
     let old = try decodePreferences(#"{"trackpad": {"enabled": true, "fingers": 3}}"#)
     #expect(old.trackpad.haptics)
     #expect(old.trackpad.fingers == 3)
+}
+
+@Test func verticalGestureDefaultsToStrips() throws {
+    #expect(Preferences().verticalGesture == .strips)
+    // Preferences saved before the stacked strips have no such key.
+    #expect(try decodePreferences("{}").verticalGesture == .strips)
+    #expect(try decodePreferences(#"{"trackpad": {"fingers": 3}}"#).verticalGesture == .strips)
+    // Someone who prefers the width gesture keeps it.
+    #expect(try decodePreferences(#"{"verticalGesture": "width"}"#).verticalGesture == .width)
+    var p = Preferences()
+    p.verticalGesture = .width
+    let stored = try JSONEncoder().encode(p)
+    #expect(try JSONDecoder().decode(Preferences.self, from: stored).verticalGesture == .width)
+    let root = try #require(try JSONSerialization.jsonObject(with: stored) as? [String: Any])
+    #expect(root["verticalGesture"] as? String == "width")
+    #expect(VerticalGesture.allCases == [.strips, .width])
 }

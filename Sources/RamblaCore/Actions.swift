@@ -37,6 +37,10 @@ public enum Action: String, CaseIterable, Codable, Sendable, CodingKeyRepresenta
     case moveUp = "move-up"
     case moveDown = "move-down"
     case sendNextDisplay = "send-next-display"
+    case stripUp = "strip-up"
+    case stripDown = "strip-down"
+    case sendStripUp = "send-strip-up"
+    case sendStripDown = "send-strip-down"
     case overview
     case cycleWidth = "cycle-width"
     case fullWidth = "full-width"
@@ -74,6 +78,10 @@ public enum Action: String, CaseIterable, Codable, Sendable, CodingKeyRepresenta
         case .moveUp: return String(localized: "Mover ventana hacia arriba")
         case .moveDown: return String(localized: "Mover ventana hacia abajo")
         case .sendNextDisplay: return String(localized: "Mandar a la siguiente pantalla")
+        case .stripUp: return String(localized: "Ir a la tira de arriba")
+        case .stripDown: return String(localized: "Ir a la tira de abajo")
+        case .sendStripUp: return String(localized: "Mandar a la tira de arriba")
+        case .sendStripDown: return String(localized: "Mandar a la tira de abajo")
         case .overview: return String(localized: "Vista general")
         case .cycleWidth: return String(localized: "Rotar ancho")
         case .fullWidth: return String(localized: "Ancho completo")
@@ -100,7 +108,8 @@ public enum Action: String, CaseIterable, Codable, Sendable, CodingKeyRepresenta
         switch self {
         case .focusLeft, .focusRight, .focusUp, .focusDown, .focusFirst, .focusLast,
              .focus1, .focus2, .focus3, .focus4, .focus5, .focus6, .focus7, .focus8, .focus9,
-             .moveLeft, .moveRight, .moveUp, .moveDown, .sendNextDisplay, .overview:
+             .moveLeft, .moveRight, .moveUp, .moveDown, .sendNextDisplay,
+             .stripUp, .stripDown, .sendStripUp, .sendStripDown, .overview:
             return .navigate
         case .cycleWidth, .fullWidth, .center, .wider, .narrower, .taller, .shorter,
              .equalizeHeights, .pinLeft, .pinRight:
@@ -109,6 +118,16 @@ public enum Action: String, CaseIterable, Codable, Sendable, CodingKeyRepresenta
             return .stacks
         case .closeWindow, .togglePause:
             return .other
+        }
+    }
+
+    /// The switches between stacked strips the user asks for (going to the strip above or below, sending the focused
+    /// window there): they wait for the veil to cover the display, behind the ones already waiting, so that quick
+    /// repeats share one veil. Every other action runs those first, and sees the strips as they leave them.
+    public var switchesStrips: Bool {
+        switch self {
+        case .stripUp, .stripDown, .sendStripUp, .sendStripDown: return true
+        default: return false
         }
     }
 

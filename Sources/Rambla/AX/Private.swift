@@ -111,4 +111,14 @@ enum Private {
         _ = bytes.withUnsafeMutableBufferPointer { postEventRecord(&psn, $0.baseAddress!) }
         return true
     }
+
+    /// Brings Rambla itself to the front without raising any of its windows, so the keyboard goes to it: what
+    /// `NSApp.activate()` does, for when cooperative activation ignores that from an app in the background.
+    @discardableResult
+    static func activateOwnProcess() -> Bool {
+        guard let getPSN, let setFront else { return false }
+        var psn = ProcessSerialNumber()
+        guard getPSN(getpid(), &psn) == noErr else { return false }
+        return setFront(&psn, 0, 0x400 /* kCPSNoWindows */) == 0
+    }
 }
