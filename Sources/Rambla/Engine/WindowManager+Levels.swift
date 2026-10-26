@@ -110,12 +110,22 @@ extension WindowManager {
                                   occupied: occupiedLevels(of: stack))
     }
 
-    /// Runs `change`, a switch between the strips of `stack` that the user asked for, behind the overlay's veil, or at
-    /// once when there is none (`levelTransition`). A switch that follows a focus from outside Rambla never waits for
-    /// it: the keyboard would be in a window out of sight meanwhile.
+    /// Runs `change`, a switch between the strips of `stack` that the user asked for, behind the overlay's veil: it
+    /// waits with the others (`pendingSwitches`) until the veil covers the display (`levelTransition`), or runs at
+    /// once, after them, when no veil comes. A switch that follows a focus from outside Rambla never waits for it: the
+    /// keyboard would be in a window out of sight meanwhile.
     private func behindVeil(of stack: StackKey, up: Bool, _ change: @escaping () -> Void) {
-        guard let levelTransition else { return change() }
-        levelTransition(stack, up, change)
+        pendingSwitches.append(change)
+        if levelTransition?(stack, up) != true { runPendingSwitches() }
+    }
+
+    /// Runs the switches waiting for the veil (`pendingSwitches`), each once and in the order they were asked for: the
+    /// veil covers the display. Nothing happens when none waits.
+    func runPendingSwitches() {
+        guard !pendingSwitches.isEmpty else { return }
+        let waiting = pendingSwitches
+        pendingSwitches.removeAll()
+        waiting.forEach { $0() }
     }
 
     /// Nothing in view to give the keyboard to (an empty level came into view, or the last window in view went away

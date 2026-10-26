@@ -157,10 +157,14 @@ final class WindowManager {
     var levelHook: ((StackKey) -> Void)?
     /// Called when the level that came into view of that stack is empty (its hint).
     var emptyLevelHook: ((StackKey) -> Void)?
-    /// Runs a switch between the strips of a stack that the user asked for (a swipe, a strip shortcut, sending a
-    /// window) behind the overlay's veil: `change` runs once the veil covers the stack's display. `up`: toward the strip
-    /// above. Nil: the switch runs at once.
-    var levelTransition: ((_ stack: StackKey, _ up: Bool, _ change: @escaping () -> Void) -> Void)?
+    /// Covers the display of a stack with the overlay's veil, for a switch between its strips that the user asked for
+    /// (a swipe, a strip shortcut, sending a window; `up`: toward the strip above), and calls `runPendingSwitches` once
+    /// the veil covers it. False when no veil comes (the animations are off, or the display is not there), and nil
+    /// without an overlay: the switch runs at once.
+    var levelTransition: ((_ stack: StackKey, _ up: Bool) -> Bool)?
+    /// The switches between strips the user asked for that wait for the veil to cover their display (`behindVeil`),
+    /// oldest first: `runPendingSwitches` runs them.
+    var pendingSwitches: [() -> Void] = []
     /// Saved layout from the previous run (its floating windows; the strips go to `archive`).
     var restoreState: SavedState?
     /// Strips not in view: those of the previous run not seen yet, and those of unplugged displays. Each is rebuilt

@@ -22,7 +22,14 @@ final class OverlayCoordinator {
     private let border = FocusBorderController()
     private let hint = HintController()
     private let dimmer = DimmerController()
-    private let veil = LevelTransitionController()
+    /// The veils over the switches between strips: once one covers its display the switches waiting for it run, and it
+    /// goes once the apps have moved their windows, or after a quarter of a second.
+    private lazy var veil = LevelTransitionController(
+        covered: { [weak self] in self?.engine.runPendingSwitches() },
+        settle: { [weak self] done in
+            guard let self else { return done() }
+            engine.afterPendingMoves(timeout: 0.25, done)
+        })
     private var indicatorKey: StripKey?
     private var icons: [pid_t: NSImage] = [:]
     private var tints: [pid_t: NSColor] = [:]
@@ -35,10 +42,7 @@ final class OverlayCoordinator {
         engine.indicatorHook = { [weak self] key, modifiers in self?.showIndicator(key, holding: modifiers) }
         engine.levelHook = { [weak self] stack in self?.levelChanged(on: stack) }
         engine.emptyLevelHook = { [weak self] stack in self?.showEmptyStripHint(of: stack) }
-        engine.levelTransition = { [weak self] stack, up, change in
-            guard let self else { return change() }
-            coverSwitch(of: stack, up: up, change)
-        }
+        engine.levelTransition = { [weak self] stack, up in self?.coverSwitch(of: stack, up: up) ?? false }
         engine.overviewHook = { [weak self] key in self?.toggleOverview(key) }
         engine.overviewAction = { [weak self] action in self?.overview.perform(action) ?? false }
         engine.overviewSwipe = { [weak self] stack, up, move in self?.overview.swipe(on: stack, up: up, move: move) ?? nil }
@@ -145,17 +149,15 @@ final class OverlayCoordinator {
         }
     }
 
-    /// A switch between strips the user asked for runs behind the veil of the stack's display, which waits for the
-    /// windows to be in their places before it goes. With the animations off it runs at once, as every move does then.
-    private func coverSwitch(of stack: StackKey, up: Bool, _ change: @escaping () -> Void) {
+    /// A switch between strips the user asked for waits for the veil of the stack's display to cover it, and the veil
+    /// waits for the windows to be in their places before it goes. False with the animations off, as every move is
+    /// instant then, or without that display: the switch runs at once.
+    private func coverSwitch(of stack: StackKey, up: Bool) -> Bool {
         let prefs = engine.prefs
-        guard prefs.animations, let display = engine.display(forStack: stack) else { return change() }
-        veil.run(on: display, up: up, speed: prefs.animationSpeed,
-                 reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion, change: change,
-                 settle: { [weak self] done in
-                     guard let self else { return done() }
-                     engine.afterPendingMoves(timeout: 0.25, done)
-                 })
+        guard prefs.animations, let display = engine.display(forStack: stack) else { return false }
+        veil.request(on: display, up: up, speed: prefs.animationSpeed,
+                     reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
+        return true
     }
 
     /// Another strip of `stack` came into view. The hint of an empty strip that was left goes, unless the strip that

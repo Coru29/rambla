@@ -5,64 +5,54 @@ import RamblaCore
 /// The veil over a switch between stacked strips (`LevelTransition`): a sheet of frosted glass over the windows of a
 /// display, under its menu bar and Dock and under Rambla's own panels, so the levels panel shows on top of it. It
 /// crosses the display the way the content goes, holds while the switch runs and the apps move their windows behind
-/// it, and goes on out the other side. The mouse goes through it, and it is on screen only while it moves. One per
-/// display.
+/// it, and goes on out the other side. The mouse goes through it, and it is on screen only during a switch. One per
+/// display. Its phases and rules are `LevelTransition.Veil`'s: here are only the panel, the glass, the display link
+/// that moves it and the timers of its deadlines.
 @MainActor
 final class LevelTransitionController {
-    private var veils: [CGDirectDisplayID: Veil] = [:]
+    private var veils: [CGDirectDisplayID: DisplayVeil] = [:]
+    /// Called once a veil covers its display, or its deadline says it does: the switches waiting for it run.
+    private let covered: () -> Void
+    /// Starts waiting for the windows that moved to be in their places, and calls `done` once they are, or it gave up.
+    private let settle: (_ done: @escaping () -> Void) -> Void
 
-    /// Runs `change` behind the veil of `display` once it covers it. `settle` calls back once the windows that moved
-    /// are in their places, or it gave up waiting, and then the veil goes. With `reduceMotion` it fades in and out
-    /// where it is instead. A switch asked for while the veil is under way joins it: before it covers, it runs with the
-    /// others; while it leaves, the veil comes back first.
-    func run(on display: DisplayInfo, up: Bool, speed: Double, reduceMotion: Bool, change: @escaping () -> Void,
-             settle: @escaping (_ done: @escaping () -> Void) -> Void) {
-        let veil = veils[display.id] ?? Veil()
+    init(covered: @escaping () -> Void, settle: @escaping (_ done: @escaping () -> Void) -> Void) {
+        self.covered = covered
+        self.settle = settle
+    }
+
+    /// Covers `display` for a switch between its strips (`up`: toward the strip above) and calls `covered` once it
+    /// does. The veil then holds until the windows are in their places (`settle`), and goes. With `reduceMotion` it
+    /// fades in and out where it is instead. A switch asked for while the veil is under way joins it: before it
+    /// covers, it is covered with the others; while it holds, at once; while it leaves, the veil comes back first.
+    func request(on display: DisplayInfo, up: Bool, speed: Double, reduceMotion: Bool) {
+        let veil = veils[display.id] ?? DisplayVeil(covered: covered, settle: settle)
         veils[display.id] = veil
-        veil.run(frame: Displays.cocoaRect(display.visible), up: up, speed: speed, reduceMotion: reduceMotion,
-                 change: change, settle: settle)
+        veil.request(frame: Displays.cocoaRect(display.visible), up: up, speed: speed, reduceMotion: reduceMotion)
+    }
+
+    /// Takes every veil off its display at once, calling nothing back: the switches waiting for them were dropped.
+    func reset() {
+        veils.values.forEach { $0.reset() }
     }
 }
 
-/// The veil of one display.
+/// The veil of one display, doing what its state machine says.
 @MainActor
-private final class Veil: NSObject {
-    private enum Phase {
-        case idle
-        /// Coming over the display.
-        case covering
-        /// Over the whole display, that frame on its way to the screen: the switch runs on the next one.
-        case covered
-        /// The switch ran, and the apps move their windows behind it.
-        case holding
-        /// Going out the other side.
-        case revealing
-    }
-
+private final class DisplayVeil: NSObject {
     /// Under the Dock and the menu bar, over every app's windows, floating panels included.
     private static let level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.dockWindow)) - 1)
 
     private let panel: OverlayPanel
     private let glass = NSVisualEffectView()
     private var link: CADisplayLink?
-    private var phase = Phase.idle
-    /// How much of the display the veil covers, and the side the rest of it is on (`LevelTransition.entrySide`).
-    private var coverage = 0.0
-    private var side = 1.0
-    /// The stretch under way: what the veil covered when it set off, when, and for how long.
-    private var start = 0.0
-    private var startedAt: CFTimeInterval = 0
-    private var duration: CFTimeInterval = 0
-    /// The way the last switch went: the veil leaves through the other side.
-    private var up = true
-    private var speed = 1.0
-    private var reduceMotion = false
-    private var pending: [() -> Void] = []
-    private var settle: ((@escaping () -> Void) -> Void)?
-    /// Counts the switches run while the veil holds: only the last one's settling lets it go.
-    private var holds = 0
+    private var machine = LevelTransition.Veil()
+    private let covered: () -> Void
+    private let settle: (@escaping () -> Void) -> Void
 
-    override init() {
+    init(covered: @escaping () -> Void, settle: @escaping (@escaping () -> Void) -> Void) {
+        self.covered = covered
+        self.settle = settle
         panel = OverlayPanel(level: Self.level, collectionBehavior: [.canJoinAllSpaces, .transient, .ignoresCycle])
         super.init()
         panel.ignoresMouseEvents = true
@@ -74,102 +64,61 @@ private final class Veil: NSObject {
         panel.contentView = content
     }
 
-    func run(frame: CGRect, up: Bool, speed: Double, reduceMotion: Bool, change: @escaping () -> Void,
-             settle: @escaping (@escaping () -> Void) -> Void) {
-        self.up = up
-        self.speed = speed
-        self.settle = settle
-        switch phase {
-        case .idle:
-            self.reduceMotion = reduceMotion
-            panel.setFrame(frame, display: false)
-            coverage = 0
-            side = LevelTransition.entrySide(up: up)
-            pending = [change]
-            place()
-            panel.orderFrontRegardless()
-            startCovering()
-        case .covering, .covered:
-            pending.append(change)
-        case .holding:
-            change()
-            waitForMoves()
-        case .revealing:
-            // Back over the display from where it is, on the side it was leaving through.
-            pending = [change]
-            startCovering()
-        }
+    func request(frame: CGRect, up: Bool, speed: Double, reduceMotion: Bool) {
+        // Off screen, it takes the display's frame before it comes on: the display may have changed since.
+        if machine.phase == .idle { panel.setFrame(frame, display: false) }
+        apply(machine.request(up: up, speed: speed, reduceMotion: reduceMotion, now: CACurrentMediaTime()))
     }
 
-    private func startCovering() {
-        phase = .covering
-        start = coverage
-        startedAt = CACurrentMediaTime()
-        duration = LevelTransition.seconds(LevelTransition.coverSeconds, speed: speed, distance: 1 - coverage)
-        startLink()
-    }
-
-    private func startRevealing() {
-        phase = .revealing
-        side = LevelTransition.exitSide(up: up)
-        startedAt = CACurrentMediaTime()
-        duration = LevelTransition.seconds(LevelTransition.revealSeconds, speed: speed)
-        startLink()
+    func reset() {
+        apply(machine.reset())
     }
 
     @objc private func tick(_ link: CADisplayLink) {
-        let progress = duration > 0 ? (CACurrentMediaTime() - startedAt) / duration : 1
-        switch phase {
-        case .covering:
-            coverage = LevelTransition.coverage(coveringFrom: start, progress: progress)
-            place()
-            if progress >= 1 { phase = .covered }
-        case .covered:
-            // The frame that covers the display is on screen: the switch runs behind it.
-            phase = .holding
-            stopLink()
-            let changes = pending
-            pending = []
-            changes.forEach { $0() }
-            waitForMoves()
-        case .revealing:
-            coverage = LevelTransition.coverage(revealing: progress)
-            place()
-            if progress >= 1 { finish() }
-        case .idle, .holding:
-            stopLink()
+        apply(machine.tick(now: CACurrentMediaTime()))
+    }
+
+    private func apply(_ effects: [LevelTransition.Veil.Effect]) {
+        for effect in effects {
+            switch effect {
+            case .slide(let coverage, let side):
+                place(offset: side * (1 - coverage), opacity: 1)
+            case .fade(let opacity):
+                place(offset: 0, opacity: opacity)
+            case .show:
+                panel.orderFrontRegardless()
+            case .tick:
+                startLink()
+            case .stopTicking:
+                stopLink()
+            case .deadline(let token, let seconds):
+                DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in
+                    MainActor.assumeIsolated {
+                        guard let self else { return }
+                        self.apply(self.machine.deadline(token, now: CACurrentMediaTime()))
+                    }
+                }
+            case .covered:
+                covered()
+            case .settle(let hold):
+                settle { [weak self] in
+                    MainActor.assumeIsolated {
+                        guard let self else { return }
+                        self.apply(self.machine.settled(hold: hold, now: CACurrentMediaTime()))
+                    }
+                }
+            case .hide:
+                panel.orderOut(nil)
+            }
         }
     }
 
-    /// Lets the veil go once the windows that moved are in their places: those of the last switch that ran.
-    private func waitForMoves() {
-        holds += 1
-        let hold = holds
-        guard let settle else { return startRevealing() }
-        settle { [weak self] in
-            guard let self, phase == .holding, holds == hold else { return }
-            startRevealing()
-        }
-    }
-
-    private func finish() {
-        stopLink()
-        phase = .idle
-        coverage = 0
-        panel.orderOut(nil)
-    }
-
-    /// Puts the glass where `coverage` and `side` say: moved off the display by what it does not cover, or, with
-    /// Reduce Motion, in place and that much see-through.
-    private func place() {
+    /// Puts the glass `offset` of the display's height off it (up when positive, on AppKit's y axis), at `opacity`.
+    private func place(offset: Double, opacity: Double) {
         guard let content = panel.contentView else { return }
         var frame = content.bounds
-        if reduceMotion {
-            panel.alphaValue = coverage
-        } else {
-            panel.alphaValue = 1
-            frame.origin.y = side * (1 - coverage) * frame.height
-        }
+        frame.origin.y = offset * frame.height
+        panel.alphaValue = opacity
         glass.frame = frame
     }
 
