@@ -124,14 +124,15 @@ La opción vale para el trackpad y para los botones del mouse. El interruptor ac
 
 ### El cambio de tira
 
-- **Es inmediato:**
-  - las ventanas de la tira que se va saltan a su estacionamiento;
+- **Las ventanas saltan, una sola vez cada una, detrás del velo:**
+  - las de la tira que se va saltan a su estacionamiento;
   - las de la que llega saltan a su lugar, sin cruzar la pantalla.
   - No hay movimiento vertical posible, porque macOS no deja sacar ventanas por arriba ni por abajo.
 - **Orden:** primero se ubican las que llegan, que quedan detrás, y después se van las otras.
 - **Velo** (pedido por el usuario al probarlo, porque el salto se veía brusco): un velo de vidrio esmerilado cruza la pantalla en la dirección del cambio y tapa el salto.
-  - Baja desde arriba al ir a la tira de arriba y sube desde abajo al ir a la de abajo. El cambio corre cuando el velo tapa la pantalla, y el velo se va cuando las apps terminaron de mover sus ventanas.
+  - Baja desde arriba al ir a la tira de arriba y sube desde abajo al ir a la de abajo. El cambio corre cuando el velo tapa la pantalla, y el velo se va cuando las apps terminaron de mover sus ventanas, o a los 0,25 s si alguna tarda más.
   - Solo en los cambios que pide el usuario: el gesto, los atajos y mandar una ventana. El foco desde afuera cambia sin velo, porque mientras tanto el teclado quedaría en una ventana escondida. Elegir una ventana de otra fila en la vista general también cambia sin velo.
+  - Cualquier otra cosa que llegue mientras el cambio espera al velo (otro atajo, un gesto, un comando, un cambio de foco o de ventanas) corre después de él, y un cambio de escritorio o de pantallas lo descarta.
   - Sigue Animaciones y Velocidad de Configuración. Sin animaciones no hay velo, y con Reducir movimiento es un fundido.
 - **Foco:** se enfoca la ventana enfocada de la tira que llega, y su columna queda a la vista.
 - **Indicador de tiras:** si el indicador está activado, aparece un momento un panel con una fila por tira de esa pantalla, la de arriba arriba.
@@ -259,7 +260,7 @@ La opción vale para el trackpad y para los botones del mouse. El interruptor ac
    - la vacía de arriba aparece al subir;
    - desaparece si queda vacía arriba de todas y no estás en ella;
    - las vacías de abajo se conservan.
-5. **Estacionamiento y cambio:** las ventanas de las otras tiras se estacionan en los bordes laterales, porque arriba y abajo no se puede, y el cambio es inmediato.
+5. **Estacionamiento y cambio:** las ventanas de las otras tiras se estacionan en los bordes laterales, porque arriba y abajo no se puede, y en el cambio saltan una sola vez, detrás del velo.
 6. **Indicador:** muestra las tiras con íconos, sin nombres.
 7. **Foco:** manda lo que enfocás. Con ⌘Tab, el Dock o una notificación, si la app tiene una ventana en la tira actual, te quedás.
 8. **Ventanas flotantes:** las de reglas de app, los diálogos y los paneles se ven en todas las tiras. Las que flotan por el usuario o por Rectangle son de su tira. El usuario lo confirmó.
