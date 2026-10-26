@@ -29,6 +29,11 @@ enum Log {
         append("ERROR", message)
     }
 
+    /// Waits until every line logged so far is in the file: an `exit` would drop those still on their way.
+    static func flush() {
+        queue.sync {}
+    }
+
     private static func append(_ level: String, _ message: String) {
         let line = "\(formatter.string(from: Date())) [\(level)] \(message)\n"
         queue.async {
