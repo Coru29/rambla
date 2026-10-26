@@ -36,6 +36,7 @@
 
 /* Rambla/App/CLI.swift */
 "Rambla no está abierto." = "Rambla is not running.";
+"Rambla ya está abierto." = "Rambla is already running.";
 "Rambla no respondió." = "Rambla did not respond.";
 "No se pudo pasar la orden a Rambla." = "Could not pass the command to Rambla.";
 "«%@» no es una acción de Rambla: rambla list muestra todas." = "“%@” is not a Rambla action: rambla list shows them all.";

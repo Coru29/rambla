@@ -40,6 +40,12 @@ enum CLI {
         return 0
     }
 
+    /// Another Rambla is running: one started now would manage the same windows.
+    static var anotherIsRunning: Bool {
+        NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+            .contains { $0.processIdentifier != getpid() && !$0.isTerminated }
+    }
+
     private static func failed() -> Int32 {
         FileHandle.standardError.write(Data((String(localized: "No se pudo pasar la orden a Rambla.") + "\n").utf8))
         return 1
