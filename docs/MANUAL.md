@@ -384,6 +384,8 @@ Los enlaces también sirven en Atajos de Apple, Alfred, Keyboard Maestro, Better
 
 **Una ventana salió sola de la tira.** Otra app la movió (Rectangle, un doble click en la barra de título, el botón verde con ⌥). Es a propósito: Rambla no pelea con otras apps. Devolvela con ⌃⌘T.
 
+**Después de reiniciar la Mac, una ventana quedó al final de la tira.** Rambla reconoce cada ventana por su app y su título. Si el título cambió (una terminal, un documento abierto en otra página) pero es la única ventana de esa app que le falta a la tira, igual vuelve a su lugar. Si faltan dos de la misma app, quedan al final. Para que las apps vuelvan a abrir sus ventanas, dejá marcada la opción de volver a abrirlas en el diálogo de reiniciar.
+
 **Deslizar con el trackpad cambia de escritorio.** macOS usa el mismo gesto, aunque Configuración del Sistema diga «3 dedos»: mirá la [sección 10](#10-mouse-y-trackpad).
 
 **Un atajo no hace nada.** Puede que otra app ya lo use. Revisá Configuración → Atajos, que marca los que macOS no dejó registrar, y cambialo por otro.

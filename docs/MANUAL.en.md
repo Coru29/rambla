@@ -384,6 +384,8 @@ The links also work in Apple Shortcuts, Alfred, Keyboard Maestro, BetterTouchToo
 
 **A window left the strip by itself.** Another app moved it (Rectangle, a double-click on the title bar, the green button with ⌥). That is on purpose: Rambla does not fight other apps. Put it back with ⌃⌘T.
 
+**After restarting the Mac, a window ended up at the end of the strip.** Rambla recognizes each window by its app and its title. If the title changed (a terminal, a document open on another page) but it is the only window of that app the strip is missing, it still goes back to its place. If two of the same app are missing, they go to the end. For apps to reopen their windows, leave **Reopen windows when logging back in** checked in the restart dialog.
+
 **Swiping on the trackpad switches desktops.** macOS uses the same gesture, even when System Settings says three fingers: see [section 10](#10-mouse-and-trackpad).
 
 **A shortcut does nothing.** Another app may already use it. Check Settings → Shortcuts, which flags the ones macOS did not let Rambla register, and pick another one.

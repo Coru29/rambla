@@ -377,3 +377,79 @@ private func refs(_ titles: [WindowID: String]) -> [WindowRef] {
                                           returning: true, current: "today", alive: [40, 41])
     #expect(two.isEmpty)
 }
+
+// After a Mac restart only app and title tell the windows apart, and a terminal's title changes all the time (a document
+// may also come back on another page): an app with one window of the stack that no title found, and one window shown on
+// the stack's display that no level took, has found it.
+
+private func restarted(_ windows: [(WindowID, String, String)], level: Int = 0, session: String = "yesterday",
+                       unplugged: Bool = false) -> SavedStrip {
+    SavedStrip(displayUUID: "A", spaceKey: "s1", strip: strip(windows.map(\.0)), session: session,
+               refs: windows.map { WindowRef(id: $0.0, bundleID: $0.1, title: $0.2) }, unplugged: unplugged, level: level)
+}
+
+private func live(_ windows: [(WindowID, String, String)]) -> [WindowRef] {
+    windows.map { WindowRef(id: $0.0, bundleID: $0.1, title: $0.2) }
+}
+
+@Test func anAppsOneUnknownWindowTakesItsPlaceAfterARestart() {
+    let stack = [restarted([(1, "notes", "Notes"), (2, "term", "✳ build"), (3, "notes", "Ideas")])]
+    let free = live([(40, "notes", "Notes"), (41, "term", "~"), (42, "notes", "Ideas")])
+    let levels = StateMatcher.restoredLevels(stack, free: free, onScreen: [], returning: false, current: "today",
+                                             alive: [40, 41, 42], shownHere: [40, 41, 42])
+    #expect(levels.mapValues(\.allWindows) == [0: [40, 41, 42]])
+
+    // Shown on another display, it is not taken for it: it joins the strips there like any new window.
+    let elsewhere = StateMatcher.restoredLevels(stack, free: free, onScreen: [], returning: false, current: "today",
+                                                alive: [40, 41, 42], shownHere: [40, 42])
+    #expect(elsewhere.mapValues(\.allWindows) == [0: [40, 42]])
+}
+
+@Test func theOneUnknownWindowCanBeOnAnyLevel() {
+    // The level above misses its terminal, and no other level misses one.
+    let stack = [restarted([(1, "notes", "Notes")]), restarted([(2, "term", "✳ build"), (3, "notes", "Ideas")], level: 1)]
+    let free = live([(40, "notes", "Notes"), (41, "term", "~"), (42, "notes", "Ideas")])
+    let levels = StateMatcher.restoredLevels(stack, free: free, onScreen: [], returning: false, current: "today",
+                                             alive: [40, 41, 42], shownHere: [40, 41, 42])
+    #expect(levels.mapValues(\.allWindows) == [0: [40], 1: [41, 42]])
+}
+
+@Test func twoUnknownWindowsOfAnAppAreNotGuessed() {
+    // Two windows of the app unknown in the stack, even on two levels: nothing tells which is which.
+    let two = [restarted([(1, "term", "✳ build"), (2, "term", "✳ tests")])]
+    let one = live([(41, "term", "~")])
+    #expect(StateMatcher.restoredLevels(two, free: one, onScreen: [], returning: false, current: "today", alive: [41],
+                                        shownHere: [41]).isEmpty)
+    let apart = [restarted([(1, "term", "✳ build")]), restarted([(2, "term", "✳ tests")], level: 1)]
+    #expect(StateMatcher.restoredLevels(apart, free: one, onScreen: [], returning: false, current: "today", alive: [41],
+                                        shownHere: [41]).isEmpty)
+    // Two windows of the app left: neither is taken for the one unknown.
+    let single = [restarted([(1, "term", "✳ build")])]
+    let both = live([(41, "term", "~"), (42, "term", "~/src")])
+    #expect(StateMatcher.restoredLevels(single, free: both, onScreen: [], returning: false, current: "today",
+                                        alive: [41, 42], shownHere: [41, 42]).isEmpty)
+}
+
+@Test func aWindowAnotherLevelTookByTitleIsNotGuessedAgain() {
+    // The one window of the app left over is the only candidate: the windows the titles found are not.
+    let stack = [restarted([(1, "notes", "Notes")]), restarted([(2, "notes", "Old title")], level: 1)]
+    let free = live([(40, "notes", "Notes")])
+    let levels = StateMatcher.restoredLevels(stack, free: free, onScreen: [], returning: false, current: "today",
+                                             alive: [40], shownHere: [40])
+    #expect(levels.mapValues(\.allWindows) == [0: [40]])
+}
+
+@Test func theOneUnknownWindowIsOnlyGuessedAfterARestart() {
+    // In the session the strip was saved in, its ids still name its windows: another window of the app is another one.
+    let today = [restarted([(1, "notes", "Notes"), (2, "term", "✳ build")], session: "today")]
+    let free = live([(1, "notes", "Notes"), (41, "term", "~")])
+    let levels = StateMatcher.restoredLevels(today, free: free, onScreen: [], returning: false, current: "today",
+                                             alive: [1, 41], shownHere: [1, 41])
+    #expect(levels.mapValues(\.allWindows) == [0: [1]])
+
+    // A level taking its windows back while its display returns finds them only by id, or by a title that is theirs.
+    let unplugged = [restarted([(2, "term", "✳ build")], unplugged: true)]
+    let back = StateMatcher.restoredLevels(unplugged, free: [], onScreen: live([(41, "term", "~")]), returning: true,
+                                           current: "today", alive: [41], shownHere: [41])
+    #expect(back.isEmpty)
+}

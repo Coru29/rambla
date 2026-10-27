@@ -32,12 +32,23 @@ final class AppWorker: @unchecked Sendable {
     private var ids: [AXElementKey: WindowID] = [:]
     private var lastFrames: [WindowID: CGRect] = [:]
     private var lastWrite: [WindowID: CFAbsoluteTime] = [:]
+    /// Windows whose position is not known for sure: the frame read back after a write was not the one written (an app
+    /// that applies moves late), or the app did not answer. Their size read back stays known.
+    private var originUnknown: Set<WindowID> = []
+    /// The last frame written to each window, and every one written in the last moments: a notice of an earlier one,
+    /// within the echo window of the last, is an earlier write applied late.
+    private var lastTarget: [WindowID: CGRect] = [:]
+    private var written = FrameEchoes()
+    /// Windows to read again once the echo window of their last write is over (`recheck`).
+    private var recheckPending: Set<WindowID> = []
+    /// Test mode only (`debugUnseenMove`): windows whose notices go unheard until then.
+    private var muted: [WindowID: CFAbsoluteTime] = [:]
     private var frozen: Set<WindowID> = []
     private var titlePending: Set<WindowID> = []
     private var stopped = false
 
     private let lock = NSLock()
-    private var pending: [WindowID: (frame: CGRect, verify: Bool)] = [:]
+    private var pending: [WindowID: (frame: CGRect, verify: Bool, force: Bool)] = [:]
     private var drainScheduled = false
 
     /// Notifications that arrive this soon after our own write are echoes of it.
@@ -132,10 +143,11 @@ final class AppWorker: @unchecked Sendable {
     // MARK: - Commands from the main thread
 
     /// Coalesced: the latest frame per window wins and one drain runs per run-loop turn.
-    /// `verify` reads the frame back (used for final positions, skipped for animation frames).
-    func setFrames(_ frames: [WindowID: CGRect], verify: Bool = true) {
+    /// `verify` reads the frame back (used for final positions, skipped for animation frames). `force` writes it even
+    /// where the worker last saw the window there: the window moved without a word from its app.
+    func setFrames(_ frames: [WindowID: CGRect], verify: Bool = true, force: Bool = false) {
         lock.lock()
-        for (id, frame) in frames { pending[id] = (frame, verify) }
+        for (id, frame) in frames { pending[id] = (frame, verify, force || pending[id]?.force == true) }
         let schedule = !drainScheduled
         drainScheduled = true
         lock.unlock()
@@ -192,7 +204,10 @@ final class AppWorker: @unchecked Sendable {
     func readFrame(_ id: WindowID, _ completion: @escaping (CGRect?) -> Void) {
         perform { [self] in
             let frame = windows[id].flatMap(AX.frame)
-            if let frame { lastFrames[id] = frame }
+            if let frame {
+                lastFrames[id] = frame
+                originUnknown.remove(id)
+            }
             DispatchQueue.main.async { completion(frame) }
         }
     }
@@ -208,6 +223,17 @@ final class AppWorker: @unchecked Sendable {
     func debugExternalMove(_ id: WindowID, _ frame: CGRect) {
         perform { [self] in
             guard let element = windows[id] else { return }
+            AX.setSize(element, frame.size)
+            AX.setPosition(element, frame.origin)
+        }
+    }
+
+    /// Test mode only: moves window `id` with no word of it reaching the main thread, nor this worker's record of where
+    /// the window is, as macOS can when a display appears.
+    func debugUnseenMove(_ id: WindowID, _ frame: CGRect) {
+        perform { [self] in
+            guard let element = windows[id] else { return }
+            muted[id] = CFAbsoluteTimeGetCurrent() + 0.5
             AX.setSize(element, frame.size)
             AX.setPosition(element, frame.origin)
         }
@@ -245,10 +271,16 @@ final class AppWorker: @unchecked Sendable {
             guard let element = windows[id], !frozen.contains(id) else { continue }
             let target = request.frame
             let current = lastFrames[id]
-            let sizeChanged = current.map { abs($0.width - target.width) > 0.5 || abs($0.height - target.height) > 0.5 } ?? true
-            let originChanged = current.map { abs($0.minX - target.minX) > 0.5 || abs($0.minY - target.minY) > 0.5 } ?? true
-            guard sizeChanged || originChanged else { continue }
-            lastWrite[id] = CFAbsoluteTimeGetCurrent()
+            // A forced write goes where the worker's record is stale by definition: size and position, read back.
+            let sizeChanged = request.force
+                || (current.map { abs($0.width - target.width) > 0.5 || abs($0.height - target.height) > 0.5 } ?? true)
+            let originChanged = originUnknown.contains(id)
+                || (current.map { abs($0.minX - target.minX) > 0.5 || abs($0.minY - target.minY) > 0.5 } ?? true)
+            guard request.force || sizeChanged || originChanged else { continue }
+            let now = CFAbsoluteTimeGetCurrent()
+            lastWrite[id] = now
+            lastTarget[id] = target
+            written.asked(target, of: id, at: now)
             if sizeChanged {
                 // Size, position, size: a large window may not fit at its old position (Rectangle's approach).
                 AX.setSize(element, target.size)
@@ -257,18 +289,47 @@ final class AppWorker: @unchecked Sendable {
                 AX.setPosition(element, target.origin)
             }
             var actual = target
+            var answered = true
             if request.verify || sizeChanged {
-                actual = AX.frame(element) ?? target
-                if sizeChanged, !actual.size.approximatelyEquals(target.size, tolerance: 1) {
-                    AX.setSize(element, target.size)
-                    actual = AX.frame(element) ?? actual
+                if let read = AX.frame(element) {
+                    actual = read
+                    if sizeChanged, !actual.size.approximatelyEquals(target.size, tolerance: 1) {
+                        AX.setSize(element, target.size)
+                        actual = AX.frame(element) ?? actual
+                    }
+                } else {
+                    answered = false
                 }
             }
+            // A frame read back that is not the one written may only be the app not done yet (Electron apps apply
+            // moves late), and an app that does not answer may not have moved at all: the size read back stays known,
+            // the position does not, so the next write is not skipped as one already made.
+            let applied = answered && actual.approximatelyEquals(target, tolerance: 2)
             lastFrames[id] = actual
-            if !actual.approximatelyEquals(target, tolerance: 2) {
+            if applied { originUnknown.remove(id) } else { originUnknown.insert(id) }
+            if answered, !applied {
                 emit(.applied(pid, id, actual))
             }
         }
+    }
+
+    /// Once the echo window of the last write to window `id` is over: if the window is still at a frame written before
+    /// that one, the main thread hears of it. A newer write gets its own echo window first.
+    private func recheck(_ id: WindowID) {
+        recheckPending.remove(id)
+        guard let element = windows[id], !frozen.contains(id), let frame = AX.frame(element) else { return }
+        let now = CFAbsoluteTimeGetCurrent()
+        if let at = lastWrite[id], now - at < Self.echoWindow {
+            recheckPending.insert(id)
+            perform(after: at + Self.echoWindow + 0.05 - now) { [self] in recheck(id) }
+            return
+        }
+        guard let target = lastTarget[id], !frame.approximatelyEquals(target, tolerance: 2),
+              written.isOwn(frame, of: id, at: now) else { return }
+        lastFrames[id] = frame
+        originUnknown.remove(id)
+        // A frame Rambla wrote, whatever the mouse is doing: never the start of a drag.
+        emit(.frameChanged(pid, id, frame, mouseDown: false))
     }
 
     /// AX only lists windows of the active Spaces, so a missing window is not a closed one: windows are
@@ -296,8 +357,10 @@ final class AppWorker: @unchecked Sendable {
                 }
             }
         }
-        let frame = AX.frame(element) ?? .zero
+        let read = AX.frame(element)
+        let frame = read ?? .zero
         lastFrames[id] = frame
+        if read == nil { originUnknown.insert(id) } else { originUnknown.remove(id) }
         return WindowSnapshot(id: id, pid: pid,
                               traits: AX.traits(of: element, bundleID: bundleID, appIsRegular: isRegular),
                               frame: frame, title: AX.title(element))
@@ -313,6 +376,11 @@ final class AppWorker: @unchecked Sendable {
         ids[AXElementKey(element)] = nil
         lastFrames[id] = nil
         lastWrite[id] = nil
+        originUnknown.remove(id)
+        lastTarget[id] = nil
+        written.forget(id)
+        recheckPending.remove(id)
+        muted[id] = nil
         frozen.remove(id)
         if notify { emit(.windowDestroyed(pid, id)) }
     }
@@ -340,9 +408,24 @@ final class AppWorker: @unchecked Sendable {
             if let id = ids[AXElementKey(element)] { forget(id, element) }
         case kAXWindowMovedNotification, kAXWindowResizedNotification:
             guard let id = ids[AXElementKey(element)], let frame = AX.frame(element) else { return }
-            if let last = lastFrames[id], frame.approximatelyEquals(last, tolerance: 2) { return }
+            let now = CFAbsoluteTimeGetCurrent()
+            if let until = muted[id] {
+                if now < until { return }
+                muted[id] = nil
+            }
+            if !originUnknown.contains(id), let last = lastFrames[id], frame.approximatelyEquals(last, tolerance: 2) {
+                return
+            }
             lastFrames[id] = frame
-            if let written = lastWrite[id], CFAbsoluteTimeGetCurrent() - written < Self.echoWindow, !frozen.contains(id) {
+            originUnknown.remove(id)
+            if let at = lastWrite[id], now - at < Self.echoWindow, !frozen.contains(id) {
+                // Most likely Rambla's own write settling. A frame written before the last one, though, is an earlier
+                // write applied late (Electron apps): if the window is still there once this write had its time, the
+                // main thread hears of it, so that the window goes where Rambla wants it.
+                if let target = lastTarget[id], !frame.approximatelyEquals(target, tolerance: 2),
+                   written.isOwn(frame, of: id, at: now), recheckPending.insert(id).inserted {
+                    perform(after: at + Self.echoWindow + 0.05 - now) { [self] in recheck(id) }
+                }
                 return
             }
             let mouseDown = CGEventSource.buttonState(.combinedSessionState, button: .left)

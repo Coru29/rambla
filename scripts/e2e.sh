@@ -97,9 +97,28 @@ $CHECK host "restore 2"; $CHECK settle
 $CHECK check-order "$ORDER"
 $CHECK check-tiles
 
-# Another app moving a window (what Rectangle does) makes it float where it was put. (After the restore above, moves
-# of that window count as macOS putting it back for 1.5 s.)
+# After the restore above, moves of its windows count as macOS putting them back for 1.5 s: wait that out.
 sleep 2
+
+# An app that applies moves late (VS Code) can report a frame Rambla asked for a moment ago after Rambla asked for the
+# next one: that is Rambla's own move, so the window stays in its strip and goes where Rambla wants it now.
+# The report comes once Rambla is done moving it (an animation would put it right anyway) and a little later than the
+# worker takes for echoes of its own writes, but well within the time Rambla remembers what it asked for.
+LATE=$($CHECK window-at 4)
+$CLI focus-last; $CHECK settle
+$CLI focus-first
+PARKED=$($CHECK placement-of "$LATE")
+$CHECK check-frame-near "$LATE" $PARKED
+$CLI focus-last
+SHOWN=$($CHECK placement-of "$LATE")
+$CHECK check-frame-near "$LATE" $SHOWN
+sleep 0.4
+$CLI debug-external-move "$LATE" $PARKED
+$CHECK settle
+$CHECK check-order "$ORDER"
+$CHECK check-placed
+
+# Another app moving a window (what Rectangle does) makes it float where it was put.
 ID=$($CHECK window-at 1)
 $CLI debug-external-move "$ID" 200 150 700 500
 $CHECK settle
@@ -311,6 +330,16 @@ $CHECK settle
 $CHECK check-placed
 $CHECK check-shelved 1
 
+# A window of the strip out of view that macOS puts back on screen with no word from its app (it can when a display
+# appears) goes back to its parking spot with the next pass: Rambla goes by where the WindowServer shows it, once its
+# own last move of that window is a couple of seconds old (a slow app may still be making it).
+sleep 2.5
+$CHECK watch-reparked "$SENT" debug-unseen-move "$SENT" 300 200 700 500
+$CHECK settle
+$CHECK check-shelved 1
+$CHECK check-not-floating "$SENT"
+$CHECK level-of "$SENT" 1
+
 # A display beside the one with the strips: nothing out of sight shows on it, whichever strip is in view.
 NEIGHBOR=$($CHECK neighbor-right)
 $CLI debug-neighbor $NEIGHBOR; sleep 1; $CHECK settle
@@ -344,6 +373,39 @@ $CHECK check-levels 2 0
 $CHECK wait-columns 3
 $CHECK check-placed
 $CHECK check-shelved 1
+
+# After a Mac restart window ids are new, so the windows are recognised by app and title: one whose title changed (a
+# terminal's does all the time) is its app's only window the strip misses, and takes its old place. The restart is
+# faked by a layout file that looks saved in another login session.
+ORDER=$($CHECK column-order)
+MID=$($CHECK window-at 1)
+quit_rambla
+$CHECK fake-restart "$STATE" "$MID"
+open -g -a /Applications/$APP_NAME.app --args --only-bundle $HOST_ID --state-file "$STATE"
+$CHECK check-levels 2 0 30
+$CHECK settle
+$CHECK check-columns "$ORDER"
+$CHECK check-placed
+
+# A logout, a restart or a shutdown keeps the layout file as it was: a window macOS closes then stays in it, until the
+# logout is cancelled.
+GONE=$($CHECK window-at 2)
+$CLI debug-logout notice
+$CHECK host "close-number $GONE"
+$CHECK wait-columns 2
+sleep 2   # past the save that a change schedules a second later
+$CHECK check-saved "$STATE" "$GONE" yes
+$CLI debug-logout cancel
+$CHECK check-saved "$STATE" "$GONE" no 5
+# Asked to quit for a logout that closed a window before Rambla heard of it: the layout from before it went is the one
+# saved. (The cancel ended the run of closings, so this one starts a run of its own.)
+GONE=$($CHECK window-at 1)
+$CHECK host "close-number $GONE"
+$CHECK wait-columns 1
+$CHECK check-saved "$STATE" "$GONE" no 5
+$CLI debug-logout quit
+$CHECK check-saved "$STATE" "$GONE" yes 5
+$CLI debug-logout cancel
 
 $CHECK host quit >/dev/null
 echo "E2E OK"
