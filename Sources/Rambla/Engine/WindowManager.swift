@@ -712,6 +712,7 @@ final class WindowManager {
         requested[id] = nil
         echoes.forget(id)
         unseenFixed[id] = nil
+        strayBroughtBack[id] = nil
         hiddenSince[id] = nil
         lastFocusedAt[id] = nil
         backFromDock[id] = nil
@@ -1190,6 +1191,12 @@ final class WindowManager {
         var hiddenNow: [StripKey: Set<WindowID>] = [:]
         for key in keys {
             for id in strips[key]!.allWindows where !visible.contains(id) {
+                // Parked where another display now lies, and filed under its desktop: it comes back with the layout
+                // below, or keeps its place while that is tried again (`StrayParked`).
+                if let back = strayParked(id, in: key, spaces: spacesOf[id] ?? [], now: now) {
+                    if !back { hiddenNow[key, default: []].insert(id) }
+                    continue
+                }
                 if !followToItsSpace(id, from: key, spaces: spacesOf[id] ?? [], now: now) {
                     hiddenNow[key, default: []].insert(id)
                     if hiddenSince[id] == nil { hiddenSince[id] = now }
@@ -1201,6 +1208,10 @@ final class WindowManager {
         // another Space in Mission Control goes there, as one in view does.
         for key in outOfView {
             for id in strips[key]!.allWindows where !visible.contains(id) {
+                if let back = strayParked(id, in: key, spaces: spacesOf[id] ?? [], now: now) {
+                    if !back { hiddenNow[key, default: []].insert(id) }
+                    continue
+                }
                 if inGrace || !followToItsSpace(id, from: key, spaces: spacesOf[id] ?? [], now: now) {
                     hiddenNow[key, default: []].insert(id)
                     if hiddenSince[id] == nil { hiddenSince[id] = now }
@@ -1368,6 +1379,27 @@ final class WindowManager {
     /// `id`, a window of `key` that is not on screen, is on another Space (`spaces`, the ones macOS files it under):
     /// the user took it there in Mission Control, and it joins the strip in view of that Space. False when it stays:
     /// on no other Space Rambla manages, tucked away (`isTuckedAway`), or that Space's display not settled yet.
+    /// Whether window `id` of `key`, not on screen, is one macOS filed under the desktop another display shows because
+    /// Rambla had parked it past the edge that display now covers (`StrayParked`): nil when it is not. true: it comes
+    /// back to its own display now, with the layout that follows (the write takes it to this display's desktop); false:
+    /// it keeps its place in the strip, out of sight, while the displays settle or until it is tried again.
+    private func strayParked(_ id: WindowID, in key: StripKey, spaces: [UInt64], now: CFAbsoluteTime) -> Bool? {
+        guard !isTuckedAway(id), let frame = requested[id] ?? windows[id]?.frame else { return nil }
+        let others = displays.filter { $0.uuid != key.displayUUID }
+            .map { StrayParked.Other(frame: $0.frame, currentSpace: $0.currentSpace) }
+        guard StrayParked.isStray(frame: frame, spaces: spaces, own: key.spaceID, others: others) else { return nil }
+        if inGrace { return false }
+        if let at = strayBroughtBack[id], now - at < Self.strayRetry { return false }
+        strayBroughtBack[id] = now
+        Log.info("Window \(id), parked where another display now lies, was filed under that display's desktop: back to "
+                 + "its own")
+        return true
+    }
+
+    /// When each window filed under another display's desktop was last brought back (`strayParked`).
+    private var strayBroughtBack: [WindowID: CFAbsoluteTime] = [:]
+    static let strayRetry: CFAbsoluteTime = 10
+
     private func followToItsSpace(_ id: WindowID, from key: StripKey, spaces: [UInt64], now: CFAbsoluteTime) -> Bool {
         guard !spaces.isEmpty, !spaces.contains(key.spaceID), !isTuckedAway(id),
               let target = spaces.lazy.compactMap({ self.stripKey(forSpace: $0) }).first, target != key,
