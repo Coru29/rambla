@@ -697,9 +697,12 @@ final class WindowManager {
     func removeWindow(_ id: WindowID) {
         guard windows[id] != nil || floating.contains(id) else { return }
         // Maybe macOS is quitting the apps for a logout Rambla has not heard of yet (`LogoutLayout`). Only a window of
-        // the layout counts: one in a strip, or floating by the user's choice.
+        // the layout counts: one in a strip, or floating by the user's choice. The layout without it is saved even when
+        // no other window moves: left in the file, a closed window would keep another of its app from being recognised
+        // after a restart.
         if key(containing: id) != nil || (floating.contains(id) && !autoFloated.contains(id)) {
             logout.windowGoes(at: Self.uptime) { currentLayout() }
+            scheduleSave()
         }
         let record = windows.removeValue(forKey: id)
         // The focused window going away (closed, or gone with its app) moves the focus by itself (`FocusRoute`).
