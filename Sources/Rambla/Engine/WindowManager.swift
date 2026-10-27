@@ -1595,6 +1595,7 @@ final class WindowManager {
         }
         return LayoutInput(
             strip: strip, viewport: viewport, display: display.frame, otherDisplays: otherDisplays(than: display),
+            otherVisible: otherVisibleFrames(than: display),
             hidden: hidden[key] ?? [], minSizes: minSizes, originalHeights: originalHeights,
             config: LayoutConfig(gap: prefs.innerGap, tabBarHeight: 28, centerMode: prefs.centerMode,
                                  keepOriginalHeight: prefs.keepOriginalHeight, sliver: Self.sliver))
@@ -1604,6 +1605,11 @@ final class WindowManager {
     /// is not there, `debug-neighbor`).
     func otherDisplays(than display: DisplayInfo) -> [CGRect] {
         displays.filter { $0.uuid != display.uuid }.map(\.frame) + (testNeighbor.map { [$0] } ?? [])
+    }
+
+    /// The visible frames of `otherDisplays(than:)`, in the same order (the tests' display has no menu bar).
+    func otherVisibleFrames(than display: DisplayInfo) -> [CGRect] {
+        displays.filter { $0.uuid != display.uuid }.map(\.visible) + (testNeighbor.map { [$0] } ?? [])
     }
 
     func apply(_ key: StripKey, animate: Bool, verify: Bool = true) {
@@ -1637,10 +1643,11 @@ final class WindowManager {
             animator.speed = prefs.animationSpeed
             var to: [WindowID: CGRect] = [:], from: [WindowID: CGRect] = [:], then: [WindowID: CGRect] = [:]
             var jumps: [WindowID: CGRect] = [:]
+            let walls = Layout.walls(input)
             for (id, frame) in changed {
                 let now = animator.current[id] ?? windows[id]?.frame
                 switch Layout.transition(of: id, at: now, to: result, from: previous, display: input.display,
-                                         others: input.otherDisplays, sliver: input.config.sliver) {
+                                         others: input.otherDisplays, sliver: input.config.sliver, walls: walls) {
                 case .jump:
                     jumps[id] = frame
                 case .animate(let start):
