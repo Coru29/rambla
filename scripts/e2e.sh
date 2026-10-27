@@ -388,7 +388,9 @@ $CHECK check-columns "$ORDER"
 $CHECK check-placed
 
 # A logout, a restart or a shutdown keeps the layout file as it was: a window macOS closes then stays in it, until the
-# logout is cancelled.
+# logout is cancelled. The windows closed here never have the focus: macOS would give it to another window of the test
+# app, maybe the one in the strip out of view.
+$CLI focus-first; $CHECK settle
 GONE=$($CHECK window-at 2)
 $CLI debug-logout notice
 $CHECK host "close-number $GONE"
