@@ -305,15 +305,16 @@ public enum Layout {
         case .visible(let frame):
             guard outOfSight else { break }
             if let exit = previous?.exits[id] {
-                // Its size may have changed meanwhile: centered where it left, and never over a lower neighbor.
+                // Its size may have changed meanwhile: centered where it left, and never further over a lower neighbor
+                // than a peek (`wallPeek`).
                 let w = Double(frame.width), y = Double(frame.minY), h = Double(frame.height)
                 var x = Double(exit.midX) - w / 2
                 if exit.midX > display.midX {
                     if walled(.right, width: w, display: display, y: y, height: h, walls: walls) {
-                        x = min(x, Double(display.maxX) - w)
+                        x = min(x, edgeX(.right, width: w, display: display, y: y, height: h, walls: walls))
                     }
                 } else if walled(.left, width: w, display: display, y: y, height: h, walls: walls) {
-                    x = max(x, Double(display.minX))
+                    x = max(x, edgeX(.left, width: w, display: display, y: y, height: h, walls: walls))
                 }
                 return .animate(from: CGRect(x: x, y: y, width: w, height: h))
             }
@@ -363,16 +364,21 @@ public enum Layout {
         return CGRect(x: x, y: Double(frame.minY), width: w, height: Double(frame.height))
     }
 
-    /// Where a window `width` wide sits as it leaves or comes in through `side`: just under half of it out, or flush
-    /// with the edge when a lower neighbor is there (`walls`), which no window reaches over.
+    /// Where a window `width` wide sits as it leaves or comes in through `side`: just under the most of it that may be
+    /// out, half, or `wallPeek` toward a lower neighbor (`walls`).
     static func edgeX(_ side: HDirection, width: Double, display: CGRect, y: Double, height: Double,
                       walls: [CGRect]) -> Double {
-        let flush = walled(side, width: width, display: display, y: y, height: height, walls: walls)
+        let out = walled(side, width: width, display: display, y: y, height: height, walls: walls) ? wallPeek : 0.5
         switch side {
-        case .right: return flush ? Double(display.maxX) - width : Double(display.maxX) - width / 2 - 1
-        case .left: return flush ? Double(display.minX) : Double(display.minX) - width / 2 + 1
+        case .right: return Double(display.maxX) - width * (1 - out) - 1
+        case .left: return Double(display.minX) - width * out + 1
         }
     }
+
+    /// The most of a window's width that may reach over a lower neighbor (`walls`): under half, with room to spare.
+    /// At exactly half, macOS or the app can take the window for one of that display, and push it down below its menu
+    /// bar.
+    public static let wallPeek = 0.45
 
     /// Whether a lower neighbor (`walls`) is beyond `side` of `display`, where a window `width` wide and `height` tall
     /// at `y` would reach out.
@@ -383,10 +389,10 @@ public enum Layout {
         return walls.contains { overlaps(probe, $0) }
     }
 
-    /// The other displays no window of the strip may reach over at all, not even to peek: those whose visible area
+    /// The other displays a window of the strip may reach over only a little (`wallPeek`): those whose visible area
     /// begins below the strip's top (they sit lower, or their menu bar is taller). macOS, or the app (VS Code does),
-    /// pushes a window reaching over one down below that menu bar, and the window jumps back up as Rambla puts it in
-    /// place again.
+    /// pushes a window that reaches half over one down below that menu bar, and the window jumps back up as Rambla puts
+    /// it in place again.
     public static func walls(_ input: LayoutInput) -> [CGRect] {
         let top = Double(input.viewport.minY)
         return input.otherDisplays.indices.filter { index in
@@ -490,17 +496,17 @@ extension Layout {
         }
 
         let y = Double(column.minY), h = Double(column.height)
-        // Toward a lower neighbor (`walls`) not even a peek: parked as soon as more than a point would reach over it.
+        // Toward a lower neighbor (`walls`) a smaller peek: parked once more than `wallPeek` of it would reach over.
         if slots.rightPin == nil {
             let beyond = x + w - Double(display.maxX)
             let part = CGRect(x: Double(display.maxX), y: y, width: max(beyond, 0), height: h)
-            if beyond > parkThreshold, walls.contains(where: { overlaps(part, $0) }) { return .right }
+            if beyond > w * wallPeek, walls.contains(where: { overlaps(part, $0) }) { return .right }
             if beyond > w / 2, others.contains(where: { overlaps(part, $0) }) { return .right }
         }
         if slots.leftPin == nil {
             let beyond = Double(display.minX) - x
             let part = CGRect(x: x, y: y, width: max(beyond, 0), height: h)
-            if beyond > parkThreshold, walls.contains(where: { overlaps(part, $0) }) { return .left }
+            if beyond > w * wallPeek, walls.contains(where: { overlaps(part, $0) }) { return .left }
             if beyond > w / 2, others.contains(where: { overlaps(part, $0) }) { return .left }
         }
         return nil
