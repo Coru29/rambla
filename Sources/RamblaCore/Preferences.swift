@@ -221,6 +221,9 @@ public struct Preferences: Codable, Equatable, Sendable {
     public var shortcutOverrides: [Action: [KeyCombo]] = [:]
     /// Look for a new release on GitHub once a day.
     public var checkForUpdates = true
+    /// In the overview and on the veil, a browser window shows the site it is on: Rambla reads the page's address and
+    /// asks the site for its icon. Off unless the user turns it on, as it is a connection to the internet.
+    public var siteIcons = false
 
     public init() {}
 
@@ -251,6 +254,7 @@ public struct Preferences: Codable, Equatable, Sendable {
         appRules = try container.decodeIfPresent([AppRule].self, forKey: .appRules) ?? appRules
         disabledDisplays = try container.decodeIfPresent([String].self, forKey: .disabledDisplays) ?? disabledDisplays
         checkForUpdates = try container.decodeIfPresent(Bool.self, forKey: .checkForUpdates) ?? checkForUpdates
+        siteIcons = try container.decodeIfPresent(Bool.self, forKey: .siteIcons) ?? siteIcons
         // Decoded through plain strings so an id this version does not know (a downgrade, a removed action) is
         // skipped instead of making the whole dictionary, and with it every preference, fail to load.
         if let stored = try container.decodeIfPresent([String: [KeyCombo]].self, forKey: .shortcutOverrides) {

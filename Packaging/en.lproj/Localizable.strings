@@ -149,6 +149,8 @@
 "Grosor del borde" = "Border width";
 "Dibuja un borde redondeado alrededor de la ventana enfocada." = "Draws a rounded border around the focused window.";
 "Atenuar ventanas inactivas" = "Dim inactive windows";
+"Íconos de los sitios" = "Site icons";
+"En la vista general y en el velo, una ventana del navegador muestra el ícono y el nombre del sitio de su pestaña. Para eso Rambla lee la dirección de la página y le pide el ícono al sitio, una vez por sitio, sin cookies y sin guardarlo en el disco." = "In the overview and on the veil, a browser window shows the icon and the name of the site its tab is on. For that, Rambla reads the page's address and asks the site for its icon, once per site, with no cookies and without keeping it on disk.";
 "Intensidad" = "Intensity";
 "Oscurece todo menos la ventana enfocada." = "Darkens everything except the focused window.";
 "El mouse sigue al foco" = "Mouse follows focus";
@@ -446,5 +448,5 @@
 
 /* Settings/Views/GeneralView.swift (updates) */
 "Buscar actualizaciones automáticamente" = "Check for updates automatically";
-"Rambla consulta GitHub al arrancar y una vez por día. Es su única conexión a internet y no envía nada tuyo. Desde el menú podés buscar a mano cuando quieras." = "Rambla checks GitHub when it starts and once a day. It is its only connection to the internet and it sends nothing of yours. You can always check by hand from the menu.";
+"Rambla consulta GitHub al arrancar y una vez por día, y no envía nada tuyo. Es su única conexión a internet, salvo los íconos de los sitios si los activás en Apariencia. Desde el menú podés buscar a mano cuando quieras." = "Rambla checks GitHub when it starts and once a day, and it sends nothing of yours. It is its only connection to the internet, other than site icons if you turn them on in Appearance. You can always check by hand from the menu.";
 "Respuesta háptica" = "Haptic feedback";

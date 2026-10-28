@@ -362,12 +362,13 @@ final class OverlayCoordinator {
     }
 
     /// How a window shows in the overview and on the veil: its app's name, icon and color, or for a browser window the
-    /// site it shows, once known (`PageIcons`).
+    /// site it shows, once known, when the user turned the sites' icons on (`PageIcons`).
     private func look(of id: WindowID) -> (name: String, icon: NSImage?, tint: NSColor) {
         let record = engine.windows[id]
         let app = record.flatMap { NSRunningApplication(processIdentifier: $0.pid)?.localizedName } ?? ""
-        guard let record, let page = pages.look(of: id, bundleID: record.bundleID, title: record.title,
-                                                 browserIcon: icon(for: id)) else {
+        guard engine.prefs.siteIcons, let record,
+              let page = pages.look(of: id, bundleID: record.bundleID, title: record.title,
+                                    browserIcon: icon(for: id)) else {
             return (app, icon(for: id), tint(for: id))
         }
         return (page.site, page.icon ?? icon(for: id), page.tint ?? tint(for: id))
@@ -375,7 +376,7 @@ final class OverlayCoordinator {
 
     /// A window's title changed: for a browser window, the site it shows may have changed with it.
     private func titleChanged(_ id: WindowID) {
-        guard let record = engine.windows[id] else { return }
+        guard engine.prefs.siteIcons, let record = engine.windows[id] else { return }
         pages.titleChanged(id, bundleID: record.bundleID, title: record.title)
     }
 

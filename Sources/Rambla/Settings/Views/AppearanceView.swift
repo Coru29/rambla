@@ -2,7 +2,8 @@ import AppKit
 import RamblaCore
 import SwiftUI
 
-/// "Apariencia": the indicator bar, the focus border, dimming, and how the mouse and the focus follow each other.
+/// "Apariencia": the indicator bar, the focus border, dimming, how the mouse and the focus follow each other, and the
+/// sites' icons on browser windows.
 struct AppearanceView: View {
     @ObservedObject private var store = PreferencesStore.shared
 
@@ -12,6 +13,7 @@ struct AppearanceView: View {
             borderSection
             dimSection
             mouseSection
+            siteIconsSection
         }
         .formStyle(.grouped)
         .toggleStyle(.switch)
@@ -55,6 +57,14 @@ struct AppearanceView: View {
             Toggle("El foco sigue al mouse", isOn: $store.prefs.focusFollowsMouse)
         } footer: {
             Text("Con el primero, el puntero va al centro de la ventana que enfocás con un atajo. Con el segundo, enfocás una ventana dejando el puntero quieto sobre ella (sin desplazar la tira).")
+        }
+    }
+
+    private var siteIconsSection: some View {
+        Section {
+            Toggle("Íconos de los sitios", isOn: $store.prefs.siteIcons)
+        } footer: {
+            Text("En la vista general y en el velo, una ventana del navegador muestra el ícono y el nombre del sitio de su pestaña. Para eso Rambla lee la dirección de la página y le pide el ícono al sitio, una vez por sitio, sin cookies y sin guardarlo en el disco.")
         }
     }
 
