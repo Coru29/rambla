@@ -41,6 +41,15 @@ final class OverlayCoordinator {
     private var indicatorKey: StripKey?
     private var icons: [pid_t: NSImage] = [:]
     private var tints: [pid_t: NSColor] = [:]
+    /// The sites the browser windows show, which the overview and the veil draw them with (`look`).
+    private lazy var pages: PageIcons = {
+        let pages = PageIcons { [weak self] id, done in
+            guard let self else { return done(nil) }
+            engine.readPage(of: id, done)
+        }
+        pages.changed = { [weak self] in self?.pagesChanged() }
+        return pages
+    }()
     /// Stands in for the icon of an app that has none.
     private lazy var genericIcon = NSWorkspace.shared.icon(for: .application)
 
@@ -49,6 +58,7 @@ final class OverlayCoordinator {
         engine.overlayHook = { [weak self] in self?.refresh() }
         engine.indicatorHook = { [weak self] key, modifiers in self?.showIndicator(key, holding: modifiers) }
         engine.levelHook = { [weak self] stack in self?.levelChanged(on: stack) }
+        engine.titleHook = { [weak self] id in self?.titleChanged(id) }
         engine.emptyLevelHook = { [weak self] stack in self?.showEmptyStripHint(of: stack) }
         engine.levelTransition = { [weak self] stack, up in self?.coverSwitch(of: stack, up: up) ?? false }
         engine.levelTransitionReset = { [weak self] in self?.veil.reset() }
@@ -207,9 +217,9 @@ final class OverlayCoordinator {
         }
         return shown.compactMap { id, frame in
             guard frame.intersects(display.visible), let record = engine.windows[id] else { return nil }
-            return VeilCard(id: id, frame: frame,
-                            app: NSRunningApplication(processIdentifier: record.pid)?.localizedName ?? "",
-                            title: record.title, icon: icon(for: id) ?? genericIcon, tint: tint(for: id))
+            let look = look(of: id)
+            return VeilCard(id: id, frame: frame, app: look.name, title: record.title, icon: look.icon ?? genericIcon,
+                            tint: look.tint)
         }
     }
 
@@ -294,10 +304,9 @@ final class OverlayCoordinator {
                 strip: strip, metrics: result.metrics, pinnedWidths: pinned, gap: engine.prefs.innerGap, hidden: hidden,
                 focused: selecting ?? engine.focusedWindow)))
             for id in strip.allWindows {
-                let record = engine.windows[id]
-                let app = record.flatMap { NSRunningApplication(processIdentifier: $0.pid)?.localizedName } ?? ""
-                items[id] = OverviewItem(app: app, title: record?.title ?? "", icon: icon(for: id), tint: tint(for: id),
-                                         hidden: hidden.contains(id))
+                let look = look(of: id)
+                items[id] = OverviewItem(app: look.name, title: engine.windows[id]?.title ?? "", icon: look.icon,
+                                         tint: look.tint, hidden: hidden.contains(id))
             }
         }
         guard rows.contains(where: { !$0.overview.cards.isEmpty }) else { return nil }
@@ -349,6 +358,35 @@ final class OverlayCoordinator {
             engine.focus(window: id, in: key)
         } else {
             engine.switchLevel(of: key.stack, to: key.level, focusing: id)
+        }
+    }
+
+    /// How a window shows in the overview and on the veil: its app's name, icon and color, or for a browser window the
+    /// site it shows, once known (`PageIcons`).
+    private func look(of id: WindowID) -> (name: String, icon: NSImage?, tint: NSColor) {
+        let record = engine.windows[id]
+        let app = record.flatMap { NSRunningApplication(processIdentifier: $0.pid)?.localizedName } ?? ""
+        guard let record, let page = pages.look(of: id, bundleID: record.bundleID, title: record.title,
+                                                 browserIcon: icon(for: id)) else {
+            return (app, icon(for: id), tint(for: id))
+        }
+        return (page.site, page.icon ?? icon(for: id), page.tint ?? tint(for: id))
+    }
+
+    /// A window's title changed: for a browser window, the site it shows may have changed with it.
+    private func titleChanged(_ id: WindowID) {
+        guard let record = engine.windows[id] else { return }
+        pages.titleChanged(id, bundleID: record.bundleID, title: record.title)
+    }
+
+    /// A site the browser windows show, or its icon, came: the overview on screen draws its windows again.
+    private func pagesChanged() {
+        overview.updateItems { items in
+            for (id, item) in items {
+                let look = look(of: id)
+                items[id] = OverviewItem(app: look.name, title: item.title, icon: look.icon, tint: look.tint,
+                                         hidden: item.hidden)
+            }
         }
     }
 

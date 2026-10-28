@@ -164,6 +164,8 @@ final class WindowManager {
     var overviewSwipe: ((_ stack: StackKey, _ up: Bool, _ move: Bool) -> Bool?)?
     /// Called when another level of that stack comes into view (the levels indicator).
     var levelHook: ((StackKey) -> Void)?
+    /// Called when a window's title changes: the page a browser window shows may have changed with it.
+    var titleHook: ((WindowID) -> Void)?
     /// Called when the level that came into view of that stack is empty (its hint).
     var emptyLevelHook: ((StackKey) -> Void)?
     /// Covers the display of a stack with the overlay's veil, for a switch between its strips that the user asked for
@@ -614,6 +616,15 @@ final class WindowManager {
         DispatchQueue.main.asyncAfter(deadline: .now() + timeout) { MainActor.assumeIsolated { waiting.finish() } }
     }
 
+    /// Reads the address of the page a browser window shows, on its app's worker, and calls `completion` with it: nil
+    /// when it shows none, or Rambla does not know the window.
+    func readPage(of id: WindowID, _ completion: @escaping (URL?) -> Void) {
+        guard let pid = windows[id]?.pid, let worker = workers[pid] else {
+            return DispatchQueue.main.async { completion(nil) }
+        }
+        worker.readPage(id, completion)
+    }
+
     // MARK: - AX events
 
     /// The events that change the windows or the focus come after the switches between strips waiting for the veil
@@ -656,6 +667,7 @@ final class WindowManager {
             scheduleReconcile()
         case .titleChanged(_, let id, let title):
             windows[id]?.title = title
+            titleHook?(id)
             // Only tab bars show titles; skip the overlay refresh otherwise (terminals retitle constantly).
             if let key = key(containing: id), let location = strips[key]?.location(of: id),
                strips[key]?.columns[location.column].mode == .tabbed {

@@ -223,6 +223,14 @@ final class OverviewController {
         })
     }
 
+    /// The windows look otherwise now (the icon of a site a browser window shows came): the overview on screen draws them
+    /// again.
+    func updateItems(_ update: (inout [WindowID: OverviewItem]) -> Void) {
+        guard isShown, var content = state.content else { return }
+        update(&content.items)
+        state.content = content
+    }
+
     /// A window that is not on screen (minimized, its app hidden) cannot be chosen, nor can a strip without windows.
     private func choose(_ id: WindowID?) {
         guard let id, let stack = shownStack, let content = state.content, let item = content.items[id], !item.hidden,

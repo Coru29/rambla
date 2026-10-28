@@ -82,6 +82,23 @@ enum AX {
         string(window, kAXTitleAttribute) ?? ""
     }
 
+    /// The address of the page a browser window shows: the URL of its web area, the first one found breadth first
+    /// through the window's own controls, never inside a page, and through `limit` elements at most.
+    static func pageURL(_ window: AXUIElement, limit: Int = 300) -> URL? {
+        var queue = [window]
+        var next = 0
+        while next < queue.count, next < limit {
+            let element = queue[next]
+            next += 1
+            if string(element, kAXRoleAttribute) == "AXWebArea" {
+                let url = attribute(element, "AXURL")
+                return (url as? URL) ?? (url as? String).flatMap(URL.init(string:))
+            }
+            queue += elements(element, kAXChildrenAttribute) ?? []
+        }
+        return nil
+    }
+
     static func traits(of window: AXUIElement, bundleID: String?, appIsRegular: Bool) -> WindowTraits {
         WindowTraits(
             role: string(window, kAXRoleAttribute),
