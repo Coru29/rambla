@@ -1,25 +1,41 @@
 import Foundation
 
-/// The veil over a switch between stacked strips: a sheet of frosted glass that crosses the display the way the
-/// content goes, covers it while the windows jump to their places behind it, and goes on out the other side. The
-/// windows cannot slide up or down themselves (macOS keeps them below the menu bar and above the bottom edge), so the
-/// veil makes the switch read as a move instead of a jump. Here are its path and its phases (`Veil`); the overlay draws
-/// it.
+/// The veil over a switch between stacked strips: frosted glass that comes over the display, covers it while the
+/// windows jump to their places behind it, and goes. The windows cannot slide up or down themselves (macOS keeps them
+/// below the menu bar and above the bottom edge), so the veil shows them as cards that do: the cards of the strip that
+/// leaves slide out the way the content goes, those of the strip that comes slide in to their windows' places, and the
+/// glass goes once they are there. The switch reads as a move instead of a jump. Here are the veil's timing and phases
+/// (`Veil`) and the cards' slide; the overlay draws them.
 ///
-/// Where the veil is goes by how much of the display it covers, 0 to 1. It comes in from the side of the strip that
-/// comes into view (`entrySide`) and slows down as it settles over the display, then sets off gently out the other
-/// side. A switch asked for while it leaves sends it back from where it is.
+/// How far the veil is over the display goes from 0 to 1, from the side of the strip that comes into view
+/// (`entrySide`): it comes in quickly and settles, then sets off gently out the other side. A switch asked for while it
+/// leaves brings it back from where it is.
 public enum LevelTransition {
     /// Seconds to cover the display, and to leave it, at Rambla's animation speed 1.
     public static let coverSeconds = 0.12
     public static let revealSeconds = 0.18
+    /// Seconds the cards take to slide from the strip that leaves to the one that comes, at speed 1.
+    public static let slideSeconds = 0.26
+    /// Points between the strip that leaves and the one that comes, as their cards slide.
+    public static let slideGap = 40.0
 
-    /// The side the veil comes in from, as a sign on AppKit's y axis: from above (+1) when the strip above comes into
-    /// view (the content goes down, as the fingers do with the natural direction), from below (−1) for the one below.
+    /// The side the veil and the cards of the strip that comes come from, as a sign on AppKit's y axis: from above (+1)
+    /// when the strip above comes into view (the content goes down, as the fingers do with the natural direction), from
+    /// below (−1) for the one below.
     public static func entrySide(up: Bool) -> Double { up ? 1 : -1 }
 
-    /// The side it leaves through: the other one, so that it crosses the display.
+    /// The side the veil, and the cards of the strip that leaves, go out through: the other one.
     public static func exitSide(up: Bool) -> Double { -entrySide(up: up) }
+
+    /// How far the cards slide on a display `height` points high: the strip that leaves goes all the way off it, the
+    /// one that comes from just as far, the gap between them.
+    public static func slideDistance(height: Double) -> Double { height + slideGap }
+
+    /// Seconds the cards take to slide at Rambla's animation `speed`: they are in their places before the longest hold
+    /// is over (`holdCap`), as the glass goes then.
+    public static func slideDuration(speed: Double) -> Double {
+        min(seconds(slideSeconds, speed: speed), holdCap - 0.05)
+    }
 
     /// How much of the display the veil covers `progress` (0 to 1) of the way in from `start`, what it covered when it
     /// set off: it slows down as it settles.
@@ -46,7 +62,8 @@ public enum LevelTransition {
     /// ends it without the display link: a display asleep or unplugged, or a link that stalls, never leaves the veil
     /// on screen or a switch waiting for it.
     public static let watchdogSlack = 0.3
-    /// The longest the veil holds over the display while the apps move their windows, whatever the wait for them does.
+    /// The longest the veil holds over the display while the apps move their windows and the cards slide, whatever the
+    /// wait for them does.
     public static let holdCap = 0.5
 }
 
@@ -80,8 +97,8 @@ extension LevelTransition {
         public enum Effect: Equatable, Sendable {
             /// Put the panel on screen (where the glass already is).
             case show
-            /// Put the glass over `coverage` (0 to 1) of the display, the rest of it off the display on `side`, a sign
-            /// on AppKit's y axis (`entrySide`).
+            /// The glass `coverage` (0 to 1) of the way over the display, from or toward `side`, a sign on AppKit's y
+            /// axis (`entrySide`).
             case slide(coverage: Double, side: Double)
             /// With Reduce Motion: the glass over the whole display, `opacity` opaque.
             case fade(opacity: Double)

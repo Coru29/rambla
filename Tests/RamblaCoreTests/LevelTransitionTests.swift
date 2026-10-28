@@ -44,6 +44,20 @@ import Testing
     #expect(LevelTransition.seconds(0.2, speed: 0) == 0.2 / 0.25)
 }
 
+@Test func theCardsSlideAllTheWayOffTheDisplayAndAGap() {
+    // The strip that leaves goes all the way off the display, and the one that comes from just as far.
+    #expect(LevelTransition.slideDistance(height: 1000) == 1000 + LevelTransition.slideGap)
+    #expect(LevelTransition.slideGap > 0)
+}
+
+@Test func theCardsKeepTheAnimationSpeedWithinTheLongestHold() {
+    #expect(LevelTransition.slideDuration(speed: 1) == LevelTransition.slideSeconds)
+    #expect(LevelTransition.slideDuration(speed: 2) == LevelTransition.slideSeconds / 2)
+    // Slow animations: the cards are still in their places before the veil stops waiting for them and goes.
+    #expect(LevelTransition.slideDuration(speed: 0.25) < LevelTransition.holdCap)
+    #expect(LevelTransition.slideDuration(speed: 0.5) < LevelTransition.holdCap)
+}
+
 // MARK: - The veil's phases
 
 private typealias Veil = LevelTransition.Veil

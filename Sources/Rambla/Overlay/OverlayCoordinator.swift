@@ -167,8 +167,50 @@ final class OverlayCoordinator {
         let prefs = engine.prefs
         guard prefs.animations, let display = engine.display(forStack: stack) else { return false }
         veil.request(on: display, up: up, speed: prefs.animationSpeed,
-                     reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
+                     reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
+                     cards: { [weak self] in self?.veilCards(of: stack) ?? [] })
         return true
+    }
+
+    /// The windows shown on the display of `stack`, as the veil draws them: the strip in view's, column by column (the
+    /// tab a tabbed column shows), then the floating windows in view, the focused window last, on top. Each where it is
+    /// going: those of a strip that just came into view went there at once.
+    private func veilCards(of stack: StackKey) -> [VeilCard] {
+        guard let display = engine.display(forStack: stack), let key = engine.currentKey(of: display) else { return [] }
+        var shown: [(id: WindowID, frame: CGRect)] = []
+        if let strip = engine.strips[key], let placements = engine.results[key]?.placements {
+            let hidden = engine.hidden[key] ?? []
+            for column in strip.columns {
+                let windows = column.mode == .tabbed ? column.activeWindow.map { [$0] } ?? [] : column.windows
+                for id in windows where !hidden.contains(id) {
+                    guard case .visible(let frame)? = placements[id] else { continue }
+                    shown.append((id, engine.animator.current[id] ?? frame))
+                }
+            }
+        }
+        // The floating windows that go with the strips: those parked with a strip out of view are not shown.
+        let parked = Set(engine.floatShelf.values.flatMap(\.keys)).union(engine.floatsAway.keys)
+        let onScreen = WindowManager.windowIDs(onScreenOnly: true)
+        for id in engine.floating.sorted() where !parked.contains(id) && onScreen.contains(id) {
+            guard let record = engine.windows[id], !record.traits.isMinimized,
+                  NSRunningApplication(processIdentifier: record.pid)?.isHidden != true else { continue }
+            // Where it is, unless it is still parked off the display: then where it was just sent back to.
+            var frame = record.frame
+            if frame.intersection(display.visible).width < frame.width / 2, let going = engine.requested[id] {
+                frame = going
+            }
+            guard Displays.best(for: frame, in: engine.displays)?.uuid == display.uuid else { continue }
+            shown.append((id, frame))
+        }
+        if let focused = engine.focusedWindow, let index = shown.firstIndex(where: { $0.id == focused }) {
+            shown.append(shown.remove(at: index))
+        }
+        return shown.compactMap { id, frame in
+            guard frame.intersects(display.visible), let record = engine.windows[id] else { return nil }
+            return VeilCard(id: id, frame: frame,
+                            app: NSRunningApplication(processIdentifier: record.pid)?.localizedName ?? "",
+                            title: record.title, icon: icon(for: id) ?? genericIcon, tint: tint(for: id))
+        }
     }
 
     /// Another strip of `stack` came into view. The hint of an empty strip that was left goes, unless the strip that
