@@ -12,7 +12,8 @@ public enum CommandPolicy {
 
     /// Words that are not actions.
     static let windowCommands: Set<String> = ["settings", "gather", "relayout"]
-    static let diagnostics: Set<String> = ["dump", "debug-windows", "debug-update", "debug-external-move", "debug-neighbor"]
+    static let diagnostics: Set<String> = ["dump", "debug-windows", "debug-update", "debug-external-move", "debug-neighbor",
+                                           "debug-logout", "debug-unseen-move"]
 
     /// Actions a link may not run: closing a window can lose work.
     static let commandLineOnly: Set<Action> = [.closeWindow]

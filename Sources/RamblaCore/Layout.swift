@@ -31,18 +31,23 @@ public struct LayoutInput: Sendable {
     /// with a pinned column, where the scroll area's edge decides.
     public var display: CGRect
     public var otherDisplays: [CGRect]
+    /// The visible frames of `otherDisplays`, in the same order (below their menu bars). Without them, their frames
+    /// stand in.
+    public var otherVisible: [CGRect]
     /// Windows that take no space: minimized, app hidden, inactive native tab.
     public var hidden: Set<WindowID>
     public var minSizes: [WindowID: CGSize]
     public var originalHeights: [WindowID: Double]
     public var config: LayoutConfig
 
-    public init(strip: Strip, viewport: CGRect, display: CGRect, otherDisplays: [CGRect] = [], hidden: Set<WindowID> = [],
-                minSizes: [WindowID: CGSize] = [:], originalHeights: [WindowID: Double] = [:], config: LayoutConfig = .init()) {
+    public init(strip: Strip, viewport: CGRect, display: CGRect, otherDisplays: [CGRect] = [], otherVisible: [CGRect] = [],
+                hidden: Set<WindowID> = [], minSizes: [WindowID: CGSize] = [:], originalHeights: [WindowID: Double] = [:],
+                config: LayoutConfig = .init()) {
         self.strip = strip
         self.viewport = viewport
         self.display = display
         self.otherDisplays = otherDisplays
+        self.otherVisible = otherVisible
         self.hidden = hidden
         self.minSizes = minSizes
         self.originalHeights = originalHeights
@@ -205,6 +210,7 @@ public enum Layout {
         var columnFrames: [UUID: CGRect] = [:]
         var tabBars: [UUID: CGRect] = [:]
         var exits: [WindowID: CGRect] = [:]
+        let walls = Self.walls(input)
 
         for i in strip.columns.indices where !strip.isCollapsed(i, hidden: input.hidden) {
             let column = strip.columns[i]
@@ -221,13 +227,16 @@ public enum Layout {
             columnFrames[column.id] = rect
 
             // Pinned columns stay put; the others are parked once (nearly) off the display.
-            let side = isPinned ? nil : parkedSide(of: rect, display: input.display, others: input.otherDisplays, slots: slots)
+            let side = isPinned ? nil : parkedSide(of: rect, display: input.display, others: input.otherDisplays,
+                                                   walls: walls, slots: slots)
             for (id, frame) in windowFrames(of: column, in: rect, input) {
                 if let side {
                     let park = parking(for: frame, side: side, display: input.display, others: input.otherDisplays,
                                        sliver: input.config.sliver)
                     placements[id] = .parked(park.frame)
-                    if park.edge != side { exits[id] = exitFrame(for: frame, side: side, display: input.display, slots: slots) }
+                    if park.edge != side {
+                        exits[id] = exitFrame(for: frame, side: side, display: input.display, slots: slots, walls: walls)
+                    }
                 } else {
                     placements[id] = .visible(frame)
                 }
@@ -284,7 +293,8 @@ public enum Layout {
     /// One that comes from another display where it was out of sight too (parked there, or taken back by a display
     /// that returns) comes in through the edge on its side, instead of crossing the displays in between.
     public static func transition(of id: WindowID, at current: CGRect?, to result: LayoutResult, from previous: LayoutResult?,
-                                  display: CGRect, others: [CGRect] = [], sliver: Double) -> Transition {
+                                  display: CGRect, others: [CGRect] = [], sliver: Double,
+                                  walls: [CGRect] = []) -> Transition {
         guard let placement = result.placements[id], let current else { return .animate(from: nil) }
         func shown(on d: CGRect) -> Double { current.intersects(d) ? Double(current.intersection(d).width) : 0 }
         let outOfSight = shown(on: display) <= sliver + 1
@@ -295,12 +305,21 @@ public enum Layout {
         case .visible(let frame):
             guard outOfSight else { break }
             if let exit = previous?.exits[id] {
-                // Its size may have changed meanwhile: centered where it left.
-                return .animate(from: CGRect(x: exit.midX - frame.width / 2, y: frame.minY, width: frame.width, height: frame.height))
+                // Its size may have changed meanwhile: centered where it left, and never over a lower neighbor.
+                let w = Double(frame.width), y = Double(frame.minY), h = Double(frame.height)
+                var x = Double(exit.midX) - w / 2
+                if exit.midX > display.midX {
+                    if walled(.right, width: w, display: display, y: y, height: h, walls: walls) {
+                        x = min(x, Double(display.maxX) - w)
+                    }
+                } else if walled(.left, width: w, display: display, y: y, height: h, walls: walls) {
+                    x = max(x, Double(display.minX))
+                }
+                return .animate(from: CGRect(x: x, y: y, width: w, height: h))
             }
             if shown(on: display) < 0.5, others.allSatisfy({ shown(on: $0) <= sliver + 1 }) {
-                let x = current.midX > display.midX ? Double(display.maxX) - frame.width / 2 - 1
-                                                     : Double(display.minX) - frame.width / 2 + 1
+                let x = edgeX(current.midX > display.midX ? .right : .left, width: Double(frame.width), display: display,
+                              y: Double(frame.minY), height: Double(frame.height), walls: walls)
                 return .animate(from: CGRect(x: x, y: Double(frame.minY), width: frame.width, height: frame.height))
             }
         }
@@ -332,14 +351,48 @@ public enum Layout {
     /// Where a window parked away from `side` leaves the display on `side`: as far out as a column may peek toward a
     /// neighbor display, kept just under half so it still shows on this display; next to a pinned column, flush with
     /// the scroll area instead (strip columns never slide under a pin).
-    private static func exitFrame(for frame: CGRect, side: HDirection, display: CGRect, slots: Slots) -> CGRect {
+    private static func exitFrame(for frame: CGRect, side: HDirection, display: CGRect, slots: Slots,
+                                  walls: [CGRect]) -> CGRect {
         let w = Double(frame.width)
         let x: Double
         switch side {
-        case .right: x = slots.rightPin != nil ? Double(slots.area.maxX) - w : Double(display.maxX) - w / 2 - 1
-        case .left: x = slots.leftPin != nil ? Double(slots.area.minX) : Double(display.minX) - w / 2 + 1
+        case .right where slots.rightPin != nil: x = Double(slots.area.maxX) - w
+        case .left where slots.leftPin != nil: x = Double(slots.area.minX)
+        default: x = edgeX(side, width: w, display: display, y: Double(frame.minY), height: Double(frame.height), walls: walls)
         }
         return CGRect(x: x, y: Double(frame.minY), width: w, height: Double(frame.height))
+    }
+
+    /// Where a window `width` wide sits as it leaves or comes in through `side`: just under half of it out, or flush
+    /// with the edge when a lower neighbor is there (`walls`), which no window reaches over.
+    static func edgeX(_ side: HDirection, width: Double, display: CGRect, y: Double, height: Double,
+                      walls: [CGRect]) -> Double {
+        let flush = walled(side, width: width, display: display, y: y, height: height, walls: walls)
+        switch side {
+        case .right: return flush ? Double(display.maxX) - width : Double(display.maxX) - width / 2 - 1
+        case .left: return flush ? Double(display.minX) : Double(display.minX) - width / 2 + 1
+        }
+    }
+
+    /// Whether a lower neighbor (`walls`) is beyond `side` of `display`, where a window `width` wide and `height` tall
+    /// at `y` would reach out.
+    static func walled(_ side: HDirection, width: Double, display: CGRect, y: Double, height: Double,
+                       walls: [CGRect]) -> Bool {
+        let probe = side == .right ? CGRect(x: Double(display.maxX), y: y, width: width / 2, height: height)
+                                   : CGRect(x: Double(display.minX) - width / 2, y: y, width: width / 2, height: height)
+        return walls.contains { overlaps(probe, $0) }
+    }
+
+    /// The other displays no window of the strip may reach over at all, not even to peek: those whose visible area
+    /// begins below the strip's top (they sit lower, or their menu bar is taller). macOS, or the app (VS Code does),
+    /// pushes a window reaching over one down below that menu bar, and the window jumps back up as Rambla puts it in
+    /// place again.
+    public static func walls(_ input: LayoutInput) -> [CGRect] {
+        let top = Double(input.viewport.minY)
+        return input.otherDisplays.indices.filter { index in
+            let visible = input.otherVisible.indices.contains(index) ? input.otherVisible[index] : input.otherDisplays[index]
+            return Double(visible.minY) > top + 1
+        }.map { input.otherDisplays[$0] }
     }
 }
 
@@ -420,7 +473,8 @@ extension Layout {
     /// A side with a pinned column uses the scroll area's edge instead of the display's, and parks a column that pokes
     /// past it at all: strip columns never slide under a pin, so nothing peeks there. The other sides use the display's
     /// edge, and toward a neighboring display let a column peek out by at most half its width.
-    private static func parkedSide(of column: CGRect, display: CGRect, others: [CGRect], slots: Slots) -> HDirection? {
+    private static func parkedSide(of column: CGRect, display: CGRect, others: [CGRect], walls: [CGRect],
+                                   slots: Slots) -> HDirection? {
         let x = Double(column.minX), w = Double(column.width)
         let area = slots.area
 
@@ -436,19 +490,18 @@ extension Layout {
         }
 
         let y = Double(column.minY), h = Double(column.height)
+        // Toward a lower neighbor (`walls`) not even a peek: parked as soon as more than a point would reach over it.
         if slots.rightPin == nil {
             let beyond = x + w - Double(display.maxX)
-            if beyond > w / 2 {
-                let part = CGRect(x: Double(display.maxX), y: y, width: beyond, height: h)
-                if others.contains(where: { overlaps(part, $0) }) { return .right }
-            }
+            let part = CGRect(x: Double(display.maxX), y: y, width: max(beyond, 0), height: h)
+            if beyond > parkThreshold, walls.contains(where: { overlaps(part, $0) }) { return .right }
+            if beyond > w / 2, others.contains(where: { overlaps(part, $0) }) { return .right }
         }
         if slots.leftPin == nil {
             let beyond = Double(display.minX) - x
-            if beyond > w / 2 {
-                let part = CGRect(x: x, y: y, width: beyond, height: h)
-                if others.contains(where: { overlaps(part, $0) }) { return .left }
-            }
+            let part = CGRect(x: x, y: y, width: max(beyond, 0), height: h)
+            if beyond > parkThreshold, walls.contains(where: { overlaps(part, $0) }) { return .left }
+            if beyond > w / 2, others.contains(where: { overlaps(part, $0) }) { return .left }
         }
         return nil
     }

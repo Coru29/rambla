@@ -91,9 +91,57 @@ extension WindowManager {
     /// own is (`StateStore.testFile`), never the user's.
     var keepsState: Bool { onlyBundles == nil || StateStore.testFile != nil }
 
+    /// Saves the layout, unless a logout holds it as it was (`LogoutLayout`).
     func saveNow() {
+        guard !logout.isHeld(at: Self.uptime), let layout = currentLayout() else { return }
+        StateStore.save(layout)
+    }
+
+    /// The clock of `LogoutLayout`, which never goes back.
+    static var uptime: TimeInterval { ProcessInfo.processInfo.systemUptime }
+
+    /// A logout, a restart or a shutdown began, as `signal` says (`what`, for the log): the layout from before macOS
+    /// started quitting the apps is saved, and the windows they take along leave it as it is.
+    func logoutBegan(_ signal: LogoutLayout.Signal, by what: String) {
+        let current = currentLayout()
+        let wasHeld = logout.isHeld(at: Self.uptime)
+        let saved = logout.logoutBegan(signal, at: Self.uptime, layout: current)
+        if let saved {
+            saveWorkItem?.cancel()
+            StateStore.save(saved)
+            let before = saved == current ? "as it is" : "from before the windows that went away just now"
+            Log.info("\(what): saved the layout \(before), \(saved.refs.count) windows, and kept it")
+        } else {
+            Log.info("\(what): \(wasHeld ? "the layout saved at its start stays" : "no layout to save")")
+        }
+        if saved != nil || !wasHeld { saveOnceHoldEnds() }
+        Log.flush()
+    }
+
+    /// A logout cancelled with no notice leaves Rambla running: what changed meanwhile is saved once the hold is over.
+    private func saveOnceHoldEnds() {
+        guard let left = logout.heldFor(at: Self.uptime) else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + left + 1) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                if self.logout.isHeld(at: Self.uptime) { self.saveOnceHoldEnds() } else { self.saveNow() }
+            }
+        }
+    }
+
+    /// The logout was cancelled (`quietly`: Rambla quits for another reason, and saves on its way out).
+    func logoutCancelled(quietly: Bool = false) {
+        guard logout.isHeld(at: Self.uptime) else { return }
+        logout.logoutCancelled()
+        guard !quietly else { return }
+        Log.info("The logout was cancelled: saving the layout again")
+        saveNow()
+    }
+
+    /// The layout as it would be saved now: nil when there is none to keep (test mode without a file of its own).
+    func currentLayout() -> SavedState? {
         // No window known at all (Accessibility lists none while the screen is locked) is no layout: keep the file's.
-        guard keepsState, !windows.isEmpty else { return }
+        guard keepsState, !windows.isEmpty else { return nil }
         var refs: [RamblaCore.WindowRef] = []
         var saved: [SavedStrip] = []
         for (key, strip) in strips where !strip.columns.isEmpty {
@@ -111,7 +159,7 @@ extension WindowManager {
         let chosen = floating.subtracting(autoFloated)
         refs += chosen.compactMap(ref)
         let live = SavedState(session: StateStore.session, refs: refs, strips: saved, floating: Array(chosen))
-        StateStore.save(archive.merged(into: live, at: Date()))
+        return archive.merged(into: live, at: Date())
     }
 
     /// What is needed to recognise the window again after a restart.
@@ -156,16 +204,28 @@ extension WindowManager {
                 .flatMap { $0.value.allWindows }
             let placed = Set(strips.filter { $0.key.stack != stack }.values.flatMap(\.allWindows))
             let free = candidates.filter { !placed.contains($0.id) } + own.compactMap { windows[$0] }
-            guard takesBack || free.contains(where: {
+            let shownHere = free.filter {
                 $0.kind == .tile && Displays.best(for: whereShown($0), in: displays)?.uuid == stack.displayUUID
-            }) else { continue }
+            }
+            guard takesBack || !shownHere.isEmpty else { continue }
+            // A window another saved place knows by its exact title (a floating one saved as such, or one of a stack
+            // not rebuilt yet) is not guessed for this stack's one unknown window of its app.
+            let elsewhere = archive.strips.filter { $0.displayUUID != stack.displayUUID || $0.spaceKey != spaceKey }
+                .flatMap(\.refs) + (restoreState?.refs.filter { pendingFloating.contains($0.id) } ?? [])
+            let known = Set(elsewhere.map { $0.bundleID + "\u{0}" + $0.title })
+            let guessable = shownHere.filter { record in
+                ref(record.id).map { !known.contains($0.bundleID + "\u{0}" + $0.title) } ?? false
+            }
             let onScreen = !takesBack ? [] : windows.values.filter {
                 $0.kind == .tile && visible.contains($0.id) && !floating.contains($0.id)
             }
             // Taking windows back from other strips goes by id, or after a Mac restart by a title only one window has.
+            // After a restart, an app's one window this display shows that no title found is its one window the stack
+            // misses, if it misses just one.
             let levels = StateMatcher.restoredLevels(saved, free: free.compactMap { ref($0.id) },
                                                      onScreen: onScreen.compactMap { ref($0.id) }, returning: returning,
-                                                     current: StateStore.session, alive: alive)
+                                                     current: StateStore.session, alive: alive,
+                                                     shownHere: Set(guessable.map(\.id)))
             guard !levels.isEmpty else {
                 // None of its windows is here. A display that is coming back tries again with the next change. Any
                 // other Space starts as it is, with other windows: its live strips replace the archived ones when

@@ -42,6 +42,28 @@ extension WindowManager {
                 Log.error("debug-neighbor works only in test mode")
                 return false
             }
+        case "debug-unseen-move":
+            // Test mode only: "ID x y w h" moves the window with no word of it reaching Rambla, as macOS can when a
+            // display appears; the next pass finds it where the WindowServer shows it.
+            let values = (argument ?? "").split(separator: " ").compactMap { Double($0) }
+            guard onlyBundles != nil, values.count == 5, let id = WindowID(exactly: values[0]) else {
+                Log.error("debug-unseen-move works only in test mode, with a window id and a frame")
+                return false
+            }
+            worker(for: id)?.debugUnseenMove(id, CGRect(x: values[1], y: values[2], width: values[3], height: values[4]))
+            scheduleReconcile(after: 0.5)
+        case "debug-logout":
+            // Test mode only: "notice" and "quit" act as the two signals of a logout beginning, "cancel" as its end.
+            guard onlyBundles != nil else {
+                Log.error("debug-logout works only in test mode")
+                return false
+            }
+            switch argument {
+            case "notice": logoutBegan(.notice, by: "Test: a logout began")
+            case "quit": logoutBegan(.quit, by: "Test: asked to quit for a logout")
+            case "cancel": logoutCancelled()
+            default: return false
+            }
         default:
             guard let action = Action.parse(word) else {
                 Log.error("Unknown command: \(command)")

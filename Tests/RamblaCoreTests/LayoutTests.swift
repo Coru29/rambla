@@ -45,11 +45,11 @@ import CoreGraphics
         return s
     }
 
-    func input(_ strip: Strip, others: [CGRect] = [], hidden: Set<WindowID> = [],
+    func input(_ strip: Strip, others: [CGRect] = [], otherVisible: [CGRect] = [], hidden: Set<WindowID> = [],
                minSizes: [WindowID: CGSize] = [:], originalHeights: [WindowID: Double] = [:],
                config: LayoutConfig? = nil) -> LayoutInput {
-        LayoutInput(strip: strip, viewport: vp, display: vp, otherDisplays: others, hidden: hidden,
-                    minSizes: minSizes, originalHeights: originalHeights, config: config ?? cfg)
+        LayoutInput(strip: strip, viewport: vp, display: vp, otherDisplays: others, otherVisible: otherVisible,
+                    hidden: hidden, minSizes: minSizes, originalHeights: originalHeights, config: config ?? cfg)
     }
 
     func near(_ a: Double, _ b: Double) -> Bool { abs(a - b) <= 1e-6 }
@@ -524,6 +524,61 @@ import CoreGraphics
         let l = Layout.compute(input(threeColumns(scroll: 300), others: leftNeighbor))
         #expect(l.placements[1] == parked(999, 0, 495, 800))
         #expect(l.exits == [1: CGRect(x: -246.5, y: 0, width: 495, height: 800)])
+    }
+
+    // A neighbor display that sits lower (its visible area begins below the strip's top): macOS, or the app (VS Code),
+    // pushes a window reaching over it down below its menu bar, and the window jumps back up as Rambla puts it in place
+    // again, again and again. Nothing reaches over it, not even a peek, and windows leave and come in flush with the edge.
+
+    @Test func aLowerNeighborTakesNoPeek() {
+        let neighbor = [CGRect(x: 1000, y: 0, width: 800, height: 600)]
+        // At scroll 300 window 3 sits at x = 710, 205 pt beyond the edge: under half, so it peeks beside an even neighbor.
+        let even = Layout.compute(input(threeColumns(scroll: 300), others: neighbor, otherVisible: neighbor))
+        #expect(even.placements[3] == visible(710, 0, 495, 800))
+        // A lower one (its menu bar ends at y = 40, below the strip's top at 0) takes none of it: parked on the left.
+        let lower = [CGRect(x: 1000, y: 40, width: 800, height: 560)]
+        let r = Layout.compute(input(threeColumns(scroll: 300), others: neighbor, otherVisible: lower))
+        #expect(r.placements[3] == parked(-494, 0, 495, 800))
+        // It leaves flush with the edge, not over the neighbor.
+        #expect(r.exits == [3: CGRect(x: 505, y: 0, width: 495, height: 800)])
+        // A column within a point of the edge still shows.
+        let flush = Layout.compute(input(threeColumns(scroll: 504.5), others: neighbor, otherVisible: lower))
+        #expect(flush.placements[3] == visible(505.5, 0, 495, 800))
+    }
+
+    @Test func aLowerNeighborOnTheLeftTakesNoPeekEither() {
+        let neighbor = [CGRect(x: -800, y: 0, width: 800, height: 600)]
+        let lower = [CGRect(x: -800, y: 40, width: 800, height: 560)]
+        // At scroll 200 window 1 sits at x = -200: a peek beside an even neighbor, parked beside a lower one.
+        #expect(Layout.compute(input(threeColumns(scroll: 200), others: neighbor, otherVisible: neighbor)).placements[1]
+                == visible(-200, 0, 495, 800))
+        let r = Layout.compute(input(threeColumns(scroll: 200), others: neighbor, otherVisible: lower))
+        #expect(r.placements[1] == parked(999, 0, 495, 800))
+        #expect(r.exits == [1: CGRect(x: 0, y: 0, width: 495, height: 800)])
+    }
+
+    @Test func windowsComeInFlushBesideALowerNeighbor() {
+        let neighbor = [CGRect(x: 1000, y: 0, width: 800, height: 600)]
+        let lower = [CGRect(x: 1000, y: 40, width: 800, height: 560)]
+        let walls = Layout.walls(input(threeColumns(), others: neighbor, otherVisible: lower))
+        #expect(walls == neighbor)
+        #expect(Layout.walls(input(threeColumns(), others: neighbor, otherVisible: neighbor)).isEmpty)
+        // Back in view from where it left, it starts flush with the edge, even when it got wider meanwhile.
+        let before = Layout.compute(input(threeColumns(scroll: 300), others: neighbor, otherVisible: lower))
+        var wider = threeColumns(scroll: 610)
+        wider.columns[2].width = .fraction(0.6)
+        let after = Layout.compute(input(wider, others: neighbor, otherVisible: lower))
+        guard case .visible(let frame)? = after.placements[3] else { Issue.record("window 3 not in view"); return }
+        #expect(frame.width > 495)
+        let parkedThere = CGRect(x: -494, y: 0, width: 495, height: 800)
+        #expect(Layout.transition(of: 3, at: parkedThere, to: after, from: before, display: vp, others: neighbor,
+                                  sliver: 1, walls: walls)
+                == .animate(from: CGRect(x: 1000 - frame.width, y: 0, width: frame.width, height: 800)))
+        // From out of sight anywhere else, it comes in flush too.
+        let away = CGRect(x: 2500, y: 0, width: 495, height: 800)
+        #expect(Layout.transition(of: 3, at: away, to: after, from: nil, display: vp, others: neighbor, sliver: 1,
+                                  walls: walls)
+                == .animate(from: CGRect(x: 1000 - frame.width, y: 0, width: frame.width, height: 800)))
     }
 
     @Test func windowParkedOnItsOwnSideHasNoExit() {

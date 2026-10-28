@@ -84,6 +84,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if onlyBundles == nil { WelcomeWindowController.shared.showIfFirstLaunch() }
     }
 
+    /// Quit for a logout, a restart or a shutdown, the quit event says why (`kAEQuitReason`): the layout saved when it
+    /// began stays as it was. Quit for any other reason (the menu, an update, a script), what changed since a logout that
+    /// was cancelled with no word of it is saved on the way out.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        let event = NSAppleEventManager.shared().currentAppleEvent
+        if let reason = event?.attributeDescriptor(forKeyword: AEKeyword(kAEQuitReason)) {
+            engine.logoutBegan(.quit, by: "Asked to quit for a logout, restart or shutdown (reason '\(Self.code(reason))')")
+        } else {
+            engine.logoutCancelled(quietly: true)
+        }
+        return .terminateNow
+    }
+
+    /// A four-character code as its characters ('logo', 'rrst'), for the log.
+    private static func code(_ descriptor: NSAppleEventDescriptor) -> String {
+        let value = descriptor.enumCodeValue != 0 ? descriptor.enumCodeValue : descriptor.typeCodeValue
+        let bytes = [24, 16, 8, 0].map { UInt8((value >> $0) & 0xFF) }
+        return String(bytes: bytes, encoding: .macOSRoman) ?? "\(value)"
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         engine.stop()
         engine.saveNow()
@@ -334,6 +354,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let source = DispatchSource.makeSignalSource(signal: sig, queue: .main)
             source.setEventHandler {
                 MainActor.assumeIsolated {
+                    // A shutdown can come as a signal, with no notice: the layout from before the apps quit stays.
+                    WindowManager.shared.logoutBegan(.quit, by: "Asked to quit by signal \(sig)")
                     WindowManager.shared.stop()
                     WindowManager.shared.saveNow()
                 }

@@ -82,8 +82,12 @@ final class WindowManager {
     var focusedWindow: WindowID?
     /// Last frame Rambla asked for, per window (the final target, not animation frames).
     private(set) var requested: [WindowID: CGRect] = [:]
-    /// Where the WindowServer showed each on-screen window at the last reconcile (`whereShown`).
+    /// The frames Rambla asked of each window in the last moments, animation frames too, and when it last asked: an app
+    /// that reports a move late reports one of them (`FrameEchoes`).
+    private(set) var echoes = FrameEchoes()
+    /// Where the WindowServer showed each on-screen window at the last reconcile (`whereShown`), and when.
     private var onScreenFrames: [WindowID: CGRect] = [:]
+    private var onScreenFramesAt: CFAbsoluteTime = 0
     private var hiddenSince: [WindowID: CFAbsoluteTime] = [:]
     /// Windows macOS is putting back (back from the Dock, their app unhidden), and until when: macOS moves them by
     /// itself then (a parked one back on screen, a minimized one to where it was), which is not another app's move.
@@ -105,6 +109,10 @@ final class WindowManager {
     /// The reconcile that checks again once a display's time is up (gone long enough, or done coming back), and when.
     /// Separate from `scheduleReconcile`, which would otherwise hold every other reconcile until then.
     private var displayCheck: DispatchWorkItem?
+    private var unseenCheck: DispatchWorkItem?
+    /// When each window was last put back out of sight after it was found moved unseen, and where it showed then
+    /// (`movedUnseen`).
+    private var unseenFixed: [WindowID: (at: CFAbsoluteTime, shown: CGRect)] = [:]
     private var displayCheckAt: CFAbsoluteTime = 0
     /// How long a display that appears (plugged in again, or there when Rambla starts) may take back the windows of its
     /// strips archived when it was unplugged.
@@ -133,6 +141,7 @@ final class WindowManager {
     /// it parks anything.
     private var focusMayBeOutOfView = false
     private var observers: [(NotificationCenter, NSObjectProtocol)] = []
+    private var noticeObservers: [ImmediateObserver] = []
 
     private(set) lazy var animator = Animator { [weak self] frames, verify in
         self?.write(frames, verify: verify)
@@ -208,6 +217,8 @@ final class WindowManager {
     /// parked one stays where the drag takes it until the button is released.
     private(set) var draggedFloat: WindowID?
     var saveWorkItem: DispatchWorkItem?
+    /// What a logout, a restart or a shutdown leaves saved: the layout from before macOS started quitting the apps.
+    var logout = LogoutLayout()
     /// Strip being moved by a trackpad swipe.
     var gestureKey: StripKey?
     /// The detents of a slide done on the trackpad, felt as taps (nil when it is not, or haptics are off).
@@ -284,6 +295,7 @@ final class WindowManager {
         isRunning = false
         for (center, token) in observers { center.removeObserver(token) }
         observers.removeAll()
+        noticeObservers.removeAll()
         CGDisplayRemoveReconfigurationCallback(displaysReconfigured, Unmanaged.passUnretained(self).toOpaque())
         workers.values.forEach { $0.stop() }
         workers.removeAll()
@@ -399,6 +411,18 @@ final class WindowManager {
         observe(ws, NSWorkspace.didWakeNotification) { [weak self] _ in self?.screensWoke() }
         observe(ws, NSWorkspace.screensDidSleepNotification) { [weak self] _ in self?.screensAsleep = true }
         observe(ws, NSWorkspace.screensDidWakeNotification) { [weak self] _ in self?.screensWoke() }
+        // A logout, a restart or a shutdown: loginwindow's notices, before it quits the apps (delivered at once, as
+        // Rambla is in the background), and Rambla's own quit for one, which may come after macOS quit other apps
+        // (`LogoutLayout`).
+        for notice in Self.logoutNotices {
+            noticeObservers.append(ImmediateObserver(notice) { [weak self] in
+                self?.logoutBegan(.notice, by: "macOS began a logout, restart or shutdown (\(notice.rawValue))")
+            })
+        }
+        noticeObservers.append(ImmediateObserver(Self.logoutCancelled) { [weak self] in self?.logoutCancelled() })
+        observe(ws, NSWorkspace.willPowerOffNotification) { [weak self] _ in
+            self?.logoutBegan(.quit, by: "Asked to quit for a logout, restart or shutdown")
+        }
         observe(DistributedNotificationCenter.default(), Self.screenUnlocked) { [weak self] _ in
             // Accessibility lists no window while the screen is locked: if Rambla started then, it knows none yet.
             Log.info("Screen unlocked: reading the windows again")
@@ -419,6 +443,9 @@ final class WindowManager {
     }
 
     private static let screenUnlocked = Notification.Name("com.apple.screenIsUnlocked")
+    private static let logoutNotices = ["com.apple.logoutInitiated", "com.apple.restartInitiated",
+                                        "com.apple.shutdownInitiated"].map { Notification.Name($0) }
+    private static let logoutCancelled = Notification.Name("com.apple.logoutCancelled")
 
     /// Every app lists its windows again, and one reconcile takes all the answers after the same wait as at launch.
     /// Right after an unlock Accessibility may still list nothing: while no window is known, it tries twice more.
@@ -486,6 +513,18 @@ final class WindowManager {
 
     private func grace(_ seconds: CFAbsoluteTime) {
         graceUntil = max(graceUntil, CFAbsoluteTimeGetCurrent() + seconds)
+        // macOS may move windows out of sight with no word of it while it changes the displays: a pass once Rambla's own
+        // moves of the change are old enough finds them (`movedUnseen`).
+        unseenCheck?.cancel()
+        let item = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                self?.unseenCheck = nil
+                self?.scheduleReconcile()
+            }
+        }
+        unseenCheck = item
+        let after = graceUntil - CFAbsoluteTimeGetCurrent() + Self.unseenAfter + 1
+        DispatchQueue.main.asyncAfter(deadline: .now() + after, execute: item)
     }
 
     private var inGrace: Bool { CFAbsoluteTimeGetCurrent() < graceUntil }
@@ -656,13 +695,24 @@ final class WindowManager {
     }
 
     func removeWindow(_ id: WindowID) {
+        guard windows[id] != nil || floating.contains(id) else { return }
+        // Maybe macOS is quitting the apps for a logout Rambla has not heard of yet (`LogoutLayout`). Only a window of
+        // the layout counts: one in a strip, or floating by the user's choice. The layout without it is saved even when
+        // no other window moves: left in the file, a closed window would keep another of its app from being recognised
+        // after a restart.
+        if key(containing: id) != nil || (floating.contains(id) && !autoFloated.contains(id)) {
+            logout.windowGoes(at: Self.uptime) { currentLayout() }
+            scheduleSave()
+        }
         let record = windows.removeValue(forKey: id)
-        guard record != nil || floating.contains(id) else { return }
         // The focused window going away (closed, or gone with its app) moves the focus by itself (`FocusRoute`).
         if id == focusedWindow, spaceInView(of: id, record: record) != nil { lastLossAt = CFAbsoluteTimeGetCurrent() }
         floating.remove(id)
         autoFloated.remove(id)
         requested[id] = nil
+        echoes.forget(id)
+        unseenFixed[id] = nil
+        strayBroughtBack[id] = nil
         hiddenSince[id] = nil
         lastFocusedAt[id] = nil
         backFromDock[id] = nil
@@ -1101,6 +1151,7 @@ final class WindowManager {
         displays = Displays.current()
         let existing = Self.windowIDs(onScreenOnly: false)
         onScreenFrames = Self.windowFrames(onScreenOnly: true)
+        onScreenFramesAt = CFAbsoluteTimeGetCurrent()
         let visible = Set(onScreenFrames.keys)
         let now = CFAbsoluteTimeGetCurrent()
         presence.update(connected: Set(displays.map(\.uuid)), now: now)
@@ -1140,6 +1191,12 @@ final class WindowManager {
         var hiddenNow: [StripKey: Set<WindowID>] = [:]
         for key in keys {
             for id in strips[key]!.allWindows where !visible.contains(id) {
+                // Parked where another display now lies, and filed under its desktop: it comes back with the layout
+                // below, or keeps its place while that is tried again (`StrayParked`).
+                if let back = strayParked(id, in: key, spaces: spacesOf[id] ?? [], now: now) {
+                    if !back { hiddenNow[key, default: []].insert(id) }
+                    continue
+                }
                 if !followToItsSpace(id, from: key, spaces: spacesOf[id] ?? [], now: now) {
                     hiddenNow[key, default: []].insert(id)
                     if hiddenSince[id] == nil { hiddenSince[id] = now }
@@ -1151,6 +1208,10 @@ final class WindowManager {
         // another Space in Mission Control goes there, as one in view does.
         for key in outOfView {
             for id in strips[key]!.allWindows where !visible.contains(id) {
+                if let back = strayParked(id, in: key, spaces: spacesOf[id] ?? [], now: now) {
+                    if !back { hiddenNow[key, default: []].insert(id) }
+                    continue
+                }
                 if inGrace || !followToItsSpace(id, from: key, spaces: spacesOf[id] ?? [], now: now) {
                     hiddenNow[key, default: []].insert(id)
                     if hiddenSince[id] == nil { hiddenSince[id] = now }
@@ -1318,6 +1379,27 @@ final class WindowManager {
     /// `id`, a window of `key` that is not on screen, is on another Space (`spaces`, the ones macOS files it under):
     /// the user took it there in Mission Control, and it joins the strip in view of that Space. False when it stays:
     /// on no other Space Rambla manages, tucked away (`isTuckedAway`), or that Space's display not settled yet.
+    /// Whether window `id` of `key`, not on screen, is one macOS filed under the desktop another display shows because
+    /// Rambla had parked it past the edge that display now covers (`StrayParked`): nil when it is not. true: it comes
+    /// back to its own display now, with the layout that follows (the write takes it to this display's desktop); false:
+    /// it keeps its place in the strip, out of sight, while the displays settle or until it is tried again.
+    private func strayParked(_ id: WindowID, in key: StripKey, spaces: [UInt64], now: CFAbsoluteTime) -> Bool? {
+        guard !isTuckedAway(id), let frame = requested[id] ?? windows[id]?.frame else { return nil }
+        let others = displays.filter { $0.uuid != key.displayUUID }
+            .map { StrayParked.Other(frame: $0.frame, currentSpace: $0.currentSpace) }
+        guard StrayParked.isStray(frame: frame, spaces: spaces, own: key.spaceID, others: others) else { return nil }
+        if inGrace { return false }
+        if let at = strayBroughtBack[id], now - at < Self.strayRetry { return false }
+        strayBroughtBack[id] = now
+        Log.info("Window \(id), parked where another display now lies, was filed under that display's desktop: back to "
+                 + "its own")
+        return true
+    }
+
+    /// When each window filed under another display's desktop was last brought back (`strayParked`).
+    private var strayBroughtBack: [WindowID: CFAbsoluteTime] = [:]
+    static let strayRetry: CFAbsoluteTime = 10
+
     private func followToItsSpace(_ id: WindowID, from key: StripKey, spaces: [UInt64], now: CFAbsoluteTime) -> Bool {
         guard !spaces.isEmpty, !spaces.contains(key.spaceID), !isTuckedAway(id),
               let target = spaces.lazy.compactMap({ self.stripKey(forSpace: $0) }).first, target != key,
@@ -1545,6 +1627,7 @@ final class WindowManager {
         }
         return LayoutInput(
             strip: strip, viewport: viewport, display: display.frame, otherDisplays: otherDisplays(than: display),
+            otherVisible: otherVisibleFrames(than: display),
             hidden: hidden[key] ?? [], minSizes: minSizes, originalHeights: originalHeights,
             config: LayoutConfig(gap: prefs.innerGap, tabBarHeight: 28, centerMode: prefs.centerMode,
                                  keepOriginalHeight: prefs.keepOriginalHeight, sliver: Self.sliver))
@@ -1556,6 +1639,11 @@ final class WindowManager {
         displays.filter { $0.uuid != display.uuid }.map(\.frame) + (testNeighbor.map { [$0] } ?? [])
     }
 
+    /// The visible frames of `otherDisplays(than:)`, in the same order (the tests' display has no menu bar).
+    func otherVisibleFrames(than display: DisplayInfo) -> [CGRect] {
+        displays.filter { $0.uuid != display.uuid }.map(\.visible) + (testNeighbor.map { [$0] } ?? [])
+    }
+
     func apply(_ key: StripKey, animate: Bool, verify: Bool = true) {
         guard isRunning, !isPaused, let strip = strips[key], let display = display(for: key),
               !prefs.disabledDisplays.contains(key.displayUUID) else { return }
@@ -1564,14 +1652,21 @@ final class WindowManager {
         let result = Layout.compute(input)
         results[key] = result
         var targets: [WindowID: CGRect] = [:]
+        var unseen: [WindowID: CGRect] = [:]
         for (id, placement) in result.placements where !dragTracker.isFrozen(id) && !heldForReturn.contains(id) {
-            targets[id] = placement.frame.integral(keepingSize: true)
+            let frame = placement.frame.integral(keepingSize: true)
+            if case .parked = placement, movedUnseen(id, from: frame) { unseen[id] = frame } else { targets[id] = frame }
         }
         let changed = targets.filter { id, frame in
             !(requested[id]?.approximatelyEquals(frame, tolerance: 0.5) ?? false)
                 || !(windows[id]?.frame.approximatelyEquals(frame, tolerance: 2) ?? false)
         }
-        for (id, frame) in targets { requested[id] = frame }
+        for (id, frame) in targets.merging(unseen, uniquingKeysWith: { $1 }) { requested[id] = frame }
+        if !unseen.isEmpty {
+            // Straight back to its parking spot, out of sight, where the worker may think it still is.
+            unseen.keys.forEach(animator.cancel)
+            write(unseen, verify: verify, force: true)
+        }
         guard !changed.isEmpty else {
             overlayHook?()
             return
@@ -1580,10 +1675,11 @@ final class WindowManager {
             animator.speed = prefs.animationSpeed
             var to: [WindowID: CGRect] = [:], from: [WindowID: CGRect] = [:], then: [WindowID: CGRect] = [:]
             var jumps: [WindowID: CGRect] = [:]
+            let walls = Layout.walls(input)
             for (id, frame) in changed {
                 let now = animator.current[id] ?? windows[id]?.frame
                 switch Layout.transition(of: id, at: now, to: result, from: previous, display: input.display,
-                                         others: input.otherDisplays, sliver: input.config.sliver) {
+                                         others: input.otherDisplays, sliver: input.config.sliver, walls: walls) {
                 case .jump:
                     jumps[id] = frame
                 case .animate(let start):
@@ -1618,14 +1714,19 @@ final class WindowManager {
         let result = Layout.shelved(layoutInput(for: key, strip: strip, display: display))
         results[key] = result
         var changed: [WindowID: CGRect] = [:]
+        var unseen: [WindowID: CGRect] = [:]
         for (id, placement) in result.placements where !dragTracker.isFrozen(id) && !heldForReturn.contains(id) {
             let frame = placement.frame.integral(keepingSize: true)
-            if !(requested[id]?.approximatelyEquals(frame, tolerance: 0.5) ?? false)
+            if movedUnseen(id, from: frame) {
+                unseen[id] = frame
+            } else if !(requested[id]?.approximatelyEquals(frame, tolerance: 0.5) ?? false)
                 || !(windows[id]?.frame.approximatelyEquals(frame, tolerance: 2) ?? false) {
                 changed[id] = frame
             }
             requested[id] = frame
         }
+        unseen.keys.forEach(animator.cancel)
+        write(unseen, verify: true, force: true)
         guard !changed.isEmpty else { return }
         changed.keys.forEach(animator.cancel)
         write(changed, verify: true)
@@ -1711,16 +1812,45 @@ final class WindowManager {
         currentKeys.forEach { apply($0, animate: animate) }
     }
 
-    /// Sends frames to each app's worker. Also records them as the windows' known frames.
-    func write(_ frames: [WindowID: CGRect], verify: Bool) {
+    /// Sends frames to each app's worker. Also records them as the windows' known frames, and as frames Rambla asked
+    /// for (`echoes`). `force` writes them even where a worker last saw the window there (`movedUnseen`).
+    func write(_ frames: [WindowID: CGRect], verify: Bool, force: Bool = false) {
+        let now = CFAbsoluteTimeGetCurrent()
         var byPID: [pid_t: [WindowID: CGRect]] = [:]
         for (id, frame) in frames {
             guard let pid = windows[id]?.pid else { continue }
             byPID[pid, default: [:]][id] = frame
             windows[id]?.frame = frame
+            echoes.asked(frame, of: id, at: now)
         }
-        for (pid, group) in byPID { workers[pid]?.setFrames(group, verify: verify) }
+        for (pid, group) in byPID { workers[pid]?.setFrames(group, verify: verify, force: force) }
     }
+
+    /// Window `id`, meant to be out of sight at `frame`, is somewhere else than Rambla's record says, as the WindowServer
+    /// showed it at the last reconcile, a while after Rambla last asked anything of it: macOS moved it with no word from
+    /// its app (it can when a display appears), so nothing else would put it back.
+    private func movedUnseen(_ id: WindowID, from frame: CGRect) -> Bool {
+        guard let shown = onScreenFrames[id], shown != .zero, !shown.approximatelyEquals(frame, tolerance: 2),
+              let known = windows[id]?.frame, !shown.approximatelyEquals(known, tolerance: 2),
+              echoes.lastAsked(id).map({ onScreenFramesAt > $0 + Self.unseenAfter }) ?? true else { return false }
+        // A window still where it showed when Rambla last put it back (its app does not answer, or keeps it there) is
+        // tried again only now and then, with a pass when the wait is over.
+        let now = CFAbsoluteTimeGetCurrent()
+        if let last = unseenFixed[id], now - last.at < Self.unseenRetry, shown.approximatelyEquals(last.shown, tolerance: 2) {
+            checkDisplaysAgain(after: Self.unseenRetry - (now - last.at) + 0.1)
+            return false
+        }
+        unseenFixed[id] = (now, shown)
+        Log.info("Window \(id) shows at \(Self.describe(shown)), not at \(Self.describe(known)) as Rambla had it: "
+                 + "out of sight again")
+        return true
+    }
+
+    static let unseenRetry: CFAbsoluteTime = 30
+
+    /// How long after Rambla's last write a window found elsewhere counts as moved unseen: a slow app may still be
+    /// applying the write.
+    static let unseenAfter: CFAbsoluteTime = 2
 
     /// "Reacomodar ventanas": reads every window again and puts back in the strip the ones Rambla floated by itself.
     /// One parked with a level out of view (`floatShelf`) goes back into the strip of that level, out of view with it:
@@ -1843,6 +1973,15 @@ final class WindowManager {
         "\(Int(r.minX.rounded())),\(Int(r.minY.rounded())) \(Int(r.width.rounded()))×\(Int(r.height.rounded()))"
     }
 
+    /// `frame` is one Rambla asked of window `id` a moment ago, before it asked for where it wants it now: an app that
+    /// applies moves late (VS Code) reports them late, and may apply them out of order, so the window goes where Rambla
+    /// wants it, unless an animation is taking it there.
+    private func lateEcho(_ id: WindowID, _ frame: CGRect) -> Bool {
+        guard let wanted = requested[id], echoes.isOwn(frame, of: id, at: CFAbsoluteTimeGetCurrent()) else { return false }
+        if animator.current[id] == nil { write([id: wanted], verify: true) }
+        return true
+    }
+
     private func externalFrameChange(_ id: WindowID, _ frame: CGRect, mouseDown: Bool) {
         let previous = windows[id]?.frame
         windows[id]?.frame = frame
@@ -1875,6 +2014,7 @@ final class WindowManager {
         guard !dragTracker.isFrozen(id) else { return }
         // Exactly where Rambla put it: the app reported Rambla's own move late (it applies AX writes asynchronously).
         if let wanted = requested[id], frame.approximatelyEquals(wanted, tolerance: 2) { return }
+        if lateEcho(id, frame) { return }
         if inGrace {
             // macOS moving windows while it changes the displays or the Space (one that spanned two displays, one
             // parked past an edge) is not another app's move: once it is done, the strips put them back in place.
@@ -1912,6 +2052,7 @@ final class WindowManager {
         guard !mouseDown, !dragTracker.isFrozen(id), isCurrentStack(key.stack) else { return }
         // Exactly where Rambla parked it: its own move, reported late.
         if let wanted = requested[id], frame.approximatelyEquals(wanted, tolerance: 2) { return }
+        if lateEcho(id, frame) { return }
         let reference = requested[id] ?? previous ?? frame
         if inGrace {
             // As for the windows in view: once the displays are done changing, the reconcile parks it again.
@@ -1983,6 +2124,7 @@ final class WindowManager {
             let inView = keys.contains(key)
             if inView { bringBackFloats(of: key, shown: visible) }
             var drifted: [WindowID: CGRect] = [:]
+            var unseen: [WindowID: CGRect] = [:]
             for (id, parked) in floatShelf[key] ?? [:] where id != dragging {
                 guard visible.contains(id) else {
                     // Out of sight, and not because it is minimized, its app hidden or in full screen: it may be on
@@ -1992,13 +2134,16 @@ final class WindowManager {
                 }
                 guard !inView else { continue }
                 let park = floatParkingFrame(parked, on: display)
-                if !(requested[id]?.approximatelyEquals(park, tolerance: 0.5) ?? false)
+                if movedUnseen(id, from: park) {
+                    unseen[id] = park
+                } else if !(requested[id]?.approximatelyEquals(park, tolerance: 0.5) ?? false)
                     || !(windows[id]?.frame.approximatelyEquals(park, tolerance: 2) ?? false) {
                     drifted[id] = park
                 }
                 requested[id] = park
             }
             write(drifted, verify: true)
+            write(unseen, verify: true, force: true)
         }
         letGoFloatsAway(maybeAway)
         placeFloatsAway(visible: visible)
@@ -2225,5 +2370,27 @@ extension CGRect {
     /// Whole-point origin; size rounded so apps that snap to integers agree with the request.
     func integral(keepingSize: Bool) -> CGRect {
         CGRect(x: minX.rounded(), y: minY.rounded(), width: width.rounded(), height: height.rounded())
+    }
+}
+
+/// A distributed notification delivered at once, even while Rambla is in the background: AppKit holds back the ones
+/// observed the usual way while an app is inactive, which Rambla almost always is. Distributed notifications always
+/// arrive on the main thread.
+private final class ImmediateObserver: NSObject {
+    private let action: @MainActor () -> Void
+
+    init(_ name: Notification.Name, _ action: @escaping @MainActor () -> Void) {
+        self.action = action
+        super.init()
+        DistributedNotificationCenter.default().addObserver(self, selector: #selector(fire), name: name, object: nil,
+                                                            suspensionBehavior: .deliverImmediately)
+    }
+
+    deinit {
+        DistributedNotificationCenter.default().removeObserver(self)
+    }
+
+    @objc private func fire() {
+        MainActor.assumeIsolated { action() }
     }
 }

@@ -1,7 +1,8 @@
 // A tiny regular app with plain resizable windows, so live tests never touch the user's real apps.
 // Commands (distributed notification "TestHost.command"): "add", "quit", "hide", "unhide", "minimize N", "restore N",
 // "focus N" (N counts the windows in the order they were made, from 1; the app makes window N its key one, as it would
-// by itself, which is no activation when it is already in front), "label TEXT" (every window shows TEXT).
+// by itself, which is no activation when it is already in front), "label TEXT" (every window shows TEXT), "close-number N"
+// (closes the window whose window number is N).
 import AppKit
 
 final class Host: NSObject, NSApplicationDelegate, NSWindowDelegate {
@@ -27,6 +28,9 @@ final class Host: NSObject, NSApplicationDelegate, NSWindowDelegate {
                         NSApp.activate()
                     }
                 case "label": self?.labels.forEach { $0.stringValue = words.dropFirst().joined(separator: " ") }
+                case "close-number":
+                    let number = words.count > 1 ? Int(words[1]) : nil
+                    self?.windows.first { $0.windowNumber == number }?.close()
                 default: break
                 }
             }

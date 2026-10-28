@@ -201,7 +201,7 @@ Con un solo botón (el del medio, por ejemplo), un clic sin mover sigue funciona
 - Si pasás una ventana a otro escritorio desde Mission Control, Rambla la mueve a la tira de ese escritorio.
 - **⌃⌘N** manda la ventana enfocada a la siguiente pantalla. Si abrís la vista general en una pantalla sin ventanas (en ninguna de sus tiras), te recuerda cómo traer una.
 - Podés desactivar Rambla en una pantalla en Configuración → Pantallas. Ahí no ordena nada.
-- **Recomendado**: dejá activado "Las pantallas tienen Spaces separados" (viene así en macOS). Con dos monitores, lo ideal es poner el segundo **arriba o abajo** del principal en Configuración del Sistema → Pantallas → Organizar. Lado a lado también funciona: las ventanas se asoman como mucho hasta la mitad hacia el otro monitor, y las que quedan fuera de ese lado se estacionan en el borde opuesto (igual entran y salen por su lado).
+- **Recomendado**: dejá activado "Las pantallas tienen Spaces separados" (viene así en macOS). Con dos monitores, lo ideal es poner el segundo **arriba o abajo** del principal en Configuración del Sistema → Pantallas → Organizar. Lado a lado también funciona: las ventanas se asoman como mucho hasta la mitad hacia el otro monitor, y las que quedan fuera de ese lado se estacionan en el borde opuesto (igual entran y salen por su lado). Si la otra pantalla está más baja (por ejemplo, la de la notebook al lado de un monitor), ninguna ventana se asoma sobre ella: macOS o la app la empujarían debajo de su barra de menú y saltaría. Las ventanas entran y salen al ras del borde.
 - Las ventanas en **pantalla completa** (botón verde) salen de la tira mientras están así y vuelven a su lugar cuando salís.
 - Las ventanas **minimizadas** o de apps **ocultas** (⌘H) dejan su lugar sin ocupar espacio y reaparecen en el mismo sitio, aunque mientras tanto conectes otra pantalla o abras la tapa.
 - Si **desconectás una pantalla** (por ejemplo, al sacar la notebook del dock) y pasan más de 15 segundos, sus ventanas se suman a la tira de la pantalla donde las deja macOS. Si cerrás la tapa de la Mac, las de su pantalla se suman enseguida. Con tiras apiladas, cada tira se suma a la que ocupa su mismo lugar, como cuenta el [capítulo 12](#12-tiras-apiladas). **Cuando la volvés a conectar, vuelven a su lugar**, en el mismo orden y con sus anchos. Vuelven las que están a la vista en ese momento: una minimizada o en otro escritorio se queda donde está. Las ventanas que abriste mientras tanto quedan donde estaban. Mientras no vuelve, Rambla recuerda su orden hasta un mes, aunque reinicies; si reiniciás la Mac, reconoce cada ventana por su título.
@@ -251,7 +251,7 @@ Actúan sobre la tira de la ventana enfocada o, si no hay ninguna enfocada, sobr
 
 Al cambiar de tira, aparece un momento un panel con todas las tiras de la pantalla ([capítulo 13](#13-ayudas-visuales)).
 
-Mientras cambia, un velo de vidrio esmerilado cruza la pantalla y tapa el salto de las ventanas. Baja desde arriba cuando vas a la tira de arriba, y sube desde abajo cuando vas a la de abajo. Sigue **Animaciones** y **Velocidad** de Configuración → General: con las animaciones apagadas no hay velo, y con **Reducir movimiento** de macOS aparece y se va sin desplazarse.
+Mientras cambia, un velo de vidrio esmerilado cubre la pantalla y tapa el salto de las ventanas, y cada ventana se vuelve una tarjeta con el color, el ícono y el nombre de su app. Las tarjetas de la tira que dejás se deslizan fuera de la pantalla, y las de la tira que llega entran hasta el lugar de sus ventanas: bajan desde arriba cuando vas a la tira de arriba, y suben desde abajo cuando vas a la de abajo. Después el velo se va, y cada ventana está donde quedó su tarjeta. Sigue **Animaciones** y **Velocidad** de Configuración → General: con las animaciones apagadas no hay velo, y con **Reducir movimiento** de macOS el vidrio aparece y se va, sin tarjetas.
 
 ### Mandar ventanas a otra tira
 
@@ -383,6 +383,8 @@ Los enlaces también sirven en Atajos de Apple, Alfred, Keyboard Maestro, Better
 **Una ventana no entra en la tira.** Rambla deja flotando los diálogos, los paneles y las ventanas que no se pueden redimensionar. Si es una ventana normal, fijate si no la sacaste con ⌃⌘T o con Rectangle (en ese caso, ⌃⌘T la devuelve) y si no tiene una regla "Flotante" en Configuración → Apps.
 
 **Una ventana salió sola de la tira.** Otra app la movió (Rectangle, un doble click en la barra de título, el botón verde con ⌥). Es a propósito: Rambla no pelea con otras apps. Devolvela con ⌃⌘T.
+
+**Después de reiniciar la Mac, una ventana quedó al final de la tira.** Rambla reconoce cada ventana por su app y su título. Si el título cambió (una terminal, un documento abierto en otra página) pero es la única ventana de esa app que le falta a la tira, igual vuelve a su lugar. Si faltan dos de la misma app, quedan al final. Para que las apps vuelvan a abrir sus ventanas, dejá marcada la opción de volver a abrirlas en el diálogo de reiniciar.
 
 **Deslizar con el trackpad cambia de escritorio.** macOS usa el mismo gesto, aunque Configuración del Sistema diga «3 dedos»: mirá la [sección 10](#10-mouse-y-trackpad).
 

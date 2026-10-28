@@ -667,7 +667,58 @@ case "frontmost-is":
     } else {
         fail("the app in front is \(front()), not \(want): a focus given to a window of \(want) now would be an activation, not a move between its windows")
     }
+case "placement-of":
+    // ID: where Rambla puts window ID now (it may still be on its way there), as the X Y W H that `check-frame-near` takes.
+    let id = UInt32(args[1])!
+    let strips = dump()["strips"] as? [[String: Any]] ?? []
+    guard let placement = strips.lazy.compactMap({ ($0["placements"] as? [String: Any])?["\(id)"] as? [String: Any] }).first,
+          let frame = placement["frame"] as? [String: Double] else { failAside("Rambla places no window \(id)") }
+    print([frame["x"], frame["y"], frame["w"], frame["h"]].map { "\(Int(($0 ?? 0).rounded()))" }.joined(separator: " "))
+case "fake-restart":
+    // FILE ID: makes the layout file look saved before a Mac restart (in another login session, so only app and title
+    // tell its windows apart) and gives window ID a title no window has now, as a terminal's changes.
+    let url = URL(fileURLWithPath: args[1]), id = UInt32(args[2])!
+    guard var file = (try? JSONSerialization.jsonObject(with: Data(contentsOf: url))) as? [String: Any] else {
+        fail("no layout file at \(args[1])")
+    }
+    func retitled(_ refs: Any?) -> [[String: Any]] {
+        (refs as? [[String: Any]] ?? []).map { ref in
+            var ref = ref
+            if (ref["id"] as? NSNumber)?.uint32Value == id { ref["title"] = "Prueba de antes" }
+            return ref
+        }
+    }
+    file["session"] = "e2e-earlier-login"
+    file["refs"] = retitled(file["refs"])
+    file["strips"] = (file["strips"] as? [[String: Any]] ?? []).map { strip in
+        var strip = strip
+        strip["session"] = "e2e-earlier-login"
+        strip["refs"] = retitled(strip["refs"])
+        return strip
+    }
+    do {
+        try JSONSerialization.data(withJSONObject: file).write(to: url, options: .atomic)
+    } catch {
+        fail("could not write \(args[1]): \(error.localizedDescription)")
+    }
+    pass("the layout file looks saved before a restart, with window \(id) under a title no window has")
+case "check-saved":
+    // FILE ID yes|no [SECONDS]: window ID is (yes) or is not (no) in a strip of the layout file.
+    let url = URL(fileURLWithPath: args[1]), id = UInt32(args[2])!, want = args[3] == "yes"
+    let timeout = Double(args.count > 4 ? args[4] : "0")!
+    func saved() -> Bool {
+        let file = (try? JSONSerialization.jsonObject(with: Data(contentsOf: url))) as? [String: Any] ?? [:]
+        return (file["strips"] as? [[String: Any]] ?? []).contains { strip in
+            let columns = (strip["strip"] as? [String: Any])?["columns"] as? [[String: Any]] ?? []
+            return columns.contains { ($0["windows"] as? [NSNumber] ?? []).contains { $0.uint32Value == id } }
+        }
+    }
+    if waitUntil(timeout, { saved() == want }) {
+        pass("window \(id) is \(want ? "" : "not ")in the layout file")
+    } else {
+        fail("window \(id) is \(want ? "not " : "")in the layout file, and should \(want ? "be" : "not be")")
+    }
 default:
-    print("usage: e2e-check wait-columns N | settle | check-tiles | check-parked | check-focused-visible | check-focused-index N | check-gathered | check-floating ID | check-frame ID X Y | column-order | check-order IDS | check-columns IDS | window-at N | neighbor-right | watch-hidden ID COMMAND... | watch-enters ID right|left COMMAND... | watch-leaves ID right|left COMMAND... | wait-displays N [S] | other-display | wait-columns-on UUID N [S] | watch-until-displays N sliver|half ID | watch-reparked ID COMMAND... | watch-moves-once ID COMMAND... | check-levels COUNT ACTIVE [S] | check-levels-on UUID COUNT ACTIVE [S] | check-shelved COUNT [X Y W H] | check-float-parked ID [X Y W H] | level-of ID [LEVEL [S]] | check-not-floating ID | frame-of ID | check-frame-near ID X Y W H | window-number ID | pointer-to-display | check-paused true|false [S] | resume | frontmost-is BUNDLE [S]")
+    print("usage: e2e-check wait-columns N | settle | check-tiles | check-parked | check-focused-visible | check-focused-index N | check-gathered | check-floating ID | check-frame ID X Y | column-order | check-order IDS | check-columns IDS | window-at N | neighbor-right | watch-hidden ID COMMAND... | watch-enters ID right|left COMMAND... | watch-leaves ID right|left COMMAND... | wait-displays N [S] | other-display | wait-columns-on UUID N [S] | watch-until-displays N sliver|half ID | watch-reparked ID COMMAND... | watch-moves-once ID COMMAND... | check-levels COUNT ACTIVE [S] | check-levels-on UUID COUNT ACTIVE [S] | check-shelved COUNT [X Y W H] | check-float-parked ID [X Y W H] | level-of ID [LEVEL [S]] | check-not-floating ID | frame-of ID | check-frame-near ID X Y W H | window-number ID | pointer-to-display | check-paused true|false [S] | resume | frontmost-is BUNDLE [S] | placement-of ID | fake-restart FILE ID | check-saved FILE ID yes|no [S]")
     exit(2)
 }

@@ -201,7 +201,7 @@ With a single button (the middle one, say), a click without moving still works a
 - If you move a window to another desktop from Mission Control, Rambla moves it to that desktop's strip.
 - **⌃⌘N** sends the focused window to the next display. If you open the overview on a display without windows (on none of its strips), it reminds you how to bring one.
 - You can turn Rambla off for a display in Settings → Displays. Nothing is arranged there.
-- **Recommended**: keep "Displays have separate Spaces" on (the macOS default). With two monitors, ideally place the second one **above or below** the main one in System Settings → Displays → Arrange. Side by side works too: windows peek at most halfway toward the other monitor, and those beyond that side are parked on the opposite edge (they still come and go through their own side).
+- **Recommended**: keep "Displays have separate Spaces" on (the macOS default). With two monitors, ideally place the second one **above or below** the main one in System Settings → Displays → Arrange. Side by side works too: windows peek at most halfway toward the other monitor, and those beyond that side are parked on the opposite edge (they still come and go through their own side). If the other screen sits lower (a laptop's screen next to a monitor, say), no window peeks over it: macOS or the app would push it down below that screen's menu bar and it would jump. Windows come and go flush with the edge.
 - **Full-screen** windows (green button) leave the strip while they are full screen and come back to their place when you exit.
 - **Minimized** windows and windows of **hidden** apps (⌘H) leave their place without taking space and reappear in the same spot, even if you plug in another display or open the lid meanwhile.
 - If you **unplug a display** (taking a laptop off its dock, for example) and more than 15 seconds go by, its windows join the strip of the display macOS moves them to. If you close the Mac's lid, the ones on its screen join right away. With stacked strips, each strip joins the one in the same place, as [chapter 12](#12-stacked-strips) explains. **When you plug it back in, they go back to their places**, in the same order and with their widths. The ones that go back are those on screen at that moment: a minimized one, or one on another desktop, stays where it is. Windows you opened meanwhile stay where they are. Until it returns, Rambla remembers its arrangement for up to a month, even across restarts; after the Mac restarts, it recognizes each window by its title.
@@ -251,7 +251,7 @@ They act on the strip of the focused window or, if no window is focused, on the 
 
 When you switch strips, a panel with all the strips of the display shows up for a moment ([chapter 13](#13-visual-aids)).
 
-While it switches, a frosted-glass veil crosses the screen and hides the jump of the windows. It comes down from above when you go to the strip above, and up from below when you go to the strip below. It follows **Animations** and **Speed** in Settings → General: with animations off there is no veil, and with macOS's **Reduce motion** it fades in and out without moving.
+While it switches, a frosted-glass veil covers the screen and hides the jump of the windows, and each window turns into a card with its app's color, icon and name. The cards of the strip you leave slide off the screen, and those of the strip that comes slide in to their windows' places: down from above when you go to the strip above, and up from below when you go to the strip below. Then the veil goes, and each window is where its card landed. It follows **Animations** and **Speed** in Settings → General: with animations off there is no veil, and with macOS's **Reduce motion** the glass fades in and out, with no cards.
 
 ### Sending windows to another strip
 
@@ -383,6 +383,8 @@ The links also work in Apple Shortcuts, Alfred, Keyboard Maestro, BetterTouchToo
 **A window is not on the strip.** Rambla leaves dialogs, panels and windows that cannot be resized floating. If it is a normal window, check whether you took it out with ⌃⌘T or with Rectangle (in that case, ⌃⌘T puts it back) and whether it has a **Float** rule in Settings → Apps.
 
 **A window left the strip by itself.** Another app moved it (Rectangle, a double-click on the title bar, the green button with ⌥). That is on purpose: Rambla does not fight other apps. Put it back with ⌃⌘T.
+
+**After restarting the Mac, a window ended up at the end of the strip.** Rambla recognizes each window by its app and its title. If the title changed (a terminal, a document open on another page) but it is the only window of that app the strip is missing, it still goes back to its place. If two of the same app are missing, they go to the end. For apps to reopen their windows, leave **Reopen windows when logging back in** checked in the restart dialog.
 
 **Swiping on the trackpad switches desktops.** macOS uses the same gesture, even when System Settings says three fingers: see [section 10](#10-mouse-and-trackpad).
 

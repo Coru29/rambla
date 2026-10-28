@@ -280,26 +280,60 @@ public enum StateMatcher {
     /// its display is `returning`, a level archived when the display was unplugged takes its windows back from
     /// wherever they are (`onScreen`: every window on screen the user did not float), by id or, after a Mac restart,
     /// by a title that is its app's alone. Any other level takes them from `free`, the windows no other stack holds,
-    /// as `match` allows. Levels below 0 (only a hand-edited file has them), a second strip of the same level, and the
-    /// levels none of whose windows are here are left out.
+    /// as `match` allows. After a Mac restart, an app with one window of the stack that no level found, and one window
+    /// `shownHere` (among `free`, shown on the stack's display) that no level took, has found it: a terminal's title
+    /// changes all the time, and a document may come back on another page. Levels below 0 (only a hand-edited file has
+    /// them), a second strip of the same level, and the levels none of whose windows are here are left out.
     public static func restoredLevels(_ saved: [SavedStrip], free: [WindowRef], onScreen: [WindowRef], returning: Bool,
-                                      current: String, alive: Set<WindowID>) -> [Int: Strip] {
+                                      current: String, alive: Set<WindowID>,
+                                      shownHere: Set<WindowID> = []) -> [Int: Strip] {
         var firsts: [Int: SavedStrip] = [:]
         for strip in saved where strip.level >= 0 && firsts[strip.level] == nil { firsts[strip.level] = strip }
-        var levels: [Int: Strip] = [:]
+        let order = firsts.keys.sorted()
+        var maps: [Int: [WindowID: WindowID]] = [:]
         var taken = Set<WindowID>()
-        for level in firsts.keys.sorted() {
+        for level in order {
             let strip = firsts[level]!
             let takesBack = returning && strip.unplugged
             let live = (takesBack ? onScreen : free).filter { !taken.contains($0.id) }
             let map = match(saved: strip.refs, live: live, session: strip.session, current: current, alive: alive,
                             byTitle: !takesBack || strip.session != current, uniqueTitles: takesBack)
-            let rebuilt = strip.strip.remapped(map)
-            guard !rebuilt.columns.isEmpty else { continue }
-            taken.formUnion(rebuilt.allWindows)
-            levels[level] = rebuilt
+            maps[level] = map
+            taken.formUnion(strip.strip.remapped(map).allWindows)
+        }
+        let left = free.filter { shownHere.contains($0.id) && !taken.contains($0.id) }
+        for (level, savedID, liveID) in loneWindows(firsts, found: maps, left: left, returning: returning,
+                                                    current: current) {
+            maps[level]![savedID] = liveID
+        }
+        var levels: [Int: Strip] = [:]
+        for level in order {
+            let rebuilt = firsts[level]!.strip.remapped(maps[level]!)
+            if !rebuilt.columns.isEmpty { levels[level] = rebuilt }
         }
         return levels
+    }
+
+    /// After a Mac restart: each window of the stack (`firsts`, by level) that no level found (`found`) and is the only
+    /// one of its app the stack misses, with its app's only window among `left`. Only for levels saved in an earlier
+    /// session, since in this one an id names its window, and never for a level taking its windows back while its
+    /// display returns.
+    private static func loneWindows(_ firsts: [Int: SavedStrip], found: [Int: [WindowID: WindowID]], left: [WindowRef],
+                                    returning: Bool, current: String) -> [(level: Int, saved: WindowID, live: WindowID)] {
+        var missing: [String: [(level: Int, id: WindowID)]] = [:]
+        for (level, strip) in firsts {
+            let windows = Set(strip.strip.allWindows)
+            for ref in strip.refs where windows.contains(ref.id) && found[level]?[ref.id] == nil {
+                missing[ref.bundleID, default: []].append((level, ref.id))
+            }
+        }
+        let leftByApp = Dictionary(grouping: left, by: \.bundleID)
+        return missing.compactMap { app, windows in
+            guard !app.isEmpty, windows.count == 1, let live = leftByApp[app], live.count == 1,
+                  let strip = firsts[windows[0].level], strip.session != current, !(returning && strip.unplugged)
+            else { return nil }
+            return (windows[0].level, windows[0].id, live[0].id)
+        }
     }
 }
 
