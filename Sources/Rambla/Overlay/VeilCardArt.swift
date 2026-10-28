@@ -64,12 +64,11 @@ enum VeilCardArt {
         let label: CGFloat = 20, spacing: CGFloat = 12
         let named = !app.isEmpty && room.height > side + spacing + label + 40 && room.width > 120
         let top = (room.height + side + (named ? spacing + label : 0)) / 2
-        if let icon, side > 0 {
+        if let icon, side > 0, let image = bitmap(of: icon, side: side, scale: scale) {
             let picture = CALayer()
             picture.frame = CGRect(x: (size.width - side) / 2, y: top - side, width: side, height: side)
-            let contentsScale = icon.recommendedLayerContentsScale(scale)
-            picture.contents = icon.layerContents(forContentsScale: contentsScale)
-            picture.contentsScale = contentsScale
+            picture.contents = image
+            picture.contentsScale = scale
             picture.contentsGravity = .resizeAspect
             picture.shadowColor = NSColor.black.cgColor
             picture.shadowOpacity = 0.35
@@ -83,6 +82,24 @@ enum VeilCardArt {
             body.addSublayer(name)
         }
         return card
+    }
+
+    /// `icon` drawn `side` points wide for `scale` pixels per point, from its pictures that size or larger: an app's
+    /// icon comes 32 points wide, and Core Animation would stretch that one.
+    private static func bitmap(of icon: NSImage, side: CGFloat, scale: CGFloat) -> CGImage? {
+        let pixels = max(1, Int((side * scale).rounded()))
+        guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(data: nil, width: pixels, height: pixels, bitsPerComponent: 8, bytesPerRow: 0,
+                                      space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+            return nil
+        }
+        context.interpolationQuality = .high
+        let previous = NSGraphicsContext.current
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
+        icon.draw(in: CGRect(x: 0, y: 0, width: pixels, height: pixels), from: .zero, operation: .copy, fraction: 1,
+                  respectFlipped: false, hints: [.interpolation: NSNumber(value: NSImageInterpolation.high.rawValue)])
+        NSGraphicsContext.current = previous
+        return context.makeImage()
     }
 
     private static func text(_ string: String, size: CGFloat, weight: NSFont.Weight, alpha: CGFloat,
