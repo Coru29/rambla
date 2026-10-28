@@ -251,7 +251,7 @@ Actúan sobre la tira de la ventana enfocada o, si no hay ninguna enfocada, sobr
 
 Al cambiar de tira, aparece un momento un panel con todas las tiras de la pantalla ([capítulo 13](#13-ayudas-visuales)).
 
-Mientras cambia, un velo de vidrio esmerilado cruza la pantalla y tapa el salto de las ventanas. Baja desde arriba cuando vas a la tira de arriba, y sube desde abajo cuando vas a la de abajo. Sigue **Animaciones** y **Velocidad** de Configuración → General: con las animaciones apagadas no hay velo, y con **Reducir movimiento** de macOS aparece y se va sin desplazarse.
+Mientras cambia, un velo de vidrio esmerilado cubre la pantalla y tapa el salto de las ventanas, y cada ventana se vuelve una tarjeta con el color, el ícono y el nombre de su app. Las tarjetas de la tira que dejás se deslizan fuera de la pantalla, y las de la tira que llega entran hasta el lugar de sus ventanas: bajan desde arriba cuando vas a la tira de arriba, y suben desde abajo cuando vas a la de abajo. Después el velo se va, y cada ventana está donde quedó su tarjeta. Sigue **Animaciones** y **Velocidad** de Configuración → General: con las animaciones apagadas no hay velo, y con **Reducir movimiento** de macOS el vidrio aparece y se va, sin tarjetas.
 
 ### Mandar ventanas a otra tira
 

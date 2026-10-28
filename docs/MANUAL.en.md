@@ -251,7 +251,7 @@ They act on the strip of the focused window or, if no window is focused, on the 
 
 When you switch strips, a panel with all the strips of the display shows up for a moment ([chapter 13](#13-visual-aids)).
 
-While it switches, a frosted-glass veil crosses the screen and hides the jump of the windows. It comes down from above when you go to the strip above, and up from below when you go to the strip below. It follows **Animations** and **Speed** in Settings → General: with animations off there is no veil, and with macOS's **Reduce motion** it fades in and out without moving.
+While it switches, a frosted-glass veil covers the screen and hides the jump of the windows, and each window turns into a card with its app's color, icon and name. The cards of the strip you leave slide off the screen, and those of the strip that comes slide in to their windows' places: down from above when you go to the strip above, and up from below when you go to the strip below. Then the veil goes, and each window is where its card landed. It follows **Animations** and **Speed** in Settings → General: with animations off there is no veil, and with macOS's **Reduce motion** the glass fades in and out, with no cards.
 
 ### Sending windows to another strip
 
