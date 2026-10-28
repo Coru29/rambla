@@ -188,14 +188,15 @@ private final class DisplayVeil: NSObject {
 
     // MARK: - Cards
 
-    /// The veil comes: a card over each window shown, where it is.
+    /// The veil comes: a card over each window shown, where it is, the focused window's on top.
     private func showCards() {
         clearCards()
         guard !reduceMotion, let scene, let stageLayer = stage.layer else { return }
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        for item in scene() {
+        for (index, item) in scene().enumerated() {
             let card = makeCard(item)
+            card.layer.zPosition = CGFloat(index)
             cards[item.id] = card
             stageLayer.addSublayer(card.layer)
         }
@@ -204,7 +205,8 @@ private final class DisplayVeil: NSObject {
 
     /// The switches ran: the cards of the windows shown now slide to their places, those on the veil already from where
     /// they are and the others from off the display on the side the content comes from, and the other cards slide off
-    /// it the other way.
+    /// it the other way, under them. The focused window's card goes on top: one taken along to the strip that comes
+    /// stays in sight as it crosses.
     private func slideCards() {
         guard !reduceMotion, let scene, let stageLayer = stage.layer else { return }
         let distance = LevelTransition.slideDistance(height: Double(stage.bounds.height))
@@ -215,7 +217,7 @@ private final class DisplayVeil: NSObject {
         var shown = Set<WindowID>()
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        for item in scene() {
+        for (index, item) in scene().enumerated() {
             shown.insert(item.id)
             let rect = localRect(item.frame)
             let home = CGPoint(x: rect.midX, y: rect.midY)
@@ -225,15 +227,18 @@ private final class DisplayVeil: NSObject {
                     // On the veil already (its window comes along, or comes back): from where it is.
                     card.leaving = false
                     card.home = home
+                    card.layer.zPosition = CGFloat(index)
                     moved = move(card.layer, to: home, duration: duration) || moved
                     continue
                 }
                 // Another size: that card goes with the strip that leaves, and another one comes.
                 replaced.append(card)
+                card.layer.zPosition = -1
                 moved = move(card.layer, to: CGPoint(x: card.home.x, y: card.home.y + leave), duration: duration) || moved
             }
             let card = makeCard(item)
             card.layer.position = CGPoint(x: home.x, y: home.y + enter)
+            card.layer.zPosition = CGFloat(index)
             cards[item.id] = card
             stageLayer.addSublayer(card.layer)
             moved = move(card.layer, to: home, duration: duration) || moved
@@ -241,6 +246,7 @@ private final class DisplayVeil: NSObject {
         for (id, card) in cards where !shown.contains(id) && !card.leaving {
             // Its window went with the strip that left.
             card.leaving = true
+            card.layer.zPosition = -1
             moved = move(card.layer, to: CGPoint(x: card.home.x, y: card.home.y + leave), duration: duration) || moved
         }
         CATransaction.commit()
