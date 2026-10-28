@@ -48,7 +48,7 @@ Every window is a column on one horizontal strip that keeps going past the edges
 
 ## Privacy
 
-Rambla collects no data and has no telemetry. It does not read window contents or record the screen. Its only network request is a check of GitHub for a new release, shortly after it starts and once a day, which you can turn off in Settings → General. See [SECURITY.md](SECURITY.md).
+Rambla collects no data and has no telemetry. It does not read window contents or record the screen. Its only network request is a check of GitHub for a new release, shortly after it starts and once a day, which you can turn off in Settings → General. If you turn on **Site icons** (Settings → Appearance, off unless you do), it also reads the address of the page each browser window shows and asks those sites for their icons, with no cookies, keeping them only in memory. See [SECURITY.md](SECURITY.md).
 
 ## Requirements
 
