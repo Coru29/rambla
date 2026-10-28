@@ -131,7 +131,7 @@ struct GeneralView: View {
         Section {
             Toggle("Buscar actualizaciones automáticamente", isOn: $store.prefs.checkForUpdates)
         } footer: {
-            Text("Rambla consulta GitHub al arrancar y una vez por día. Es su única conexión a internet y no envía nada tuyo. Desde el menú podés buscar a mano cuando quieras.")
+            Text("Rambla consulta GitHub al arrancar y una vez por día, y no envía nada tuyo. Es su única conexión a internet, salvo los íconos de los sitios si los activás en Apariencia. Desde el menú podés buscar a mano cuando quieras.")
         }
     }
 

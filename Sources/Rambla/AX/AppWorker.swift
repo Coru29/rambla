@@ -212,6 +212,15 @@ final class AppWorker: @unchecked Sendable {
         }
     }
 
+    /// Reads the address of the page a browser window shows (`AX.pageURL`), and calls `completion` with it on the main
+    /// thread: nil when it shows none, or is gone.
+    func readPage(_ id: WindowID, _ completion: @escaping (URL?) -> Void) {
+        perform { [self] in
+            let url = windows[id].flatMap { AX.pageURL($0) }
+            DispatchQueue.main.async { completion(url) }
+        }
+    }
+
     /// Calls `done` on the main thread once this worker has done everything asked of it before, the frame writes
     /// included: it takes them in order.
     func afterPendingWork(_ done: @escaping @Sendable () -> Void) {

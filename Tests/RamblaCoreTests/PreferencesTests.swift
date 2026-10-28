@@ -52,6 +52,13 @@ private func decodePreferences(_ json: String) throws -> Preferences {
     #expect(p.appRules.isEmpty)
     #expect(p.disabledDisplays.isEmpty)
     #expect(p.shortcutOverrides.isEmpty)
+    #expect(p.siteIcons == false)
+}
+
+@Test func siteIconsAreOnlyOnceTurnedOn() throws {
+    // They connect to the sites a browser shows: a preferences file from before them leaves them off.
+    #expect(try decodePreferences(#"{"checkForUpdates": true}"#).siteIcons == false)
+    #expect(try decodePreferences(#"{"siteIcons": true}"#).siteIcons == true)
 }
 
 @Test func preferencesPartialJSONKeepsOtherDefaults() throws {
